@@ -1,164 +1,320 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns="http://www.w3.org/1999/html" lang="es">
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>T212 Visualizer</title>
     <style>
-        body { font-family: system-ui, sans-serif; background: #0f1115; color: #e6e6e6; margin: 2rem; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
-        th, td { text-align: left; padding: 0.6rem 1rem; border-bottom: 1px solid #2a2d35; }
-        th { color: #9aa0ab; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
-        .positive { color: #4ade80; }
-        .negative { color: #f87171; }
-        button { background: #2563eb; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; }
-        button:hover { background: #1d4ed8; }
+        /* ===== Colores de la app (se cambian aquí y afectan a toda la página) ===== */
+        :root {
+            color-scheme: dark;     /* le dice al navegador que la página es oscura: sus controles (scroll, buscador…) también lo serán */
+            --bg: #0f1115;          /* fondo de la página */
+            --panel: #171a21;       /* fondo de los recuadros */
+            --border: #2a2d35;      /* bordes y líneas separadoras */
+            --text: #e6e6e6;        /* texto principal */
+            --muted: #9aa0ab;       /* texto secundario (gris) */
+            --accent: #60a5fa;      /* azul de resaltado */
+            --accent-bg: #1e3a5f;   /* azul oscuro de fondos (etiquetas, píldoras) */
+            --green: #4ade80;
+            --red: #f87171;
+        }
 
+        /* ===== Estructura general: la página ocupa justo la pantalla, sin scroll ===== */
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;     /* barra arriba, contenido debajo */
+            overflow: hidden;           /* la página no baja: el scroll va dentro de cada recuadro */
+        }
+
+        /* ===== Barra superior ===== */
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+        }
+        .brand { font-weight: 700; font-size: 1.05rem; }
+        .brand span { color: var(--accent); }
+        .nav { display: flex; gap: 1.25rem; flex: 1; }   /* flex: 1 empuja el botón a la derecha */
+        .nav a, .nav span { font-size: 0.9rem; text-decoration: none; }
+        .nav a { color: var(--text); }
+        .nav a.active { color: var(--accent); }
+        .nav .soon { color: var(--muted); opacity: 0.5; cursor: default; }   /* secciones aún no hechas */
+
+        button { font: inherit; border: none; cursor: pointer; }
+        .refresh-btn {
+            background: #2563eb;
+            color: white;
+            padding: 0.45rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+        .refresh-btn:hover { background: #1d4ed8; }
+        .refresh-btn:disabled { opacity: 0.6; cursor: wait; }
+
+        /* ===== Contenido: dos columnas que llenan el resto de la pantalla ===== */
+        .layout {
+            flex: 1;                    /* ocupa todo el alto que deja la barra */
+            min-height: 0;              /* imprescindible para que el scroll interno funcione */
+            display: grid;
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);   /* posiciones 60% · noticias 40% */
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+        }
+
+        /* Cada recuadro: título arriba y contenido con su propio scroll */
         .card {
-            background: #171a21;
-            border: 1px solid #2a2d35;
+            background: var(--panel);
+            border: 1px solid var(--border);
             border-radius: 10px;
             padding: 1rem 1.25rem;
-            margin-top: 2rem;
-            max-height: 420px;
-            overflow-y: auto;
-        }
-        .card h2 {margin-top: 0; font-size: 1.1rem; }
-
-        .news-list {list-style: none; padding: 0; margin: 0; }
-        .news-list li {
             display: flex;
-            gap: 0.75rem;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #2a2d35;
+            flex-direction: column;
+            min-height: 0;
         }
-        .news-list li:last-child {border-bottom: none; }
-        .news-time {color: #9aa0ab; font-size: 0.8rem; white-space: nowrap; }
-        .news-list a { color: #e6e6e6; text-decoration: none; }
-        .news-list a:hover { color: #60a5fa; text-decoration: underline; }
-
-        .hidden {display: none}
-
-        .tabs {
+        .card-header {
             display: flex;
-            gap: 1rem;
+            align-items: baseline;
+            justify-content: space-between;
             margin-bottom: 0.75rem;
-            border-bottom: 1px solid #2a2d35;
         }
+        .card-header h2 { margin: 0; font-size: 1rem; }
+        .card-header .count { color: var(--muted); font-size: 0.8rem; }
+        .scroll { flex: 1; min-height: 0; overflow-y: auto; }   /* la zona que hace scroll */
 
+        /* Barras de scroll discretas: finas e invisibles, solo aparecen al pasar el ratón por el recuadro */
+        .scroll {
+            scrollbar-width: thin;                         /* barra fina */
+            scrollbar-color: transparent transparent;      /* (color de la barra, color del carril): invisibles */
+        }
+        .scroll:hover { scrollbar-color: #3a3f4b transparent; }   /* al pasar el ratón: gris oscuro */
+
+        /* Lo mismo para Safari, que todavía usa su propia forma de escribirlo */
+        .scroll::-webkit-scrollbar { width: 6px; }
+        .scroll::-webkit-scrollbar-track { background: transparent; }
+        .scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+        .scroll:hover::-webkit-scrollbar-thumb { background: #3a3f4b; }
+
+        /* ===== Tabla de posiciones, compacta ===== */
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); }
+        th {
+            color: var(--muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            position: sticky;           /* la cabecera se queda fija al hacer scroll */
+            top: 0;
+            background: var(--panel);
+        }
+        tbody tr:hover { background: #1c2029; }
+        .num {
+            text-align: right;                  /* números alineados a la derecha, como en cualquier app financiera */
+            font-variant-numeric: tabular-nums; /* todas las cifras del mismo ancho: las columnas cuadran */
+            white-space: nowrap;
+        }
+        .symbol { font-weight: 600; }
+        .company {
+            display: block;
+            color: var(--muted);
+            font-size: 0.72rem;
+            max-width: 220px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;    /* nombres largos acaban en "…" */
+        }
+        .positive { color: var(--green); }
+        .negative { color: var(--red); }
+        .empty { color: var(--muted); font-size: 0.85rem; }
+
+        /* ===== Noticias ===== */
+        .tabs { display: flex; gap: 1rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
         .tab {
             background: transparent;
-            color: #9aa0ab;
-            border-radius: 0;
-            padding: 0.5rem 0.25rem;
+            color: var(--muted);
+            padding: 0.4rem 0.25rem;
             border-bottom: 2px solid transparent;
         }
-        .tab:hover {background: transparent; color: #e6e6e6;}
-        .tab.active {color: #e6e6e6; border-bottom-color: #60a5fa;}
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 
-        .ticker-badge {
-            background: #1e3a5f;
-            color: #93c5fd;
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 0.1rem 0.45rem;
-            border-radius: 4px;
-            white-space: nowrap;
-            align-self: center;
-        }
-
-        .filters {display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem;}
-
-        .chip {
-            background: transparent;
-            color: #9aa0ab;
-            border: 1px solid #2a2d35;
-            border-radius: 999px;
-            padding: 0.2rem 0.7rem;
-            font-size: 0.75rem;
-        }
-        .chip:hover {background: transparent; color: #e6e6e6; border-color: #60a5fa;}
-        .chip.active {background: #1e3a5f; color: #93c5fd; border-color: #1e3a5f;}
-
-        .ticker-badge { cursor: pointer; }
-        .ticker-badge:hover { background: #2563eb; color: white; }
+        #portfolio { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
         .search {
             width: 100%;
-            box-sizing: border-box;
-            background: #0f1115;
-            color: #e6e6e6;
-            border: 1px solid #2a2d35;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
             border-radius: 6px;
             padding: 0.45rem 0.7rem;
             margin-bottom: 0.6rem;
             font: inherit;
             font-size: 0.85rem;
         }
-        .search:focus { outline: none; border-color: #60a5fa; }
-    </style>
+        .search:focus { outline: none; border-color: var(--accent); }
 
+        .filters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+        .chip {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 0.15rem 0.65rem;
+            font-size: 0.75rem;
+        }
+        .chip:hover { color: var(--text); border-color: var(--accent); }
+        .chip.active { background: var(--accent-bg); color: #93c5fd; border-color: var(--accent-bg); }
+
+        .news-list { list-style: none; padding: 0; margin: 0; }
+        .news-list li {
+            display: flex;
+            gap: 0.6rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.875rem;
+        }
+        .news-list li:last-child { border-bottom: none; }
+        .news-time { color: var(--muted); font-size: 0.75rem; white-space: nowrap; padding-top: 0.1rem; }
+        .news-list a { color: var(--text); text-decoration: none; }
+        .news-list a:hover { color: var(--accent); text-decoration: underline; }
+
+        .ticker-badge {
+            background: var(--accent-bg);
+            color: #93c5fd;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.1rem 0.45rem;
+            border-radius: 4px;
+            white-space: nowrap;
+            align-self: flex-start;
+            cursor: pointer;
+        }
+        .ticker-badge:hover { background: #2563eb; color: white; }
+
+        /* Ocultar: con !important para que gane siempre, aunque otra regla diga display:flex */
+        .hidden { display: none !important; }
+
+        /* ===== Pantallas estrechas (móvil, ventana pequeña): una sola columna y la página sí baja ===== */
+        @media (max-width: 900px) {
+            body { overflow: auto; height: auto; }
+            .layout { grid-template-columns: 1fr; }
+            .card { max-height: 70vh; }
+            .nav { display: none; }
+        }
+    </style>
 </head>
 <body>
-    <h1>Mi cartera</h1>
-    <button onclick="refresh()">Actualizar desde T212</button>
 
-    <table>
-        <thead>
-        <tr>
-            <th>Ticker</th>
-            <th>Cantidad</th>
-            <th>Precio medio</th>
-            <th>Precio actual</th>
-            <th>Valor</th>
-            <th>P/L %</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="p : ${positions}">
-            <td th:text="${p.symbol}">TICKER</td>
-            <td th:text="${#numbers.formatDecimal(p.quantity, 1, 4)}">0</td>
-            <td th:text="${#numbers.formatDecimal(p.averagePricePaid, 1, 2)}">0</td>
-            <td th:text="${#numbers.formatDecimal(p.currentPrice, 1, 2)}">0</td>
-            <td th:text="${#numbers.formatDecimal(p.currentValue, 1, 2)}">0</td>
-            <td th:text="${#numbers.formatDecimal(p.unrealizedPlPercent, 1, 2)} + '%'"
-                th:classappend="${p.unrealizedPlPercent >= 0} ? 'positive' : 'negative'">0%</td>
-        </tr>
-        </tbody>
-    </table>
-    <p th:if="${positions.isEmpty()}">
-        Sin datos todavía — pulsa "Actualizar desde T212" (o espera al primer ciclo del scheduler).
-    </p>
-    <div class="card">
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('portfolio', this)">Mi cartera </button>
-            <button class="tab" onclick="showTab('market', this)">Mercado </button>
-        </div>
-        <div id="portfolio">
-            <input type="search" id="news-search" class="search" placeholder="Buscar ticker" oninput="searchNews(this.value)">
-            <div class="filters">
-                <button class="chip active" data-ticker="ALL" onclick="filterNews(this.dataset.ticker)">Todas</button>
-                <button class="chip" th:each="t: ${portfolioTickers}" th:data-ticker="${t}" th:text="${t}"
-                        onclick="filterNews(this.dataset.ticker)">AAPL</button>
+    <!-- ===== Barra superior ===== -->
+    <header class="topbar">
+        <div class="brand">T212 <span>Visualizer</span></div>
+        <nav class="nav">
+            <a href="/" class="active">Cartera</a>
+            <span class="soon" title="Próximamente">Calendario</span>
+            <span class="soon" title="Próximamente">Sectores</span>
+            <span class="soon" title="Próximamente">Gastos</span>
+        </nav>
+        <button id="refresh-btn" class="refresh-btn" onclick="refresh()">⟳ Actualizar</button>
+    </header>
+
+    <main class="layout">
+
+        <!-- ===== Columna izquierda: posiciones ===== -->
+        <section class="card">
+            <div class="card-header">
+                <h2>Posiciones</h2>
+                <span class="count" th:text="${positions.size()} + ' valores'">0 valores</span>
             </div>
-            <ul class="news-list">
-                <li th:each="n : ${portfolioNews}" th:data-ticker="${n.related()}">
+            <div class="scroll">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Valor</th>
+                        <th class="num">Cantidad</th>
+                        <th class="num">Precio medio</th>
+                        <th class="num">Precio actual</th>
+                        <th class="num">Valor total</th>
+                        <th class="num">P/L %</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="p : ${positions}">
+                        <td>
+                            <span class="symbol" th:text="${p.symbol}">AAPL</span>
+                            <span class="company" th:text="${p.name}">Apple Inc.</span>
+                        </td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.quantity, 1, 4)}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.averagePricePaid, 1, 2)}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.currentPrice, 1, 2)}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.currentValue, 1, 2)}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.unrealizedPlPercent, 1, 2)} + '%'"
+                            th:classappend="${p.unrealizedPlPercent >= 0} ? 'positive' : 'negative'">0%</td>
+                    </tr>
+                    </tbody>
+                </table>
+                <p class="empty" th:if="${positions.isEmpty()}">
+                    Sin datos todavía — pulsa "Actualizar" (o espera al primer ciclo del scheduler).
+                </p>
+            </div>
+        </section>
+
+        <!-- ===== Columna derecha: noticias ===== -->
+        <section class="card">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('portfolio', this)">Mi cartera</button>
+                <button class="tab" onclick="showTab('market', this)">Mercado</button>
+            </div>
+
+            <div id="portfolio">
+                <input type="search" id="news-search" class="search" placeholder="Buscar ticker o palabra…" oninput="searchNews(this.value)">
+                <div class="filters">
+                    <button class="chip active" data-ticker="ALL" onclick="filterNews(this.dataset.ticker)">Todas</button>
+                    <button class="chip" th:each="t : ${portfolioTickers}" th:data-ticker="${t}" th:text="${t}"
+                            onclick="filterNews(this.dataset.ticker)">AAPL</button>
+                </div>
+                <ul class="news-list scroll">
+                    <li class="empty" th:if="${portfolioNews.isEmpty()}">Cargando noticias de tu cartera… recarga en unos segundos.</li>
+                    <li th:each="n : ${portfolioNews}" th:data-ticker="${n.related()}">
+                        <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
+                        <span class="ticker-badge" th:text="${n.related()}" th:data-ticker="${n.related()}" onclick="filterNews(this.dataset.ticker)">AAPL</span>
+                        <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Titular</a>
+                    </li>
+                </ul>
+            </div>
+
+            <ul class="news-list scroll hidden" id="market">
+                <li th:each="n : ${news}">
                     <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
-                    <span class="ticker-badge" th:text="${n.related()}" th:data-ticker="${n.related()}" onclick="filterNews(this.dataset.ticker)"> </span>
                     <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Titular</a>
                 </li>
             </ul>
-        </div>
-        <ul class="news-list hidden" id="market">
-            <li th:each="n : ${news}">
-                <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
-                <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Titular</a>
-            </li>
-        </ul>
-    </div>
+        </section>
+
+    </main>
+
     <script>
         function refresh() {
-            fetch('/api/refresh', { method: 'POST' }).then(response => {if (response.ok)  location.reload();
-            else response.text().then(mensaje => alert('Error al actualizar: ' + mensaje));
+            // Mientras se actualiza, el botón se desactiva (evita pulsarlo varias veces seguidas y pasarse del límite de T212)
+            const button = document.getElementById('refresh-btn');
+            button.disabled = true;
+            button.textContent = 'Actualizando…';
+
+            fetch('/api/refresh', { method: 'POST' }).then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    response.text().then(mensaje => alert('Error al actualizar: ' + mensaje));
+                    button.disabled = false;
+                    button.textContent = '⟳ Actualizar';
+                }
             });
         }
 
@@ -182,11 +338,10 @@
                 ticker = 'ALL';
             }
 
-            document.querySelectorAll('#portfolio li').forEach(li => {
+            document.querySelectorAll('#portfolio li[data-ticker]').forEach(li => {
                 if (ticker === 'ALL' || li.dataset.ticker === ticker) {
                     li.classList.remove('hidden');
-                }
-                else {
+                } else {
                     li.classList.add('hidden');
                 }
             });
@@ -198,7 +353,7 @@
         function searchNews(text) {
             const query = text.trim().toLowerCase();
 
-            document.querySelectorAll('#portfolio li').forEach(li => {
+            document.querySelectorAll('#portfolio li[data-ticker]').forEach(li => {
                 if (query === '' || li.textContent.toLowerCase().includes(query)) {
                     li.classList.remove('hidden');
                 } else {
@@ -209,7 +364,6 @@
             document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
             document.querySelector('.chip[data-ticker="ALL"]').classList.add('active');
         }
-
     </script>
 </body>
 </html>
