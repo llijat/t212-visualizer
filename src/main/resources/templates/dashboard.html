@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns="http://www.w3.org/1999/html" lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>T212 Visualizer</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #0f1115; color: #e6e6e6; margin: 2rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+        th, td { text-align: left; padding: 0.6rem 1rem; border-bottom: 1px solid #2a2d35; }
+        th { color: #9aa0ab; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
+        .positive { color: #4ade80; }
+        .negative { color: #f87171; }
+        button { background: #2563eb; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #1d4ed8; }
+
+        .card {
+            background: #171a21;
+            border: 1px solid #2a2d35;
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin-top: 2rem;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .card h2 {margin-top: 0; font-size: 1.1rem; }
+
+        .news-list {list-style: none; padding: 0; margin: 0; }
+        .news-list li {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #2a2d35;
+        }
+        .news-list li:last-child {border-bottom: none; }
+        .news-time {color: #9aa0ab; font-size: 0.8rem; white-space: nowrap; }
+        .news-list a { color: #e6e6e6; text-decoration: none; }
+        .news-list a:hover { color: #60a5fa; text-decoration: underline; }
+
+        .hidden {display: none}
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid #2a2d35;
+        }
+
+        .tab {
+            background: transparent;
+            color: #9aa0ab;
+            border-radius: 0;
+            padding: 0.5rem 0.25rem;
+            border-bottom: 2px solid transparent;
+        }
+        .tab:hover {background: transparent; color: #e6e6e6;}
+        .tab.active {color: #e6e6e6; border-bottom-color: #60a5fa;}
+
+        .ticker-badge {
+            background: #1e3a5f;
+            color: #93c5fd;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.1rem 0.45rem;
+            border-radius: 4px;
+            white-space: nowrap;
+            align-self: center;
+        }
+
+        .filters {display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem;}
+
+        .chip {
+            background: transparent;
+            color: #9aa0ab;
+            border: 1px solid #2a2d35;
+            border-radius: 999px;
+            padding: 0.2rem 0.7rem;
+            font-size: 0.75rem;
+        }
+        .chip:hover {background: transparent; color: #e6e6e6; border-color: #60a5fa;}
+        .chip.active {background: #1e3a5f; color: #93c5fd; border-color: #1e3a5f;}
+
+        .ticker-badge { cursor: pointer; }
+        .ticker-badge:hover { background: #2563eb; color: white; }
+
+        .search {
+            width: 100%;
+            box-sizing: border-box;
+            background: #0f1115;
+            color: #e6e6e6;
+            border: 1px solid #2a2d35;
+            border-radius: 6px;
+            padding: 0.45rem 0.7rem;
+            margin-bottom: 0.6rem;
+            font: inherit;
+            font-size: 0.85rem;
+        }
+        .search:focus { outline: none; border-color: #60a5fa; }
+    </style>
+
+</head>
+<body>
+    <h1>Mi cartera</h1>
+    <button onclick="refresh()">Actualizar desde T212</button>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Ticker</th>
+            <th>Cantidad</th>
+            <th>Precio medio</th>
+            <th>Precio actual</th>
+            <th>Valor</th>
+            <th>P/L %</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="p : ${positions}">
+            <td th:text="${p.symbol}">TICKER</td>
+            <td th:text="${#numbers.formatDecimal(p.quantity, 1, 4)}">0</td>
+            <td th:text="${#numbers.formatDecimal(p.averagePricePaid, 1, 2)}">0</td>
+            <td th:text="${#numbers.formatDecimal(p.currentPrice, 1, 2)}">0</td>
+            <td th:text="${#numbers.formatDecimal(p.currentValue, 1, 2)}">0</td>
+            <td th:text="${#numbers.formatDecimal(p.unrealizedPlPercent, 1, 2)} + '%'"
+                th:classappend="${p.unrealizedPlPercent >= 0} ? 'positive' : 'negative'">0%</td>
+        </tr>
+        </tbody>
+    </table>
+    <p th:if="${positions.isEmpty()}">
+        Sin datos todavía — pulsa "Actualizar desde T212" (o espera al primer ciclo del scheduler).
+    </p>
+    <div class="card">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('portfolio', this)">Mi cartera </button>
+            <button class="tab" onclick="showTab('market', this)">Mercado </button>
+        </div>
+        <div id="portfolio">
+            <input type="search" id="news-search" class="search" placeholder="Buscar ticker" oninput="searchNews(this.value)">
+            <div class="filters">
+                <button class="chip active" data-ticker="ALL" onclick="filterNews(this.dataset.ticker)">Todas</button>
+                <button class="chip" th:each="t: ${portfolioTickers}" th:data-ticker="${t}" th:text="${t}"
+                        onclick="filterNews(this.dataset.ticker)">AAPL</button>
+            </div>
+            <ul class="news-list">
+                <li th:each="n : ${portfolioNews}" th:data-ticker="${n.related()}">
+                    <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
+                    <span class="ticker-badge" th:text="${n.related()}" th:data-ticker="${n.related()}" onclick="filterNews(this.dataset.ticker)"> </span>
+                    <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Titular</a>
+                </li>
+            </ul>
+        </div>
+        <ul class="news-list hidden" id="market">
+            <li th:each="n : ${news}">
+                <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
+                <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Titular</a>
+            </li>
+        </ul>
+    </div>
+    <script>
+        function refresh() {
+            fetch('/api/refresh', { method: 'POST' }).then(response => {if (response.ok)  location.reload();
+            else response.text().then(mensaje => alert('Error al actualizar: ' + mensaje));
+            });
+        }
+
+        function showTab(tab, button) {
+            document.getElementById('portfolio').classList.add('hidden');
+            document.getElementById('market').classList.add('hidden');
+
+            document.getElementById(tab).classList.remove('hidden');
+
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            button.classList.add('active');
+        }
+
+        function filterNews(ticker) {
+            // Al usar una píldora o etiqueta, se vacía el buscador
+            document.getElementById('news-search').value = '';
+
+            // Si se pulsa el filtro que ya está activo, se desactiva (vuelve a "Todas")
+            const current = document.querySelector('.chip.active');
+            if (current && current.dataset.ticker === ticker) {
+                ticker = 'ALL';
+            }
+
+            document.querySelectorAll('#portfolio li').forEach(li => {
+                if (ticker === 'ALL' || li.dataset.ticker === ticker) {
+                    li.classList.remove('hidden');
+                }
+                else {
+                    li.classList.add('hidden');
+                }
+            });
+
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            document.querySelector('.chip[data-ticker="' + ticker + '"]').classList.add('active');
+        }
+
+        function searchNews(text) {
+            const query = text.trim().toLowerCase();
+
+            document.querySelectorAll('#portfolio li').forEach(li => {
+                if (query === '' || li.textContent.toLowerCase().includes(query)) {
+                    li.classList.remove('hidden');
+                } else {
+                    li.classList.add('hidden');
+                }
+            });
+
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            document.querySelector('.chip[data-ticker="ALL"]').classList.add('active');
+        }
+
+    </script>
+</body>
+</html>
