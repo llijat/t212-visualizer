@@ -50,6 +50,9 @@
         .nav .soon { color: var(--muted); opacity: 0.5; cursor: default; }   /* secciones aún no hechas */
 
         button { font: inherit; border: none; cursor: pointer; }
+        /* Sin el recuadro blanco al hacer clic con el ratón; con teclado (Tab) sí se ve, en azul, por accesibilidad */
+        button:focus { outline: none; }
+        button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .refresh-btn {
             background: #2563eb;
             color: white;
@@ -199,12 +202,33 @@
         }
         .ticker-badge:hover { background: #2563eb; color: white; }
 
+        /* ===== Tarjetas de resumen de la cuenta ===== */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));   /* 4 tarjetas del mismo ancho */
+            gap: 1rem;
+            padding: 1rem 1.5rem 0;
+        }
+        .stat {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.8rem 1.1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        .stat-label { color: var(--muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .stat-value { font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .stat-sub { color: var(--muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+
         /* Ocultar: con !important para que gane siempre, aunque otra regla diga display:flex */
         .hidden { display: none !important; }
 
         /* ===== Pantallas estrechas (móvil, ventana pequeña): una sola columna y la página sí baja ===== */
         @media (max-width: 900px) {
             body { overflow: auto; height: auto; }
+            .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .layout { grid-template-columns: 1fr; }
             .card { max-height: 70vh; }
             .nav { display: none; }
@@ -224,6 +248,49 @@
         </nav>
         <button id="refresh-btn" class="refresh-btn" onclick="refresh()">⟳ Actualizar</button>
     </header>
+
+    <!-- ===== Tarjetas de resumen de la cuenta ===== -->
+    <!-- Si el resumen aún no ha llegado (summary es null), se muestran tarjetas "Cargando…" -->
+    <section class="stats" th:if="${summary == null}">
+        <div class="stat"><span class="stat-label">Valor total</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
+        <div class="stat"><span class="stat-label">Invertido</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
+        <div class="stat"><span class="stat-label">P/L</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
+        <div class="stat"><span class="stat-label">Efectivo</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
+    </section>
+
+    <section class="stats" th:if="${summary != null}"
+             th:with="inv=${summary.investments()},
+                      cur=${summary.currency() == 'EUR' ? '€' : summary.currency()},
+                      plPercent=${inv.totalCost() > 0 ? inv.unrealizedProfitLoss() / inv.totalCost() * 100 : 0}">
+        <div class="stat">
+            <span class="stat-label">Valor total</span>
+            <span class="stat-value" th:text="${#numbers.formatDecimal(summary.totalValue(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">0,00 €</span>
+            <span class="stat-sub">Inversiones + efectivo</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Invertido</span>
+            <span class="stat-value" th:text="${#numbers.formatDecimal(inv.totalCost(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">0,00 €</span>
+            <span class="stat-sub" th:text="'Valor actual: ' + ${#numbers.formatDecimal(inv.currentValue(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">Valor actual</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">P/L</span>
+            <span class="stat-value"
+                  th:classappend="${inv.unrealizedProfitLoss() >= 0} ? 'positive' : 'negative'"
+                  th:text="${inv.unrealizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.unrealizedProfitLoss(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">+0,00 €</span>
+            <span class="stat-sub">
+                <span th:classappend="${plPercent >= 0} ? 'positive' : 'negative'"
+                      th:text="${plPercent >= 0 ? '+' : ''} + ${#numbers.formatDecimal(plPercent, 1, 'POINT', 2, 'COMMA')} + ' %'">+0,00 %</span>
+                · Realizado:
+                <span th:classappend="${inv.realizedProfitLoss() >= 0} ? 'positive' : 'negative'"
+                      th:text="${inv.realizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.realizedProfitLoss(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">+0,00 €</span>
+            </span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Efectivo</span>
+            <span class="stat-value" th:text="${#numbers.formatDecimal(summary.cash().availableToTrade(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">0,00 €</span>
+            <span class="stat-sub">Disponible para invertir</span>
+        </div>
+    </section>
 
     <main class="layout">
 

@@ -1,5 +1,6 @@
 package com.llijat.t212visualizer.controller;
 
+import com.llijat.t212visualizer.service.AccountService;
 import com.llijat.t212visualizer.service.PositionService;
 import com.llijat.t212visualizer.service.NewsService;
 import org.springframework.stereotype.Controller;
@@ -13,10 +14,12 @@ public class DashboardController {
 
     private final PositionService positionService;
     private final NewsService newsService;
+    private final AccountService accountService;
 
-    public DashboardController(PositionService positionService, NewsService newsService) {
+    public DashboardController(PositionService positionService, NewsService newsService, AccountService accountService) {
         this.positionService = positionService;
         this.newsService = newsService;
+        this.accountService = accountService;
     }
 
     @GetMapping("/")
@@ -25,6 +28,7 @@ public class DashboardController {
         model.addAttribute("news", newsService.getNews());
         model.addAttribute("portfolioNews", newsService.getPortfolioNews());
         model.addAttribute("portfolioTickers", newsService.getPortfolioTickers());
+        model.addAttribute("summary", accountService.getSummary());
         return "dashboard"; // resolves to templates/dashboard.html
     }
 
@@ -33,6 +37,7 @@ public class DashboardController {
     public ResponseEntity<String> refreshNow() {
         try {
             positionService.refreshFromT212();
+            accountService.refreshSummary();
             return ResponseEntity.ok("ok");
         }
         catch (Exception e) {

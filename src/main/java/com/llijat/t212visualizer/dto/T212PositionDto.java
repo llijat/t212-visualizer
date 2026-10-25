@@ -13,15 +13,13 @@ public record T212PositionDto(
         double quantityAvailableForTrading,
         double quantityInPies,
         Instrument instrument,
-        WalletImpact walletImpact
-) {
+        WalletImpact walletImpact) {
     public record Instrument(
             String currency,
             String isin,
             String name,
             String ticker
-    ) {
-    }
+    ) {}
 
     public record WalletImpact(
             String currency,
