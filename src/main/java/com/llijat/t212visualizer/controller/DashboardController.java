@@ -43,6 +43,7 @@ public class DashboardController {
         try {
             positionService.refreshFromT212();
             accountService.refreshSummary();
+            transactionService.syncTransactions();
             return ResponseEntity.ok("ok");
         }
         catch (Exception e) {

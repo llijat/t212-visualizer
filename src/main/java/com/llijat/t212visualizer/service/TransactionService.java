@@ -33,7 +33,7 @@ public class TransactionService {
         return transactionRepository.sumNetDeposits(CASHBACK_THRESHOLD);
     }
 
-    @Scheduled(fixedRate = 60*60*1000, initialDelay = 20*1000)
+    @Scheduled(fixedRate = 5*60*1000, initialDelay = 20*1000)
     public void syncTransactions() {
         log.info("Syncing transactions from T212...");
 
