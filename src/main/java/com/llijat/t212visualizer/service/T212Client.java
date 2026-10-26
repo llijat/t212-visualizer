@@ -2,6 +2,7 @@ package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
 import com.llijat.t212visualizer.dto.T212PositionDto;
+import com.llijat.t212visualizer.dto.T212TransactionPageDto;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -32,5 +33,12 @@ public class T212Client {
                 .uri("/equity/account/summary")
                 .retrieve()
                 .body(T212AccountSummaryDto.class);
+    }
+
+    public T212TransactionPageDto fetchTransactions(String path) {
+        return t212RestClient.get()
+                .uri(path)
+                .retrieve()
+                .body(T212TransactionPageDto.class);
     }
 }

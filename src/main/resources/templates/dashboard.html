@@ -253,37 +253,50 @@
     <!-- Si el resumen aún no ha llegado (summary es null), se muestran tarjetas "Cargando…" -->
     <section class="stats" th:if="${summary == null}">
         <div class="stat"><span class="stat-label">Valor total</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
-        <div class="stat"><span class="stat-label">Invertido</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
-        <div class="stat"><span class="stat-label">P/L</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
+        <div class="stat"><span class="stat-label">Depositado neto</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
+        <div class="stat"><span class="stat-label">Rentabilidad total</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
         <div class="stat"><span class="stat-label">Efectivo</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
     </section>
 
+    <!--
+        netDeposits viene de la tabla de movimientos. Mientras la primera sincronización no ha terminado,
+        la suma da 0 (o no llega): en ese caso las tarjetas de depositado y rentabilidad dicen "Sincronizando…"
+        en vez de mostrar una rentabilidad falsa (todo el valor de la cuenta como ganancia).
+    -->
     <section class="stats" th:if="${summary != null}"
              th:with="inv=${summary.investments()},
                       cur=${summary.currency() == 'EUR' ? '€' : summary.currency()},
-                      plPercent=${inv.totalCost() > 0 ? inv.unrealizedProfitLoss() / inv.totalCost() * 100 : 0}">
+                      hasDeposits=${netDeposits != null and netDeposits > 0},
+                      totalReturn=${hasDeposits ? summary.totalValue() - netDeposits : 0},
+                      returnPercent=${hasDeposits ? totalReturn / netDeposits * 100 : 0}">
         <div class="stat">
             <span class="stat-label">Valor total</span>
             <span class="stat-value" th:text="${#numbers.formatDecimal(summary.totalValue(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">0,00 €</span>
             <span class="stat-sub">Inversiones + efectivo</span>
         </div>
         <div class="stat">
-            <span class="stat-label">Invertido</span>
-            <span class="stat-value" th:text="${#numbers.formatDecimal(inv.totalCost(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">0,00 €</span>
-            <span class="stat-sub" th:text="'Valor actual: ' + ${#numbers.formatDecimal(inv.currentValue(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">Valor actual</span>
+            <span class="stat-label">Depositado neto</span>
+            <span class="stat-value" th:if="${hasDeposits}"
+                  th:text="${#numbers.formatDecimal(netDeposits, 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">0,00 €</span>
+            <span class="stat-value" th:unless="${hasDeposits}">—</span>
+            <span class="stat-sub" th:text="${hasDeposits} ? 'Lo que has metido (sin cashback)' : 'Sincronizando movimientos…'">Lo que has metido</span>
         </div>
         <div class="stat">
-            <span class="stat-label">P/L</span>
-            <span class="stat-value"
-                  th:classappend="${inv.unrealizedProfitLoss() >= 0} ? 'positive' : 'negative'"
-                  th:text="${inv.unrealizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.unrealizedProfitLoss(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">+0,00 €</span>
-            <span class="stat-sub">
-                <span th:classappend="${plPercent >= 0} ? 'positive' : 'negative'"
-                      th:text="${plPercent >= 0 ? '+' : ''} + ${#numbers.formatDecimal(plPercent, 1, 'POINT', 2, 'COMMA')} + ' %'">+0,00 %</span>
-                · Realizado:
-                <span th:classappend="${inv.realizedProfitLoss() >= 0} ? 'positive' : 'negative'"
-                      th:text="${inv.realizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.realizedProfitLoss(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">+0,00 €</span>
+            <span class="stat-label">Rentabilidad total</span>
+            <span class="stat-value" th:if="${hasDeposits}"
+                  th:classappend="${totalReturn >= 0} ? 'positive' : 'negative'"
+                  th:text="${totalReturn >= 0 ? '+' : ''} + ${#numbers.formatDecimal(totalReturn, 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">+0,00 €</span>
+            <span class="stat-value" th:unless="${hasDeposits}">—</span>
+            <span class="stat-sub" th:if="${hasDeposits}">
+                <span th:classappend="${returnPercent >= 0} ? 'positive' : 'negative'"
+                      th:text="${returnPercent >= 0 ? '+' : ''} + ${#numbers.formatDecimal(returnPercent, 1, 'POINT', 2, 'COMMA')} + ' %'">+0,00 %</span>
+                sobre lo depositado ·
+                Abiertas <span th:classappend="${inv.unrealizedProfitLoss() >= 0} ? 'positive' : 'negative'"
+                               th:text="${inv.unrealizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.unrealizedProfitLoss(), 1, 'POINT', 2, 'COMMA')}">+0,00</span>
+                · Vendidas <span th:classappend="${inv.realizedProfitLoss() >= 0} ? 'positive' : 'negative'"
+                                 th:text="${inv.realizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.realizedProfitLoss(), 1, 'POINT', 2, 'COMMA')}">+0,00</span>
             </span>
+            <span class="stat-sub" th:unless="${hasDeposits}">Sincronizando movimientos…</span>
         </div>
         <div class="stat">
             <span class="stat-label">Efectivo</span>

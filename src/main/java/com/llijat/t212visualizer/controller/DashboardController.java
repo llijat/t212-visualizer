@@ -3,6 +3,7 @@ package com.llijat.t212visualizer.controller;
 import com.llijat.t212visualizer.service.AccountService;
 import com.llijat.t212visualizer.service.PositionService;
 import com.llijat.t212visualizer.service.NewsService;
+import com.llijat.t212visualizer.service.TransactionService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,11 +16,14 @@ public class DashboardController {
     private final PositionService positionService;
     private final NewsService newsService;
     private final AccountService accountService;
+    private final TransactionService transactionService;
 
-    public DashboardController(PositionService positionService, NewsService newsService, AccountService accountService) {
+
+    public DashboardController(PositionService positionService, NewsService newsService, AccountService accountService, TransactionService transactionService) {
         this.positionService = positionService;
         this.newsService = newsService;
         this.accountService = accountService;
+        this.transactionService = transactionService;
     }
 
     @GetMapping("/")
@@ -29,6 +33,7 @@ public class DashboardController {
         model.addAttribute("portfolioNews", newsService.getPortfolioNews());
         model.addAttribute("portfolioTickers", newsService.getPortfolioTickers());
         model.addAttribute("summary", accountService.getSummary());
+        model.addAttribute("netDeposits", transactionService.getNetDeposits());
         return "dashboard"; // resolves to templates/dashboard.html
     }
 
