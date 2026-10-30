@@ -6,6 +6,7 @@ import com.llijat.t212visualizer.model.AccountTransaction;
 import com.llijat.t212visualizer.repository.AccountTransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
@@ -21,16 +22,19 @@ public class TransactionService {
     private static final String FIRST_PAGE = "/equity/history/transactions?limit=50";
     private static final String API_PREFIX = "/api/v0";
     private static final double CASHBACK_THRESHOLD = 5.0;
-    private static final long PAGE_DELAY_MS = 3500;
-    private static final long RETRY_DELAY_MS = 15000;
     private static final int MAX_ATTEMPTS = 3;
 
     private final T212Client t212Client;
     private final AccountTransactionRepository transactionRepository;
+    private final long pageDelayMs;
+    private final long retryDelayMs;
 
-    public TransactionService(T212Client t212Client, AccountTransactionRepository transactionRepository) {
+    public TransactionService(T212Client t212Client, AccountTransactionRepository transactionRepository, @Value("${t212.sync.page-delay-ms}") long pageDelayMs,
+                              @Value("${t212.sync.retry-delay-ms}") long retryDelayMs) {
         this.t212Client = t212Client;
         this.transactionRepository = transactionRepository;
+        this.pageDelayMs = pageDelayMs;
+        this.retryDelayMs = retryDelayMs;
     }
 
     public double getNetDeposits() {
@@ -68,7 +72,7 @@ public class TransactionService {
                 if (page.nextPagePath() == null) path = null;
                 else path = page.nextPagePath().substring(API_PREFIX.length());
 
-                if (path != null && !reachedKnown) Thread.sleep(PAGE_DELAY_MS);
+                if (path != null && !reachedKnown) Thread.sleep(pageDelayMs);
             }
 
             transactionRepository.saveAll(newTransactions);
@@ -88,7 +92,7 @@ public class TransactionService {
                 if (attempt == MAX_ATTEMPTS) throw e;
                 else {
                     log.warn("Demasiadas peticiones, esperar un poco. Intento: {}/{}",attempt, MAX_ATTEMPTS);
-                    Thread.sleep(RETRY_DELAY_MS);
+                    Thread.sleep(retryDelayMs);
                     ++attempt;
                 }
             }

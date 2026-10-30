@@ -25,6 +25,9 @@ t212:
   base-url: https://live.trading212.com/api/v0
   api-key: ${T212_API_KEY:}
   api-secret: ${T212_API_SECRET:}
+  sync:
+    page-delay-ms: 3500
+    retry-delay-ms: 15000
 
 finnhub:
   base-url: https://finnhub.io/api/v1

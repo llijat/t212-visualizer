@@ -4,11 +4,11 @@ import com.llijat.t212visualizer.dto.T212TransactionDto;
 import com.llijat.t212visualizer.dto.T212TransactionPageDto;
 import com.llijat.t212visualizer.model.AccountTransaction;
 import com.llijat.t212visualizer.repository.AccountTransactionRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
@@ -34,14 +34,18 @@ class TransactionServiceTest {
     @Mock
     private AccountTransactionRepository transactionRepository;
 
-    @InjectMocks
     private TransactionService transactionService;
 
     @Captor
     private ArgumentCaptor<List<AccountTransaction>> savedCaptor;
 
     private static final String FIRST_PAGE = "/equity/history/transactions?limit=50";
-    
+
+    // Antes de cada test: un service nuevo, con los mocks y SIN esperas (0 ms)
+    @BeforeEach
+    void setUp() {
+        transactionService = new TransactionService(t212Client, transactionRepository, 0, 0);
+    }
 
     private T212TransactionDto transaction(String reference) {
         return new T212TransactionDto(10.0, "EUR", "2026-10-25T10:00:00Z", reference, "DEPOSIT");
