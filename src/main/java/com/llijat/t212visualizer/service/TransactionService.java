@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -20,6 +21,9 @@ public class TransactionService {
     private static final String FIRST_PAGE = "/equity/history/transactions?limit=50";
     private static final String API_PREFIX = "/api/v0";
     private static final double CASHBACK_THRESHOLD = 5.0;
+    private static final long PAGE_DELAY_MS = 3500;
+    private static final long RETRY_DELAY_MS = 15000;
+    private static final int MAX_ATTEMPTS = 3;
 
     private final T212Client t212Client;
     private final AccountTransactionRepository transactionRepository;
@@ -43,7 +47,7 @@ public class TransactionService {
             boolean reachedKnown = false;
 
             while (path != null && !reachedKnown) {
-                T212TransactionPageDto page = t212Client.fetchTransactions(path);
+                T212TransactionPageDto page = fetchPageWithRetry(path);
 
                 for (T212TransactionDto dto : page.items()) {
                     if (transactionRepository.existsById(dto.reference())) {
@@ -64,7 +68,7 @@ public class TransactionService {
                 if (page.nextPagePath() == null) path = null;
                 else path = page.nextPagePath().substring(API_PREFIX.length());
 
-                if (path != null && !reachedKnown) Thread.sleep(3_100);
+                if (path != null && !reachedKnown) Thread.sleep(PAGE_DELAY_MS);
             }
 
             transactionRepository.saveAll(newTransactions);
@@ -72,6 +76,22 @@ public class TransactionService {
 
             catch (Exception e) {
             log.warn("No se pudieron sincronizar los movimientos: {}", e.getMessage());
+        }
+    }
+
+    private T212TransactionPageDto fetchPageWithRetry(String path) throws InterruptedException {
+        int attempt = 1;
+        while (true) {
+            try {
+                return t212Client.fetchTransactions(path);
+            } catch (HttpClientErrorException.TooManyRequests e) {
+                if (attempt == MAX_ATTEMPTS) throw e;
+                else {
+                    log.warn("Demasiadas peticiones, esperar un poco. Intento: {}/{}",attempt, MAX_ATTEMPTS);
+                    Thread.sleep(RETRY_DELAY_MS);
+                    ++attempt;
+                }
+            }
         }
     }
 

@@ -11,6 +11,9 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.util.List;
 
@@ -46,6 +49,11 @@ class TransactionServiceTest {
 
     private T212TransactionPageDto page(String nextPagePath, T212TransactionDto... items) {
         return new T212TransactionPageDto(List.of(items), nextPagePath);
+    }
+
+    // Crea el mismo error que lanza RestClient cuando T212 responde con ese código (429, 401...)
+    private HttpClientErrorException httpError(HttpStatus status) {
+        return HttpClientErrorException.create(status, status.getReasonPhrase(), HttpHeaders.EMPTY, null, null);
     }
 
     @Test
@@ -97,6 +105,50 @@ class TransactionServiceTest {
         transactionService.syncTransactions();
 
         // Comprobar: todo o nada, no se guarda la primera página a medias
+        verify(transactionRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void sync_retriesAfterTooManyRequests_andSavesEverything() {
+        // Preparar: la primera vez T212 responde 429; la segunda, la página llega bien
+        when(t212Client.fetchTransactions(FIRST_PAGE))
+                .thenThrow(httpError(HttpStatus.TOO_MANY_REQUESTS))
+                .thenReturn(page(null, transaction("a"), transaction("b")));
+
+        // Ejecutar
+        transactionService.syncTransactions();
+
+        // Comprobar: ha pedido la página 2 veces y, al final, ha guardado todo
+        verify(t212Client, times(2)).fetchTransactions(FIRST_PAGE);
+        verify(transactionRepository).saveAll(savedCaptor.capture());
+        assertEquals(2, savedCaptor.getValue().size());
+    }
+
+    @Test
+    void sync_givesUpAfterThreeTooManyRequests_andSavesNothing() {
+        // Preparar: T212 responde 429 siempre
+        when(t212Client.fetchTransactions(FIRST_PAGE))
+                .thenThrow(httpError(HttpStatus.TOO_MANY_REQUESTS));
+
+        // Ejecutar
+        transactionService.syncTransactions();
+
+        // Comprobar: lo intenta exactamente 3 veces, se rinde y no guarda nada
+        verify(t212Client, times(3)).fetchTransactions(FIRST_PAGE);
+        verify(transactionRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void sync_doesNotRetryOtherErrors() {
+        // Preparar: credenciales malas (401); esperar no lo arreglaría
+        when(t212Client.fetchTransactions(FIRST_PAGE))
+                .thenThrow(httpError(HttpStatus.UNAUTHORIZED));
+
+        // Ejecutar
+        transactionService.syncTransactions();
+
+        // Comprobar: un solo intento, sin reintentos, y nada guardado
+        verify(t212Client, times(1)).fetchTransactions(FIRST_PAGE);
         verify(transactionRepository, never()).saveAll(any());
     }
 
