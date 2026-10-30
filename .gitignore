@@ -4,6 +4,7 @@ target/
 *.iml
 
 src/main/resources/application-local.yml
+.env
 
 .DS_Store
 Thumbs.db
