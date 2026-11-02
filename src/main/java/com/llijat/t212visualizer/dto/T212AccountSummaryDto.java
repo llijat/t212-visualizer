@@ -1,21 +1,23 @@
 package com.llijat.t212visualizer.dto;
 
+import java.math.BigDecimal;
+
 public record T212AccountSummaryDto(
         String currency,
         long id,
-        double totalValue,
+        BigDecimal totalValue,
         Cash cash,
         Investments investments
 ) {
     public record Cash(
-            double availableToTrade,
-            double inPies,
-            double reservedForOrders
+            BigDecimal availableToTrade,
+            BigDecimal inPies,
+            BigDecimal reservedForOrders
     ) {}
     public record Investments(
-            double currentValue,
-            double totalCost,
-            double realizedProfitLoss,
-            double unrealizedProfitLoss
+            BigDecimal currentValue,
+            BigDecimal totalCost,
+            BigDecimal realizedProfitLoss,
+            BigDecimal unrealizedProfitLoss
     ) {}
 }

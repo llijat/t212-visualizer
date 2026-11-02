@@ -1,17 +1,23 @@
 package com.llijat.t212visualizer.model;
 
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
 class PositionTest {
     private Position positionWithTicker(String ticker) {
-        return new Position(ticker, "Test Inc.", 1, 100, 110, 110, 10, null, 100, "USD", "EUR");
+        return new Position(ticker, "Test Inc.", new BigDecimal("1"), new BigDecimal("100"),
+                new BigDecimal("110"), new BigDecimal("110"), new BigDecimal("10"), null,
+                new BigDecimal("100"), "USD", "EUR");
     }
 
-    private Position positionWithPl(double unrealizedProfitLoss, double totalCost) {
-        return new Position("TEST_US_EQ", "Test Inc.", 1, 100, 110, 110,
-                unrealizedProfitLoss, null, totalCost, "USD", "EUR");
+    private Position positionWithPl(String unrealizedProfitLoss, String totalCost) {
+        return new Position("TEST_US_EQ", "Test Inc.", new BigDecimal("1"), new BigDecimal("100"),
+                new BigDecimal("110"), new BigDecimal("110"), new BigDecimal(unrealizedProfitLoss), null,
+                new BigDecimal(totalCost), "USD", "EUR");
     }
 
     @Test
@@ -34,28 +40,39 @@ class PositionTest {
 
     @Test
     void getUnrealizedPlPercent_withProfit() {
-        Position position = positionWithPl(10, 100);
+        Position position = positionWithPl("10", "100");
 
-        double percent = position.getUnrealizedPlPercent();
+        BigDecimal percent = position.getUnrealizedPlPercent();
 
-        assertEquals(10.0, percent, 0.0001);
+        assertEquals(new BigDecimal("10.00"), percent);
     }
 
     @Test
     void getUnrealizedPlPercent_withLoss() {
-        Position position = positionWithPl(-25, 100);
+        Position position = positionWithPl("-25", "100");
 
-        double percent = position.getUnrealizedPlPercent();
+        BigDecimal percent = position.getUnrealizedPlPercent();
 
-        assertEquals(-25.0, percent, 0.0001);
+        assertEquals(new BigDecimal("-25.00"), percent);
     }
 
     @Test
     void getUnrealizedPlPercent_withZeroCost_returnsZero() {
-        Position position = positionWithPl(10, 0);
+        // "0.0000" es como llega de la base de datos: equals("0") no lo detectaría, signum() sí
+        Position position = positionWithPl("10", "0.0000");
 
-        double percent = position.getUnrealizedPlPercent();
+        BigDecimal percent = position.getUnrealizedPlPercent();
 
-        assertEquals(0.0, percent, 0.0001);
+        assertEquals(BigDecimal.ZERO, percent);
+    }
+
+    @Test
+    void getUnrealizedPlPercent_withEndlessDecimals_roundsToTwo() {
+        // 1 / 3 no termina nunca: sin indicar decimales, divide() lanzaría una excepción
+        Position position = positionWithPl("1", "3");
+
+        BigDecimal percent = position.getUnrealizedPlPercent();
+
+        assertEquals(new BigDecimal("33.33"), percent);
     }
 }
