@@ -29,6 +29,7 @@ public class TransactionService {
     private final AccountTransactionRepository transactionRepository;
     private final long pageDelayMs;
     private final long retryDelayMs;
+    private volatile boolean firstSyncDone = false;
 
     public TransactionService(T212Client t212Client, AccountTransactionRepository transactionRepository, @Value("${t212.sync.page-delay-ms}") long pageDelayMs,
                               @Value("${t212.sync.retry-delay-ms}") long retryDelayMs) {
@@ -41,6 +42,7 @@ public class TransactionService {
     public BigDecimal getNetDeposits() {
         return transactionRepository.sumNetDeposits(CASHBACK_THRESHOLD);
     }
+    public boolean isFirstSyncDone() { return firstSyncDone; }
 
     @Scheduled(fixedRate = 5*60*1000, initialDelay = 20*1000)
     public void syncTransactions() {
@@ -77,6 +79,7 @@ public class TransactionService {
             }
 
             transactionRepository.saveAll(newTransactions);
+            firstSyncDone = true;
             log.info("Synced {} new transactions.", newTransactions.size());}
 
             catch (Exception e) {

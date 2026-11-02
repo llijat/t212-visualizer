@@ -19,6 +19,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -170,6 +172,33 @@ class TransactionServiceTest {
         // Comprobar: el importe llega tal cual a la base de datos
         verify(transactionRepository).saveAll(savedCaptor.capture());
         assertEquals(new BigDecimal("10.10"), savedCaptor.getValue().get(0).getAmount());
+    }
+
+    @Test
+    void firstSyncDone_isTrueAfterASuccessfulSync() {
+        // Preparar
+        when(t212Client.fetchTransactions(FIRST_PAGE))
+                .thenReturn(page(null, transaction("a")));
+        assertFalse(transactionService.isFirstSyncDone());
+
+        // Ejecutar
+        transactionService.syncTransactions();
+
+        // Comprobar
+        assertTrue(transactionService.isFirstSyncDone());
+    }
+
+    @Test
+    void firstSyncDone_staysFalseWhenTheSyncFails() {
+        // Preparar: T212 no responde
+        when(t212Client.fetchTransactions(FIRST_PAGE))
+                .thenThrow(new RuntimeException("Se ha cortado la conexión"));
+
+        // Ejecutar
+        transactionService.syncTransactions();
+
+        // Comprobar: los datos pueden estar desactualizados, así que sigue en false
+        assertFalse(transactionService.isFirstSyncDone());
     }
 
     @Test

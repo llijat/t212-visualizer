@@ -34,6 +34,7 @@ public class DashboardController {
         model.addAttribute("portfolioTickers", newsService.getPortfolioTickers());
         model.addAttribute("summary", accountService.getSummary());
         model.addAttribute("netDeposits", transactionService.getNetDeposits());
+        model.addAttribute("firstSyncDone", transactionService.isFirstSyncDone());
         return "dashboard"; // resolves to templates/dashboard.html
     }
 

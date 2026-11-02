@@ -259,14 +259,14 @@
     </section>
 
     <!--
-        netDeposits viene de la tabla de movimientos. Mientras la primera sincronización no ha terminado,
-        la suma da 0 (o no llega): en ese caso las tarjetas de depositado y rentabilidad dicen "Sincronizando…"
-        en vez de mostrar una rentabilidad falsa (todo el valor de la cuenta como ganancia).
+        netDeposits viene de la tabla de movimientos, que puede ir por detrás del valor de la cuenta hasta que
+        termina la primera sincronización tras arrancar (o estar vacía): mientras tanto, las tarjetas de depositado
+        y rentabilidad dicen "Sincronizando…" en vez de mostrar una rentabilidad falsa.
     -->
     <section class="stats" th:if="${summary != null}"
              th:with="inv=${summary.investments()},
                       cur=${summary.currency() == 'EUR' ? '€' : summary.currency()},
-                      hasDeposits=${netDeposits != null and netDeposits > 0},
+                      hasDeposits=${firstSyncDone and netDeposits != null and netDeposits > 0},
                       totalReturn=${hasDeposits ? summary.totalValue() - netDeposits : 0},
                       returnPercent=${hasDeposits ? totalReturn / netDeposits * 100 : 0}">
         <div class="stat">
