@@ -5,6 +5,7 @@ target/
 
 src/main/resources/application-local.yml
 .env
+NOTAS_DEL_PROYECTO.md
 
 .DS_Store
 Thumbs.db
