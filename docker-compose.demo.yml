@@ -1,0 +1,31 @@
+# Modo demo: sin keys ni .env, y separado de la app real (otro nombre de proyecto, otro puerto).
+# Arrancar: docker compose -f docker-compose.demo.yml up --build
+name: t212-demo
+
+services:
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: t212_demo
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d t212_demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8081:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: demo
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/t212_demo
+      TZ: Europe/Madrid

@@ -1,0 +1,8 @@
+# Modo demo: datos inventados, sin keys y con su propia base de datos.
+# El refresco de posiciones borra las que no recibe, así que NUNCA debe apuntar a la base de datos real.
+# El puerto 5433 es a propósito: si esa base de datos no existe, la app no arranca.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/t212_demo
+    username: demo
+    password: demo

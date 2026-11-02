@@ -1,63 +1,107 @@
-# T212 Visualizer — Fase 1 (esqueleto)
+# T212 Visualizer
 
-Dashboard de cartera sobre la API de T212. Esto es el MVP: conectar, traer
-posiciones, mostrarlas en una tabla. Todo lo demás (valoración, calendario,
-noticias, QoL) se construye encima de esta base en fases posteriores.
+A personal portfolio dashboard for [Trading 212](https://www.trading212.com) accounts: positions, total account return and news about the companies you hold, on one screen.
 
-## Qué incluye ya
-- Conexión a T212 vía `RestClient` (`T212Client`), apuntando al entorno
-  **demo** (paper trading) por defecto — así no arriesgas tu cuenta real
-  mientras pruebas.
-- Cacheo en Postgres (`Position` entity + `PositionRepository`).
-- Un scheduler (`@Scheduled`) que refresca cada 5 minutos, más un botón
-  manual en la UI para refrescar al momento.
-- Una vista Thymeleaf mínima en `/`.
+> **Personal project, not affiliated with Trading 212. Not financial advice.**
 
-## Antes de arrancar
+![Dashboard running in demo mode with invented data](docs/dashboard-demo.jpg)
 
-1. **Genera tu API Key y Secret** desde la app (Ajustes > API). Al crearla,
-   te pedirá qué *scopes* darle — asegúrate de incluir el que cubre
-   posiciones/portfolio, o `/equity/positions` te devolverá un 403
-   ("Scope(portfolio) missing for API key").
+*Demo mode, with invented companies and figures. The interface is in Spanish.*
 
-2. **Postgres:** crea la base de datos antes de arrancar:
-   ```sql
-   CREATE DATABASE t212_visualizer;
-   ```
-   Ajusta usuario/contraseña vía variables de entorno `DB_USERNAME` /
-   `DB_PASSWORD`, o edita directamente `application.yml`.
+## Try it in one minute
 
-3. **Variables de entorno:**
-   ```bash
-   export T212_API_KEY=tu_api_key_aqui
-   export T212_API_SECRET=tu_api_secret_aqui
-   ```
+You only need Docker. Demo mode uses invented data, needs no API keys and never contacts Trading 212 or Finnhub.
 
-4. **Nota sobre Pies:** el endpoint `/equity/pies` aparece marcado como
-   **deprecated** en la documentación oficial — no construyas nada nuevo
-   que dependa de él. Si en el futuro quieres mostrar el desglose por pie,
-   tendrás que derivarlo de otra forma (p. ej. cruzando `quantityInPies` de
-   cada posición, que si viene en la respuesta de `/equity/positions`).
-
-## Arrancar
 ```bash
-mvn spring-boot:run
+docker compose -f docker-compose.demo.yml up --build
 ```
-Luego abre `http://localhost:8080`.
 
-## Roadmap (lo que sigue)
+Then open <http://localhost:8081>. Stop it with:
 
-- **Fase 2 — Valoración:** añade un paquete `valuation/` con una interfaz
-  `ValuationFormula` (método `apply(Fundamentals) -> ValuationResult`) e
-  implementaciones concretas (Graham Number, P/E relativo, DCF simplificado).
-  Necesitarás una fuente de fundamentales — ninguno de los endpoints de T212
-  los da.
-- **Fase 3 — Calendario earnings/dividendos:** integra Finnhub (u otro),
-  cruzando los tickers que ya tienes en `positions` contra su endpoint de
-  calendario. Guárdalo en una tabla propia (`earnings_events`) y refresca
-  una vez al día, no en cada carga de página.
-- **Fase 4 — Noticias:** mismo patrón — un `NewsService` que consulta la
-  fuente externa filtrando por tus tickers, cacheado para no quemar la
-  cuota gratuita.
-- **Fase 5 — QoL:** alertas de precio, temas, layouts configurables. Déjalo
-  para el final — es pulido, no núcleo.
+```bash
+docker compose -f docker-compose.demo.yml down
+```
+
+## Features
+
+- **Positions:** quantity, average price, current value and P/L %, refreshed every 5 minutes or on demand.
+- **Total account return:** account value minus net deposits, so it includes closed positions, dividends, interest and fees, not only open positions.
+- **News:** market news and news about the US companies in your portfolio, with filters by ticker and text search.
+- **Incremental sync:** account movements are stored in PostgreSQL, so after the first load only new ones are requested.
+
+## Tech stack
+
+Java 21, Spring Boot 3.3 (Web, Data JPA, Thymeleaf, Scheduling), PostgreSQL 16, Flyway, Docker Compose, JUnit 5 and Mockito.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser -->|HTTP| Controller[DashboardController]
+    Controller --> Services[Position, Account, Transaction and News services]
+    Services --> Clients{{"T212Client / FinnhubClient (interfaces)"}}
+    Clients -->|default| Live[Live clients: real APIs]
+    Clients -->|demo profile| Demo[Demo clients: invented data]
+    Services --> Repos[Spring Data repositories]
+    Repos --> DB[(PostgreSQL)]
+```
+
+The services depend on interfaces, and a Spring profile chooses the implementation. That is what makes demo mode possible and lets the tests replace the clients with mocks.
+
+## Technical decisions
+
+- **`BigDecimal` and `NUMERIC` for money.** `double` accumulates binary rounding errors when summing hundreds of movements.
+- **Flyway instead of `ddl-auto: update`.** Schema changes are versioned SQL scripts that can also transform existing data. Hibernate only validates the schema at startup.
+- **Incremental, all-or-nothing sync.** Movements arrive newest first, so the sync stops at the first known one. New ones are saved only after every page has been read, so an interrupted first load cannot leave a permanent gap.
+- **Selective retries.** A `429 Too Many Requests` waits and retries the same page, up to 3 attempts. Other errors are not retried, because waiting would not fix them.
+- **Honest loading states.** The return is hidden until the first sync after startup finishes, because stale movements would show a false figure.
+- **Isolated demo.** Demo mode has its own in-memory database and does not create HTTP clients for the real APIs, so it cannot touch real data.
+
+## Running it with your own account
+
+You need a Trading 212 API key and secret, and a [Finnhub](https://finnhub.io) API key.
+
+> **Security:** use a Trading 212 key **without order permissions**. The app has **no login**, so anyone who can reach it sees your portfolio. The compose file only publishes it on `127.0.0.1`. Do not expose it to the internet.
+
+1. Copy the template and fill in your values:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Start the app and its database:
+
+   ```bash
+   docker compose up --build
+   ```
+
+3. Open <http://localhost:8080>. The first run downloads your whole movement history, which can take a few minutes.
+
+To run it from an IDE instead, copy `src/main/resources/application-local.example.yml` to `application-local.yml` in the same folder, fill it in and start a local PostgreSQL with a `t212_viewdb` database.
+
+## Tests
+
+```bash
+mvn test
+```
+
+The tests use JUnit 5 and Mockito, and need neither a database nor network access. They cover the sync algorithm (pagination, stopping at known movements, all-or-nothing, retries), P/L calculations, exact amount parsing and the consistency of the demo data.
+
+## Known limitations
+
+- **Pending card payments:** Trading 212 subtracts them from its net deposits straight away, but they do not appear in the API until they settle. Until then, the return shown here can be lower than the one in the app.
+- **Cashback heuristic:** the API does not distinguish card cashback from real deposits, so deposits under 5 € are treated as cashback.
+- **Percentage:** the return percentage is a simple division over net deposits, not time-weighted like the one in the Trading 212 app.
+- **News:** company news only covers US stocks, because of the Finnhub free plan.
+- **Single user:** one account per installation, with no login.
+
+## Roadmap
+
+- Economic calendar with dividends and earnings
+- Sector view
+- Expense tracking based on card payments
+- Multi-user support with login
+
+## License
+
+[MIT](LICENSE)

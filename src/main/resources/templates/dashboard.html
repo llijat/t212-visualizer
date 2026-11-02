@@ -202,6 +202,18 @@
         }
         .ticker-badge:hover { background: #2563eb; color: white; }
 
+        /* ===== Aviso del modo demo ===== */
+        .demo-badge {
+            margin-left: 0.6rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: 999px;
+            background: var(--accent-bg);
+            color: var(--accent);
+            font-size: 0.75rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
         /* ===== Tarjetas de resumen de la cuenta ===== */
         .stats {
             display: grid;
@@ -239,7 +251,7 @@
 
     <!-- ===== Barra superior ===== -->
     <header class="topbar">
-        <div class="brand">T212 <span>Visualizer</span></div>
+        <div class="brand">T212 <span>Visualizer</span><small class="demo-badge" th:if="${#arrays.contains(@environment.getActiveProfiles(), 'demo')}">Modo demo: datos inventados</small></div>
         <nav class="nav">
             <a href="/" class="active">Cartera</a>
             <span class="soon" title="Próximamente">Calendario</span>
@@ -331,11 +343,11 @@
                             <span class="symbol" th:text="${p.symbol}">AAPL</span>
                             <span class="company" th:text="${p.name}">Apple Inc.</span>
                         </td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.quantity, 1, 4)}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.averagePricePaid, 1, 2)}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.currentPrice, 1, 2)}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.currentValue, 1, 2)}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.unrealizedPlPercent, 1, 2)} + '%'"
+                        <td class="num" th:text="${#numbers.formatDecimal(p.quantity, 1, 'POINT', 4, 'COMMA')}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.averagePricePaid, 1, 'POINT', 2, 'COMMA')}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.currentPrice, 1, 'POINT', 2, 'COMMA')}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.currentValue, 1, 'POINT', 2, 'COMMA')}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.unrealizedPlPercent, 1, 'POINT', 2, 'COMMA')} + '%'"
                             th:classappend="${p.unrealizedPlPercent >= 0} ? 'positive' : 'negative'">0%</td>
                     </tr>
                     </tbody>

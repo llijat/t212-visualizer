@@ -1,0 +1,12 @@
+# Copy this file to application-local.yml (ignored by git) and fill in your values.
+spring:
+  datasource:
+    username: your_db_user
+    password: your_db_password
+
+t212:
+  api-key: your_t212_api_key        # use a key WITHOUT order permissions
+  api-secret: your_t212_api_secret
+
+finnhub:
+  api-key: your_finnhub_api_key
