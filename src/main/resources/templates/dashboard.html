@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>T212 Visualizer</title>
     <style>
-        /* ===== Colores de la app (se cambian aquí y afectan a toda la página) ===== */
+        /* ===== App colours (change them here and the whole page follows) ===== */
         :root {
-            color-scheme: dark;     /* le dice al navegador que la página es oscura: sus controles (scroll, buscador…) también lo serán */
-            --bg: #0f1115;          /* fondo de la página */
-            --panel: #171a21;       /* fondo de los recuadros */
-            --border: #2a2d35;      /* bordes y líneas separadoras */
-            --text: #e6e6e6;        /* texto principal */
-            --muted: #9aa0ab;       /* texto secundario (gris) */
-            --accent: #60a5fa;      /* azul de resaltado */
-            --accent-bg: #1e3a5f;   /* azul oscuro de fondos (etiquetas, píldoras) */
+            color-scheme: dark;     /* tells the browser the page is dark, so its controls (scrollbars, search box...) match */
+            --bg: #0f1115;          /* page background */
+            --panel: #171a21;       /* card background */
+            --border: #2a2d35;      /* borders and separators */
+            --text: #e6e6e6;        /* main text */
+            --muted: #9aa0ab;       /* secondary text (grey) */
+            --accent: #60a5fa;      /* highlight blue */
+            --accent-bg: #1e3a5f;   /* dark blue for backgrounds (badges, chips) */
             --green: #4ade80;
             --red: #f87171;
         }
 
-        /* ===== Estructura general: la página ocupa justo la pantalla, sin scroll ===== */
+        /* ===== Overall layout: the page fills the screen exactly, with no page scroll ===== */
         * { box-sizing: border-box; }
         html, body { height: 100%; }
         body {
@@ -28,11 +28,11 @@
             background: var(--bg);
             color: var(--text);
             display: flex;
-            flex-direction: column;     /* barra arriba, contenido debajo */
-            overflow: hidden;           /* la página no baja: el scroll va dentro de cada recuadro */
+            flex-direction: column;     /* bar on top, content below */
+            overflow: hidden;           /* the page does not scroll: each card scrolls on its own */
         }
 
-        /* ===== Barra superior ===== */
+        /* ===== Top bar ===== */
         .topbar {
             display: flex;
             align-items: center;
@@ -43,14 +43,14 @@
         }
         .brand { font-weight: 700; font-size: 1.05rem; }
         .brand span { color: var(--accent); }
-        .nav { display: flex; gap: 1.25rem; flex: 1; }   /* flex: 1 empuja el botón a la derecha */
+        .nav { display: flex; gap: 1.25rem; flex: 1; }   /* flex: 1 pushes the button to the right */
         .nav a, .nav span { font-size: 0.9rem; text-decoration: none; }
         .nav a { color: var(--text); }
         .nav a.active { color: var(--accent); }
-        .nav .soon { color: var(--muted); opacity: 0.5; cursor: default; }   /* secciones aún no hechas */
+        .nav .soon { color: var(--muted); opacity: 0.5; cursor: default; }   /* sections not built yet */
 
         button { font: inherit; border: none; cursor: pointer; }
-        /* Sin el recuadro blanco al hacer clic con el ratón; con teclado (Tab) sí se ve, en azul, por accesibilidad */
+        /* No white outline on mouse click; with the keyboard (Tab) it shows in blue, for accessibility */
         button:focus { outline: none; }
         button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .refresh-btn {
@@ -63,17 +63,17 @@
         .refresh-btn:hover { background: #1d4ed8; }
         .refresh-btn:disabled { opacity: 0.6; cursor: wait; }
 
-        /* ===== Contenido: dos columnas que llenan el resto de la pantalla ===== */
+        /* ===== Content: two columns that fill the rest of the screen ===== */
         .layout {
-            flex: 1;                    /* ocupa todo el alto que deja la barra */
-            min-height: 0;              /* imprescindible para que el scroll interno funcione */
+            flex: 1;                    /* takes all the height the bar leaves */
+            min-height: 0;              /* required for the inner scroll to work */
             display: grid;
-            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);   /* posiciones 60% · noticias 40% */
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);   /* positions 60% · news 40% */
             gap: 1rem;
             padding: 1rem 1.5rem;
         }
 
-        /* Cada recuadro: título arriba y contenido con su propio scroll */
+        /* Each card: title on top and content with its own scroll */
         .card {
             background: var(--panel);
             border: 1px solid var(--border);
@@ -91,22 +91,22 @@
         }
         .card-header h2 { margin: 0; font-size: 1rem; }
         .card-header .count { color: var(--muted); font-size: 0.8rem; }
-        .scroll { flex: 1; min-height: 0; overflow-y: auto; }   /* la zona que hace scroll */
+        .scroll { flex: 1; min-height: 0; overflow-y: auto; }   /* the scrolling area */
 
-        /* Barras de scroll discretas: finas e invisibles, solo aparecen al pasar el ratón por el recuadro */
+        /* Discreet scrollbars: thin and invisible until the mouse is over the card */
         .scroll {
-            scrollbar-width: thin;                         /* barra fina */
-            scrollbar-color: transparent transparent;      /* (color de la barra, color del carril): invisibles */
+            scrollbar-width: thin;                         /* thin bar */
+            scrollbar-color: transparent transparent;      /* (thumb colour, track colour): invisible */
         }
-        .scroll:hover { scrollbar-color: #3a3f4b transparent; }   /* al pasar el ratón: gris oscuro */
+        .scroll:hover { scrollbar-color: #3a3f4b transparent; }   /* on hover: dark grey */
 
-        /* Lo mismo para Safari, que todavía usa su propia forma de escribirlo */
+        /* The same for Safari, which still uses its own syntax */
         .scroll::-webkit-scrollbar { width: 6px; }
         .scroll::-webkit-scrollbar-track { background: transparent; }
         .scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
         .scroll:hover::-webkit-scrollbar-thumb { background: #3a3f4b; }
 
-        /* ===== Tabla de posiciones, compacta ===== */
+        /* ===== Compact positions table ===== */
         table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
         th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); }
         th {
@@ -114,14 +114,14 @@
             font-weight: 600;
             text-transform: uppercase;
             font-size: 0.7rem;
-            position: sticky;           /* la cabecera se queda fija al hacer scroll */
+            position: sticky;           /* the header stays in place while scrolling */
             top: 0;
             background: var(--panel);
         }
         tbody tr:hover { background: #1c2029; }
         .num {
-            text-align: right;                  /* números alineados a la derecha, como en cualquier app financiera */
-            font-variant-numeric: tabular-nums; /* todas las cifras del mismo ancho: las columnas cuadran */
+            text-align: right;                  /* numbers aligned right, as in any finance app */
+            font-variant-numeric: tabular-nums; /* all digits the same width, so columns line up */
             white-space: nowrap;
         }
         .symbol { font-weight: 600; }
@@ -132,13 +132,13 @@
             max-width: 220px;
             white-space: nowrap;
             overflow: hidden;
-            text-overflow: ellipsis;    /* nombres largos acaban en "…" */
+            text-overflow: ellipsis;    /* long names end in "…" */
         }
         .positive { color: var(--green); }
         .negative { color: var(--red); }
         .empty { color: var(--muted); font-size: 0.85rem; }
 
-        /* ===== Noticias ===== */
+        /* ===== News ===== */
         .tabs { display: flex; gap: 1rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
         .tab {
             background: transparent;
@@ -202,7 +202,7 @@
         }
         .ticker-badge:hover { background: #2563eb; color: white; }
 
-        /* ===== Aviso del modo demo ===== */
+        /* ===== Demo mode notice ===== */
         .demo-badge {
             margin-left: 0.6rem;
             padding: 0.15rem 0.55rem;
@@ -214,10 +214,10 @@
             white-space: nowrap;
         }
 
-        /* ===== Tarjetas de resumen de la cuenta ===== */
+        /* ===== Account summary cards ===== */
         .stats {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));   /* 4 tarjetas del mismo ancho */
+            grid-template-columns: repeat(4, minmax(0, 1fr));   /* 4 cards of equal width */
             gap: 1rem;
             padding: 1rem 1.5rem 0;
         }
@@ -234,10 +234,10 @@
         .stat-value { font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums; }
         .stat-sub { color: var(--muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 
-        /* Ocultar: con !important para que gane siempre, aunque otra regla diga display:flex */
+        /* Hide: !important so it always wins, even over a rule that says display:flex */
         .hidden { display: none !important; }
 
-        /* ===== Pantallas estrechas (móvil, ventana pequeña): una sola columna y la página sí baja ===== */
+        /* ===== Narrow screens (phone, small window): a single column, and the page does scroll ===== */
         @media (max-width: 900px) {
             body { overflow: auto; height: auto; }
             .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -249,31 +249,31 @@
 </head>
 <body>
 
-    <!-- ===== Barra superior ===== -->
+    <!-- ===== Top bar ===== -->
     <header class="topbar">
-        <div class="brand">T212 <span>Visualizer</span><small class="demo-badge" th:if="${#arrays.contains(@environment.getActiveProfiles(), 'demo')}">Modo demo: datos inventados</small></div>
+        <div class="brand">T212 <span>Visualizer</span><small class="demo-badge" th:if="${#arrays.contains(@environment.getActiveProfiles(), 'demo')}">Demo mode: invented data</small></div>
         <nav class="nav">
-            <a href="/" class="active">Cartera</a>
-            <span class="soon" title="Próximamente">Calendario</span>
-            <span class="soon" title="Próximamente">Sectores</span>
-            <span class="soon" title="Próximamente">Gastos</span>
+            <a href="/" class="active">Portfolio</a>
+            <span class="soon" title="Coming soon">Calendar</span>
+            <span class="soon" title="Coming soon">Sectors</span>
+            <span class="soon" title="Coming soon">Expenses</span>
         </nav>
-        <button id="refresh-btn" class="refresh-btn" onclick="refresh()">⟳ Actualizar</button>
+        <button id="refresh-btn" class="refresh-btn" onclick="refresh()">⟳ Refresh</button>
     </header>
 
-    <!-- ===== Tarjetas de resumen de la cuenta ===== -->
-    <!-- Si el resumen aún no ha llegado (summary es null), se muestran tarjetas "Cargando…" -->
+    <!-- ===== Account summary cards ===== -->
+    <!-- If the summary has not arrived yet (summary is null), the cards say "Loading…" -->
     <section class="stats" th:if="${summary == null}">
-        <div class="stat"><span class="stat-label">Valor total</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
-        <div class="stat"><span class="stat-label">Depositado neto</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
-        <div class="stat"><span class="stat-label">Rentabilidad total</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
-        <div class="stat"><span class="stat-label">Efectivo</span><span class="stat-value">—</span><span class="stat-sub">Cargando…</span></div>
+        <div class="stat"><span class="stat-label">Total value</span><span class="stat-value">—</span><span class="stat-sub">Loading…</span></div>
+        <div class="stat"><span class="stat-label">Net deposits</span><span class="stat-value">—</span><span class="stat-sub">Loading…</span></div>
+        <div class="stat"><span class="stat-label">Total return</span><span class="stat-value">—</span><span class="stat-sub">Loading…</span></div>
+        <div class="stat"><span class="stat-label">Cash</span><span class="stat-value">—</span><span class="stat-sub">Loading…</span></div>
     </section>
 
     <!--
-        netDeposits viene de la tabla de movimientos, que puede ir por detrás del valor de la cuenta hasta que
-        termina la primera sincronización tras arrancar (o estar vacía): mientras tanto, las tarjetas de depositado
-        y rentabilidad dicen "Sincronizando…" en vez de mostrar una rentabilidad falsa.
+        netDeposits comes from the transactions table, which can lag behind the account value until the
+        first sync after startup finishes (or be empty): until then, the net deposits and return cards
+        say "Syncing…" instead of showing a false return.
     -->
     <section class="stats" th:if="${summary != null}"
              th:with="inv=${summary.investments()},
@@ -282,58 +282,58 @@
                       totalReturn=${hasDeposits ? summary.totalValue() - netDeposits : 0},
                       returnPercent=${hasDeposits ? totalReturn / netDeposits * 100 : 0}">
         <div class="stat">
-            <span class="stat-label">Valor total</span>
-            <span class="stat-value" th:text="${#numbers.formatDecimal(summary.totalValue(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">0,00 €</span>
-            <span class="stat-sub">Inversiones + efectivo</span>
+            <span class="stat-label">Total value</span>
+            <span class="stat-value" th:text="${#numbers.formatDecimal(summary.totalValue(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">0.00 €</span>
+            <span class="stat-sub">Investments + cash</span>
         </div>
         <div class="stat">
-            <span class="stat-label">Depositado neto</span>
+            <span class="stat-label">Net deposits</span>
             <span class="stat-value" th:if="${hasDeposits}"
-                  th:text="${#numbers.formatDecimal(netDeposits, 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">0,00 €</span>
+                  th:text="${#numbers.formatDecimal(netDeposits, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">0.00 €</span>
             <span class="stat-value" th:unless="${hasDeposits}">—</span>
-            <span class="stat-sub" th:text="${hasDeposits} ? 'Lo que has metido (sin cashback)' : 'Sincronizando movimientos…'">Lo que has metido</span>
+            <span class="stat-sub" th:text="${hasDeposits} ? 'What you have put in (excluding cashback)' : 'Syncing transactions…'">What you have put in</span>
         </div>
         <div class="stat">
-            <span class="stat-label">Rentabilidad total</span>
+            <span class="stat-label">Total return</span>
             <span class="stat-value" th:if="${hasDeposits}"
                   th:classappend="${totalReturn >= 0} ? 'positive' : 'negative'"
-                  th:text="${totalReturn >= 0 ? '+' : ''} + ${#numbers.formatDecimal(totalReturn, 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">+0,00 €</span>
+                  th:text="${totalReturn >= 0 ? '+' : ''} + ${#numbers.formatDecimal(totalReturn, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">+0.00 €</span>
             <span class="stat-value" th:unless="${hasDeposits}">—</span>
             <span class="stat-sub" th:if="${hasDeposits}">
                 <span th:classappend="${returnPercent >= 0} ? 'positive' : 'negative'"
-                      th:text="${returnPercent >= 0 ? '+' : ''} + ${#numbers.formatDecimal(returnPercent, 1, 'POINT', 2, 'COMMA')} + ' %'">+0,00 %</span>
-                sobre lo depositado ·
-                Abiertas <span th:classappend="${inv.unrealizedProfitLoss() >= 0} ? 'positive' : 'negative'"
-                               th:text="${inv.unrealizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.unrealizedProfitLoss(), 1, 'POINT', 2, 'COMMA')}">+0,00</span>
-                · Vendidas <span th:classappend="${inv.realizedProfitLoss() >= 0} ? 'positive' : 'negative'"
-                                 th:text="${inv.realizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.realizedProfitLoss(), 1, 'POINT', 2, 'COMMA')}">+0,00</span>
+                      th:text="${returnPercent >= 0 ? '+' : ''} + ${#numbers.formatDecimal(returnPercent, 1, 'COMMA', 2, 'POINT')} + ' %'">+0.00 %</span>
+                on net deposits ·
+                Open <span th:classappend="${inv.unrealizedProfitLoss() >= 0} ? 'positive' : 'negative'"
+                               th:text="${inv.unrealizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.unrealizedProfitLoss(), 1, 'COMMA', 2, 'POINT')}">+0.00</span>
+                · Closed <span th:classappend="${inv.realizedProfitLoss() >= 0} ? 'positive' : 'negative'"
+                                 th:text="${inv.realizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.realizedProfitLoss(), 1, 'COMMA', 2, 'POINT')}">+0.00</span>
             </span>
-            <span class="stat-sub" th:unless="${hasDeposits}">Sincronizando movimientos…</span>
+            <span class="stat-sub" th:unless="${hasDeposits}">Syncing transactions…</span>
         </div>
         <div class="stat">
-            <span class="stat-label">Efectivo</span>
-            <span class="stat-value" th:text="${#numbers.formatDecimal(summary.cash().availableToTrade(), 1, 'POINT', 2, 'COMMA')} + ' ' + ${cur}">0,00 €</span>
-            <span class="stat-sub">Disponible para invertir</span>
+            <span class="stat-label">Cash</span>
+            <span class="stat-value" th:text="${#numbers.formatDecimal(summary.cash().availableToTrade(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">0.00 €</span>
+            <span class="stat-sub">Available to invest</span>
         </div>
     </section>
 
     <main class="layout">
 
-        <!-- ===== Columna izquierda: posiciones ===== -->
+        <!-- ===== Left column: positions ===== -->
         <section class="card">
             <div class="card-header">
-                <h2>Posiciones</h2>
-                <span class="count" th:text="${positions.size()} + ' valores'">0 valores</span>
+                <h2>Positions</h2>
+                <span class="count" th:text="${positions.size()} + ' holdings'">0 holdings</span>
             </div>
             <div class="scroll">
                 <table>
                     <thead>
                     <tr>
-                        <th>Valor</th>
-                        <th class="num">Cantidad</th>
-                        <th class="num">Precio medio</th>
-                        <th class="num">Precio actual</th>
-                        <th class="num">Valor total</th>
+                        <th>Holding</th>
+                        <th class="num">Quantity</th>
+                        <th class="num">Avg. price</th>
+                        <th class="num">Current price</th>
+                        <th class="num">Total value</th>
                         <th class="num">P/L %</th>
                     </tr>
                     </thead>
@@ -343,41 +343,41 @@
                             <span class="symbol" th:text="${p.symbol}">AAPL</span>
                             <span class="company" th:text="${p.name}">Apple Inc.</span>
                         </td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.quantity, 1, 'POINT', 4, 'COMMA')}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.averagePricePaid, 1, 'POINT', 2, 'COMMA')}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.currentPrice, 1, 'POINT', 2, 'COMMA')}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.currentValue, 1, 'POINT', 2, 'COMMA')}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.unrealizedPlPercent, 1, 'POINT', 2, 'COMMA')} + '%'"
+                        <td class="num" th:text="${#numbers.formatDecimal(p.quantity, 1, 'COMMA', 4, 'POINT')}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.averagePricePaid, 1, 'COMMA', 2, 'POINT')}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.currentPrice, 1, 'COMMA', 2, 'POINT')}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.currentValue, 1, 'COMMA', 2, 'POINT')}">0</td>
+                        <td class="num" th:text="${#numbers.formatDecimal(p.unrealizedPlPercent, 1, 'COMMA', 2, 'POINT')} + '%'"
                             th:classappend="${p.unrealizedPlPercent >= 0} ? 'positive' : 'negative'">0%</td>
                     </tr>
                     </tbody>
                 </table>
                 <p class="empty" th:if="${positions.isEmpty()}">
-                    Sin datos todavía — pulsa "Actualizar" (o espera al primer ciclo del scheduler).
+                    No data yet: press "Refresh" or wait for the first scheduled update.
                 </p>
             </div>
         </section>
 
-        <!-- ===== Columna derecha: noticias ===== -->
+        <!-- ===== Right column: news ===== -->
         <section class="card">
             <div class="tabs">
-                <button class="tab active" onclick="showTab('portfolio', this)">Mi cartera</button>
-                <button class="tab" onclick="showTab('market', this)">Mercado</button>
+                <button class="tab active" onclick="showTab('portfolio', this)">My portfolio</button>
+                <button class="tab" onclick="showTab('market', this)">Market</button>
             </div>
 
             <div id="portfolio">
-                <input type="search" id="news-search" class="search" placeholder="Buscar ticker o palabra…" oninput="searchNews(this.value)">
+                <input type="search" id="news-search" class="search" placeholder="Search ticker or keyword…" oninput="searchNews(this.value)">
                 <div class="filters">
-                    <button class="chip active" data-ticker="ALL" onclick="filterNews(this.dataset.ticker)">Todas</button>
+                    <button class="chip active" data-ticker="ALL" onclick="filterNews(this.dataset.ticker)">All</button>
                     <button class="chip" th:each="t : ${portfolioTickers}" th:data-ticker="${t}" th:text="${t}"
                             onclick="filterNews(this.dataset.ticker)">AAPL</button>
                 </div>
                 <ul class="news-list scroll">
-                    <li class="empty" th:if="${portfolioNews.isEmpty()}">Cargando noticias de tu cartera… recarga en unos segundos.</li>
+                    <li class="empty" th:if="${portfolioNews.isEmpty()}">Loading your portfolio news… reload in a few seconds.</li>
                     <li th:each="n : ${portfolioNews}" th:data-ticker="${n.related()}">
                         <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
                         <span class="ticker-badge" th:text="${n.related()}" th:data-ticker="${n.related()}" onclick="filterNews(this.dataset.ticker)">AAPL</span>
-                        <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Titular</a>
+                        <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Headline</a>
                     </li>
                 </ul>
             </div>
@@ -385,7 +385,7 @@
             <ul class="news-list scroll hidden" id="market">
                 <li th:each="n : ${news}">
                     <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
-                    <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Titular</a>
+                    <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Headline</a>
                 </li>
             </ul>
         </section>
@@ -394,18 +394,18 @@
 
     <script>
         function refresh() {
-            // Mientras se actualiza, el botón se desactiva (evita pulsarlo varias veces seguidas y pasarse del límite de T212)
+            // The button is disabled while refreshing, to avoid repeated clicks going over the T212 limit
             const button = document.getElementById('refresh-btn');
             button.disabled = true;
-            button.textContent = 'Actualizando…';
+            button.textContent = 'Refreshing…';
 
             fetch('/api/refresh', { method: 'POST' }).then(response => {
                 if (response.ok) {
                     location.reload();
                 } else {
-                    response.text().then(mensaje => alert('Error al actualizar: ' + mensaje));
+                    response.text().then(message => alert('Refresh failed: ' + message));
                     button.disabled = false;
-                    button.textContent = '⟳ Actualizar';
+                    button.textContent = '⟳ Refresh';
                 }
             });
         }
@@ -421,10 +421,10 @@
         }
 
         function filterNews(ticker) {
-            // Al usar una píldora o etiqueta, se vacía el buscador
+            // Using a chip or badge clears the search box
             document.getElementById('news-search').value = '';
 
-            // Si se pulsa el filtro que ya está activo, se desactiva (vuelve a "Todas")
+            // Pressing the active filter again turns it off (back to "All")
             const current = document.querySelector('.chip.active');
             if (current && current.dataset.ticker === ticker) {
                 ticker = 'ALL';

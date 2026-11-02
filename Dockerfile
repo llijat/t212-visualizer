@@ -1,20 +1,20 @@
-# --- Fase 1: compilar el proyecto con Maven ---
+# --- Stage 1: build the project with Maven ---
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# Primero solo el pom, para que Docker guarde las dependencias descargadas
-# y no las vuelva a bajar cada vez que cambia el código
+# Copy only the pom first, so Docker caches the downloaded dependencies
+# and does not fetch them again every time the code changes
 COPY pom.xml .
 RUN mvn -q dependency:go-offline
 
 COPY src ./src
 RUN mvn -q package -DskipTests
 
-# --- Fase 2: imagen final, solo con Java y el .jar ---
+# --- Stage 2: final image, with only Java and the .jar ---
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Usuario sin privilegios: si alguien encontrara un fallo en la app, no sería root
+# Unprivileged user: a flaw in the app would not give anyone root
 RUN useradd --system app
 USER app
 

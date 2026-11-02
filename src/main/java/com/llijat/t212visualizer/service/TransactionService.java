@@ -83,7 +83,7 @@ public class TransactionService {
             log.info("Synced {} new transactions.", newTransactions.size());}
 
             catch (Exception e) {
-            log.warn("No se pudieron sincronizar los movimientos: {}", e.getMessage());
+            log.warn("Could not sync the transactions: {}", e.getMessage());
         }
     }
 
@@ -95,7 +95,7 @@ public class TransactionService {
             } catch (HttpClientErrorException.TooManyRequests e) {
                 if (attempt == MAX_ATTEMPTS) throw e;
                 else {
-                    log.warn("Demasiadas peticiones, esperar un poco. Intento: {}/{}",attempt, MAX_ATTEMPTS);
+                    log.warn("Too many requests, waiting before retrying. Attempt: {}/{}",attempt, MAX_ATTEMPTS);
                     Thread.sleep(retryDelayMs);
                     ++attempt;
                 }

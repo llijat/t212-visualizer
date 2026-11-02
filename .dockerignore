@@ -1,13 +1,13 @@
-# Lo que NO debe entrar en la imagen de Docker
+# What must NOT go into the Docker image
 
-# Compilados locales (Docker compila el proyecto por su cuenta)
+# Local build output (Docker builds the project itself)
 target/
 
-# Secretos: nunca dentro de la imagen
+# Secrets: never inside the image
 src/main/resources/application-local.yml
 .env
 
-# Cosas del IDE y de git
+# IDE and git files
 .idea/
 *.iml
 .git/

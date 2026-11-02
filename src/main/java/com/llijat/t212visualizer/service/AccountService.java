@@ -31,7 +31,7 @@ public class AccountService {
             log.info("Refreshed account summary.");
         } catch (Exception e) {
             // Keep the last good summary: better slightly old numbers than empty cards
-            log.warn("No se pudo refrescar el resumen de la cuenta: {}", e.getMessage());
+            log.warn("Could not refresh the account summary: {}", e.getMessage());
         }
     }
 }

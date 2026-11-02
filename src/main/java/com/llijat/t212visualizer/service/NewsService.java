@@ -50,7 +50,7 @@ public class NewsService {
             log.info("Refreshed {} news.", generalNews.size());
         }
         catch (Exception e) {
-            log.warn("No se pudieron refrescar las noticias: {}", e.getMessage());
+            log.warn("Could not refresh the news: {}", e.getMessage());
 
         }
 
@@ -71,7 +71,7 @@ public class NewsService {
                         if (seenIds.add(news.id())) collected.add(news);
                     }
                 } catch (Exception e) {
-                    log.warn("No se pudieron cargar noticias del {}: {}", position.getSymbol(), e.getMessage());
+                    log.warn("Could not load news for {}: {}", position.getSymbol(), e.getMessage());
                 }
             }
         }

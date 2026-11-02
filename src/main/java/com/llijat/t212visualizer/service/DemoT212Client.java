@@ -12,7 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
-/** Empresas y cifras inventadas, para probar la app sin una cuenta de T212. */
+/** Invented companies and figures, to try the app without a T212 account. */
 @Service
 @Profile("demo")
 public class DemoT212Client implements T212Client {
@@ -27,11 +27,11 @@ public class DemoT212Client implements T212Client {
             position("WAYN_EU_EQ", "Wayne Enterprises", "EUR", "8", "75.00", "82.50", "600.00", "660.00", null)
     );
 
-    // Del más nuevo al más viejo, como la API real
+    // Newest first, like the real API
     private static final List<T212TransactionDto> TRANSACTIONS = List.of(
             transaction("demo-7", "INTEREST_ON_FREE_CASH", "2.35", 1),
             transaction("demo-6", "WITHDRAW", "-45.90", 3),
-            transaction("demo-5", "DEPOSIT", "0.69", 4), // cashback: menos de 5 €
+            transaction("demo-5", "DEPOSIT", "0.69", 4), // cashback: under 5 €
             transaction("demo-4", "DEPOSIT", "500.00", 30),
             transaction("demo-3", "FEE", "-0.40", 60),
             transaction("demo-2", "DEPOSIT", "1500.00", 120),
@@ -43,7 +43,7 @@ public class DemoT212Client implements T212Client {
         return POSITIONS;
     }
 
-    /** El efectivo y el total se calculan, para que las cifras siempre cuadren con posiciones y movimientos. */
+    /** Cash and total are calculated, so the figures always match the positions and transactions. */
     @Override
     public T212AccountSummaryDto fetchAccountSummary() {
         BigDecimal currentValue = sum(POSITIONS.stream().map(p -> p.walletImpact().currentValue()).toList());

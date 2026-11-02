@@ -15,7 +15,7 @@ class DemoT212ClientTest {
 
     private BigDecimal sumOfTypes(String... types) {
         BigDecimal total = BigDecimal.ZERO;
-        for (T212TransactionDto dto : client.fetchTransactions("cualquiera").items()) {
+        for (T212TransactionDto dto : client.fetchTransactions("any").items()) {
             for (String type : types) {
                 if (dto.type().equals(type)) total = total.add(dto.amount());
             }
@@ -35,13 +35,13 @@ class DemoT212ClientTest {
     @Test
     void summary_totalReturnMatchesItsParts() {
         T212AccountSummaryDto summary = client.fetchAccountSummary();
-        BigDecimal cashback = new BigDecimal("0.69"); // el único DEPOSIT de menos de 5 €
+        BigDecimal cashback = new BigDecimal("0.69"); // the only DEPOSIT under 5 €
 
-        // Lo mismo que calcula la página: valor total menos depositado neto
+        // What the page calculates: total value minus net deposits
         BigDecimal netDeposits = sumOfTypes("DEPOSIT", "WITHDRAW").subtract(cashback);
         BigDecimal totalReturn = summary.totalValue().subtract(netDeposits);
 
-        // Lo ganado con las abiertas y las vendidas, más el cashback, los intereses y las comisiones
+        // Gains on open and closed positions, plus cashback, interest and fees
         BigDecimal parts = summary.investments().unrealizedProfitLoss()
                 .add(summary.investments().realizedProfitLoss())
                 .add(cashback)
@@ -52,6 +52,6 @@ class DemoT212ClientTest {
 
     @Test
     void transactions_comeInOnePage() {
-        assertNull(client.fetchTransactions("cualquiera").nextPagePath());
+        assertNull(client.fetchTransactions("any").nextPagePath());
     }
 }

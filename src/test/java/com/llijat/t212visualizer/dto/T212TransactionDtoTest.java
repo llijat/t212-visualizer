@@ -11,16 +11,16 @@ class T212TransactionDtoTest {
 
     @Test
     void amount_isReadFromJsonWithoutLosingDigits() throws Exception {
-        // Preparar: un importe con más dígitos de los que un double puede guardar
+        // Arrange: an amount with more digits than a double can hold
         String json = """
                 {"amount": 1234567.1234567891, "currency": "EUR",
                  "dateTime": "2026-10-25T10:00:00Z", "reference": "a", "type": "DEPOSIT"}
                 """;
 
-        // Ejecutar
+        // Act
         T212TransactionDto dto = new ObjectMapper().readValue(json, T212TransactionDto.class);
 
-        // Comprobar: llega exacto, sin pasar por double
+        // Assert: it arrives exact, without going through double
         assertEquals(new BigDecimal("1234567.1234567891"), dto.amount());
     }
 }

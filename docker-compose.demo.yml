@@ -1,5 +1,5 @@
-# Modo demo: sin keys ni .env, y separado de la app real (otro nombre de proyecto, otro puerto).
-# Arrancar: docker compose -f docker-compose.demo.yml up --build
+# Demo mode: no keys or .env, kept apart from the real app (different project name and port).
+# Start it with: docker compose -f docker-compose.demo.yml up --build
 name: t212-demo
 
 services:

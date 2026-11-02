@@ -82,7 +82,7 @@ public class PositionService {
             }
         }
 
-        //Ahora borramos todas las ocurrencias cuyo ticker no esta en el set
+        // Delete every position whose ticker was not returned (it has been closed)
         
         for (Position position : positionRepository.findAll()) {
             if (!tickers.contains(position.getTicker()))positionRepository.delete(position);

@@ -45,7 +45,7 @@ class TransactionServiceTest {
 
     private static final String FIRST_PAGE = "/equity/history/transactions?limit=50";
 
-    // Antes de cada test: un service nuevo, con los mocks y SIN esperas (0 ms)
+    // Before each test: a new service, with the mocks and NO waiting (0 ms)
     @BeforeEach
     void setUp() {
         transactionService = new TransactionService(t212Client, transactionRepository, 0, 0);
@@ -59,74 +59,74 @@ class TransactionServiceTest {
         return new T212TransactionPageDto(List.of(items), nextPagePath);
     }
 
-    // Crea el mismo error que lanza RestClient cuando T212 responde con ese código (429, 401...)
+    // Builds the same error RestClient throws when T212 answers with that status (429, 401...)
     private HttpClientErrorException httpError(HttpStatus status) {
         return HttpClientErrorException.create(status, status.getReasonPhrase(), HttpHeaders.EMPTY, null, null);
     }
 
     @Test
     void sync_followsAllPages_andSavesEverything() {
-        // Preparar: dos páginas inventadas; la primera apunta a la segunda (con el prefijo /api/v0, como T212)
+        // Arrange: two invented pages; the first points to the second (with the /api/v0 prefix, like T212)
         when(t212Client.fetchTransactions(FIRST_PAGE))
                 .thenReturn(page("/api/v0/equity/history/transactions?limit=50&cursor=b",
                         transaction("a"), transaction("b")));
         when(t212Client.fetchTransactions("/equity/history/transactions?limit=50&cursor=b"))
                 .thenReturn(page(null, transaction("c")));
 
-        // Ejecutar
+        // Act
         transactionService.syncTransactions();
 
-        // Comprobar: se ha guardado UNA vez, con los 3 movimientos
+        // Assert: saved ONCE, with all 3 transactions
         verify(transactionRepository).saveAll(savedCaptor.capture());
         assertEquals(3, savedCaptor.getValue().size());
     }
 
     @Test
     void sync_stopsAtFirstKnownTransaction() {
-        // Preparar: una página con un movimiento conocido en medio, y que SÍ tiene página siguiente
+        // Arrange: a page with a known transaction in the middle, which DOES have a next page
         when(t212Client.fetchTransactions(FIRST_PAGE))
                 .thenReturn(page("/api/v0/equity/history/transactions?limit=50&cursor=b",
-                        transaction("nuevo1"), transaction("conocido"), transaction("nuevo2")));
-        when(transactionRepository.existsById("nuevo1")).thenReturn(false);
-        when(transactionRepository.existsById("conocido")).thenReturn(true);
+                        transaction("new1"), transaction("known"), transaction("new2")));
+        when(transactionRepository.existsById("new1")).thenReturn(false);
+        when(transactionRepository.existsById("known")).thenReturn(true);
 
-        // Ejecutar
+        // Act
         transactionService.syncTransactions();
 
-        // Comprobar: solo se guarda lo anterior al conocido, y no se pide la página siguiente
+        // Assert: only what comes before the known one is saved, and the next page is not requested
         verify(transactionRepository).saveAll(savedCaptor.capture());
         assertEquals(1, savedCaptor.getValue().size());
-        assertEquals("nuevo1", savedCaptor.getValue().get(0).getReference());
+        assertEquals("new1", savedCaptor.getValue().get(0).getReference());
         verify(t212Client, times(1)).fetchTransactions(anyString());
     }
 
     @Test
     void sync_whenAPageFails_savesNothing() {
-        // Preparar: la primera página va bien, pero la segunda falla (por ejemplo, se corta la conexión)
+        // Arrange: the first page works, but the second fails (for example, the connection drops)
         when(t212Client.fetchTransactions(FIRST_PAGE))
                 .thenReturn(page("/api/v0/equity/history/transactions?limit=50&cursor=b",
                         transaction("a"), transaction("b")));
         when(t212Client.fetchTransactions("/equity/history/transactions?limit=50&cursor=b"))
-                .thenThrow(new RuntimeException("Se ha cortado la conexión"));
+                .thenThrow(new RuntimeException("Connection lost"));
 
-        // Ejecutar
+        // Act
         transactionService.syncTransactions();
 
-        // Comprobar: todo o nada, no se guarda la primera página a medias
+        // Assert: all or nothing, the first page is not saved on its own
         verify(transactionRepository, never()).saveAll(any());
     }
 
     @Test
     void sync_retriesAfterTooManyRequests_andSavesEverything() {
-        // Preparar: la primera vez T212 responde 429; la segunda, la página llega bien
+        // Arrange: T212 answers 429 the first time; the second time the page arrives
         when(t212Client.fetchTransactions(FIRST_PAGE))
                 .thenThrow(httpError(HttpStatus.TOO_MANY_REQUESTS))
                 .thenReturn(page(null, transaction("a"), transaction("b")));
 
-        // Ejecutar
+        // Act
         transactionService.syncTransactions();
 
-        // Comprobar: ha pedido la página 2 veces y, al final, ha guardado todo
+        // Assert: the page was requested twice and everything was saved in the end
         verify(t212Client, times(2)).fetchTransactions(FIRST_PAGE);
         verify(transactionRepository).saveAll(savedCaptor.capture());
         assertEquals(2, savedCaptor.getValue().size());
@@ -134,83 +134,83 @@ class TransactionServiceTest {
 
     @Test
     void sync_givesUpAfterThreeTooManyRequests_andSavesNothing() {
-        // Preparar: T212 responde 429 siempre
+        // Arrange: T212 always answers 429
         when(t212Client.fetchTransactions(FIRST_PAGE))
                 .thenThrow(httpError(HttpStatus.TOO_MANY_REQUESTS));
 
-        // Ejecutar
+        // Act
         transactionService.syncTransactions();
 
-        // Comprobar: lo intenta exactamente 3 veces, se rinde y no guarda nada
+        // Assert: exactly 3 attempts, then it gives up and saves nothing
         verify(t212Client, times(3)).fetchTransactions(FIRST_PAGE);
         verify(transactionRepository, never()).saveAll(any());
     }
 
     @Test
     void sync_doesNotRetryOtherErrors() {
-        // Preparar: credenciales malas (401); esperar no lo arreglaría
+        // Arrange: bad credentials (401); waiting would not fix them
         when(t212Client.fetchTransactions(FIRST_PAGE))
                 .thenThrow(httpError(HttpStatus.UNAUTHORIZED));
 
-        // Ejecutar
+        // Act
         transactionService.syncTransactions();
 
-        // Comprobar: un solo intento, sin reintentos, y nada guardado
+        // Assert: a single attempt, no retries, and nothing saved
         verify(t212Client, times(1)).fetchTransactions(FIRST_PAGE);
         verify(transactionRepository, never()).saveAll(any());
     }
 
     @Test
     void sync_savesTheExactAmount() {
-        // Preparar: un movimiento de 10.10 (ver el ayudante transaction)
+        // Arrange: a transaction of 10.10 (see the transaction helper)
         when(t212Client.fetchTransactions(FIRST_PAGE))
                 .thenReturn(page(null, transaction("a")));
 
-        // Ejecutar
+        // Act
         transactionService.syncTransactions();
 
-        // Comprobar: el importe llega tal cual a la base de datos
+        // Assert: the amount reaches the database unchanged
         verify(transactionRepository).saveAll(savedCaptor.capture());
         assertEquals(new BigDecimal("10.10"), savedCaptor.getValue().get(0).getAmount());
     }
 
     @Test
     void firstSyncDone_isTrueAfterASuccessfulSync() {
-        // Preparar
+        // Arrange
         when(t212Client.fetchTransactions(FIRST_PAGE))
                 .thenReturn(page(null, transaction("a")));
         assertFalse(transactionService.isFirstSyncDone());
 
-        // Ejecutar
+        // Act
         transactionService.syncTransactions();
 
-        // Comprobar
+        // Assert
         assertTrue(transactionService.isFirstSyncDone());
     }
 
     @Test
     void firstSyncDone_staysFalseWhenTheSyncFails() {
-        // Preparar: T212 no responde
+        // Arrange: T212 does not respond
         when(t212Client.fetchTransactions(FIRST_PAGE))
-                .thenThrow(new RuntimeException("Se ha cortado la conexión"));
+                .thenThrow(new RuntimeException("Connection lost"));
 
-        // Ejecutar
+        // Act
         transactionService.syncTransactions();
 
-        // Comprobar: los datos pueden estar desactualizados, así que sigue en false
+        // Assert: the data may be stale, so it stays false
         assertFalse(transactionService.isFirstSyncDone());
     }
 
     @Test
     void getNetDeposits_usesCashbackThresholdOfFiveEuros() {
-        // Preparar: el repositorio solo responde si el umbral vale 5 (con compareTo: 5.0 y 5.00 valen lo mismo)
+        // Arrange: the repository only answers if the threshold is 5 (compareTo treats 5.0 and 5.00 as equal)
         when(transactionRepository.sumNetDeposits(argThat(threshold -> threshold.compareTo(new BigDecimal("5")) == 0)))
                 .thenReturn(new BigDecimal("9871.25"));
 
-        // Ejecutar
+        // Act
         BigDecimal netDeposits = transactionService.getNetDeposits();
 
-        // Comprobar
+        // Assert
         assertEquals(new BigDecimal("9871.25"), netDeposits);
     }
 }

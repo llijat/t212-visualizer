@@ -1,12 +1,14 @@
 # T212 Visualizer
 
+[![CI](https://github.com/llijat/t212-visualizer/actions/workflows/ci.yml/badge.svg)](https://github.com/llijat/t212-visualizer/actions/workflows/ci.yml)
+
 A personal portfolio dashboard for [Trading 212](https://www.trading212.com) accounts: positions, total account return and news about the companies you hold, on one screen.
 
 > **Personal project, not affiliated with Trading 212. Not financial advice.**
 
 ![Dashboard running in demo mode with invented data](docs/dashboard-demo.jpg)
 
-*Demo mode, with invented companies and figures. The interface is in Spanish.*
+*Demo mode, with invented companies and figures.*
 
 ## Try it in one minute
 
@@ -85,7 +87,7 @@ To run it from an IDE instead, copy `src/main/resources/application-local.exampl
 mvn test
 ```
 
-The tests use JUnit 5 and Mockito, and need neither a database nor network access. They cover the sync algorithm (pagination, stopping at known movements, all-or-nothing, retries), P/L calculations, exact amount parsing and the consistency of the demo data.
+The tests use JUnit 5 and Mockito, and need neither a database nor network access. GitHub Actions runs them and builds the Docker image on every push. They cover the sync algorithm (pagination, stopping at known movements, all-or-nothing, retries), P/L calculations, exact amount parsing and the consistency of the demo data.
 
 ## Known limitations
 

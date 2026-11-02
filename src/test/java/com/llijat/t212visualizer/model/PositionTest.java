@@ -58,7 +58,7 @@ class PositionTest {
 
     @Test
     void getUnrealizedPlPercent_withZeroCost_returnsZero() {
-        // "0.0000" es como llega de la base de datos: equals("0") no lo detectaría, signum() sí
+        // "0.0000" is how it comes from the database: equals("0") would miss it, signum() does not
         Position position = positionWithPl("10", "0.0000");
 
         BigDecimal percent = position.getUnrealizedPlPercent();
@@ -68,7 +68,7 @@ class PositionTest {
 
     @Test
     void getUnrealizedPlPercent_withEndlessDecimals_roundsToTwo() {
-        // 1 / 3 no termina nunca: sin indicar decimales, divide() lanzaría una excepción
+        // 1 / 3 never ends: without a scale, divide() would throw an exception
         Position position = positionWithPl("1", "3");
 
         BigDecimal percent = position.getUnrealizedPlPercent();
