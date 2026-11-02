@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +22,7 @@ public class TransactionService {
 
     private static final String FIRST_PAGE = "/equity/history/transactions?limit=50";
     private static final String API_PREFIX = "/api/v0";
-    private static final double CASHBACK_THRESHOLD = 5.0;
+    private static final BigDecimal CASHBACK_THRESHOLD = new BigDecimal("5.0");
     private static final int MAX_ATTEMPTS = 3;
 
     private final T212Client t212Client;
@@ -37,7 +38,7 @@ public class TransactionService {
         this.retryDelayMs = retryDelayMs;
     }
 
-    public double getNetDeposits() {
+    public BigDecimal getNetDeposits() {
         return transactionRepository.sumNetDeposits(CASHBACK_THRESHOLD);
     }
 

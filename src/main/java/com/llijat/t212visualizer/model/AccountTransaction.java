@@ -1,11 +1,11 @@
 package com.llijat.t212visualizer.model;
 
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jdk.jfr.Enabled;
-
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
@@ -13,9 +13,9 @@ import java.time.Instant;
 public class AccountTransaction {
     @Id
     private String reference;
-
     private String type;
-    private double amount;
+    @Column(precision = 19, scale = 4)
+    private BigDecimal amount;
     private String currency;
     private Instant dateTime;
 
@@ -23,7 +23,7 @@ public class AccountTransaction {
         //required by JPA
     }
 
-    public AccountTransaction(String reference, String type, double amount, String currency, Instant dateTime) {
+    public AccountTransaction(String reference, String type, BigDecimal amount, String currency, Instant dateTime) {
         this.reference = reference;
         this.type = type;
         this.amount = amount;
@@ -33,7 +33,7 @@ public class AccountTransaction {
 
     public String getReference() {return reference;}
     public String getType() {return type;}
-    public double getAmount() {return amount;}
+    public BigDecimal getAmount() {return amount;}
     public String getCurrency() {return currency;}
     public Instant getDateTime() {return dateTime;}
 }

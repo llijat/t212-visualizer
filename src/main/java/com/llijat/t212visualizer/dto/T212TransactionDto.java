@@ -1,7 +1,9 @@
 package com.llijat.t212visualizer.dto;
 
+import java.math.BigDecimal;
+
 public record T212TransactionDto (
-        double amount,
+        BigDecimal amount,
         String currency,
         String dateTime,
         String reference,

@@ -5,9 +5,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
+
 public interface AccountTransactionRepository extends JpaRepository<AccountTransaction, String> {
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM AccountTransaction t " +
             "WHERE (t.type = 'DEPOSIT' AND t.amount >= :cashbackThreshold) " +
             "OR t.type IN ('WITHDRAW', 'TRANSFER')")
-    double sumNetDeposits(@Param("cashbackThreshold") double cashbackThreshold);
+    BigDecimal sumNetDeposits(@Param("cashbackThreshold") BigDecimal cashbackThreshold);
 }

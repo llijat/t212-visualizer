@@ -15,11 +15,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -48,7 +50,7 @@ class TransactionServiceTest {
     }
 
     private T212TransactionDto transaction(String reference) {
-        return new T212TransactionDto(10.0, "EUR", "2026-10-25T10:00:00Z", reference, "DEPOSIT");
+        return new T212TransactionDto(new BigDecimal("10.10"), "EUR", "2026-10-25T10:00:00Z", reference, "DEPOSIT");
     }
 
     private T212TransactionPageDto page(String nextPagePath, T212TransactionDto... items) {
@@ -157,14 +159,29 @@ class TransactionServiceTest {
     }
 
     @Test
-    void getNetDeposits_usesCashbackThresholdOfFiveEuros() {
-        // Preparar: el repositorio solo responde si le piden el umbral de 5 €
-        when(transactionRepository.sumNetDeposits(5.0)).thenReturn(9871.25);
+    void sync_savesTheExactAmount() {
+        // Preparar: un movimiento de 10.10 (ver el ayudante transaction)
+        when(t212Client.fetchTransactions(FIRST_PAGE))
+                .thenReturn(page(null, transaction("a")));
 
         // Ejecutar
-        double netDeposits = transactionService.getNetDeposits();
+        transactionService.syncTransactions();
+
+        // Comprobar: el importe llega tal cual a la base de datos
+        verify(transactionRepository).saveAll(savedCaptor.capture());
+        assertEquals(new BigDecimal("10.10"), savedCaptor.getValue().get(0).getAmount());
+    }
+
+    @Test
+    void getNetDeposits_usesCashbackThresholdOfFiveEuros() {
+        // Preparar: el repositorio solo responde si el umbral vale 5 (con compareTo: 5.0 y 5.00 valen lo mismo)
+        when(transactionRepository.sumNetDeposits(argThat(threshold -> threshold.compareTo(new BigDecimal("5")) == 0)))
+                .thenReturn(new BigDecimal("9871.25"));
+
+        // Ejecutar
+        BigDecimal netDeposits = transactionService.getNetDeposits();
 
         // Comprobar
-        assertEquals(9871.25, netDeposits, 0.001);
+        assertEquals(new BigDecimal("9871.25"), netDeposits);
     }
 }
