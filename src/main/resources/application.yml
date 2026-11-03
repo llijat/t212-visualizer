@@ -35,6 +35,8 @@ t212:
   sync:
     page-delay-ms: 3500
     retry-delay-ms: 15000
+  export:
+    poll-delay-ms: 65000
 
 finnhub:
   base-url: https://finnhub.io/api/v1
