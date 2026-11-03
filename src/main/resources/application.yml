@@ -8,6 +8,10 @@ spring:
     scheduling:
       pool:
         size: 4
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
   flyway:
     baseline-on-migrate: true
     baseline-version: 1

@@ -9,3 +9,6 @@ NOTAS_DEL_PROYECTO.md
 
 .DS_Store
 Thumbs.db
+
+# Trading 212 exports contain personal purchases
+*.csv

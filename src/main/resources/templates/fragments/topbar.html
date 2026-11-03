@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+
+<!-- Brand and menu, shared by every page. "active" is the page being shown: portfolio or expenses. -->
+<th:block th:fragment="bar(active)">
+
+    <!-- The app's icons: each page uses them with <use href="#icon-name"> -->
+    <svg class="sprite" aria-hidden="true">
+        <symbol id="icon-portfolio" viewBox="0 0 24 24"><path d="M10 3.2a9 9 0 1 0 10.8 10.8h-8.8a2 2 0 0 1-2-2z"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5h-5.5z"/></symbol>
+        <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M16 3v4M8 3v4M4 11h16"/></symbol>
+        <symbol id="icon-sectors" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="10" rx="1"/><rect x="13" y="4" width="7" height="5" rx="1"/><rect x="13" y="11" width="7" height="9" rx="1"/><rect x="4" y="16" width="7" height="4" rx="1"/></symbol>
+        <symbol id="icon-expenses" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h.01M11 15h2"/></symbol>
+        <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-15.5-2M4 5v4h4M4 13a8 8 0 0 0 15.5 2M20 19v-4h-4"/></symbol>
+        <symbol id="icon-briefcase" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></symbol>
+        <symbol id="icon-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18"/></symbol>
+    </svg>
+
+    <div class="brand">T212 <span>Visualizer</span><small class="demo-badge" th:if="${#arrays.contains(@environment.getActiveProfiles(), 'demo')}">Demo mode: invented data</small></div>
+
+    <nav class="nav" aria-label="Sections">
+        <a href="/" class="nav-item" title="Portfolio" th:classappend="${active == 'portfolio'} ? 'active'" th:attr="aria-current=${active == 'portfolio'} ? 'page'">
+            <svg class="icon" aria-hidden="true"><use href="#icon-portfolio"/></svg><span class="nav-label">Portfolio</span>
+        </a>
+        <a href="/expenses" class="nav-item" title="Expenses" th:classappend="${active == 'expenses'} ? 'active'" th:attr="aria-current=${active == 'expenses'} ? 'page'">
+            <svg class="icon" aria-hidden="true"><use href="#icon-expenses"/></svg><span class="nav-label">Expenses</span>
+        </a>
+        <span class="nav-item soon" title="Calendar: coming soon">
+            <svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg><span class="nav-label">Calendar</span>
+        </span>
+        <span class="nav-item soon" title="Sectors: coming soon">
+            <svg class="icon" aria-hidden="true"><use href="#icon-sectors"/></svg><span class="nav-label">Sectors</span>
+        </span>
+    </nav>
+</th:block>
+
+</body>
+</html>

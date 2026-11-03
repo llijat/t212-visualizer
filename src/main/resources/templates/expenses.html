@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Expenses · T212 Visualizer</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <style>
+        /* ===== Import result, above the content ===== */
+        .notice {
+            margin: 1rem 1.5rem 0;
+            padding: 0.7rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--panel);
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 0.25rem 0.9rem;
+            font-size: 0.9rem;
+        }
+        .notice strong { font-weight: 600; }
+        .notice-success { border-color: #1f5c3a; }
+        .notice-success strong { color: var(--green); }
+        .notice-error { border-color: #7a2e2e; }
+        .notice-error strong { color: var(--red); }
+        .notice details { color: var(--muted); font-size: 0.82rem; }
+        .notice summary { cursor: pointer; }
+        .notice summary:hover { color: var(--text); }
+        .skipped {
+            list-style: none;
+            margin: 0.45rem 0 0;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem 1rem;
+        }
+        .skipped b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+        /* ===== No data yet: the drop area has the shape of a bank card ===== */
+        .welcome {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            padding: 1.5rem;
+        }
+        .card-drop {
+            position: relative;
+            width: min(440px, 100%);
+            aspect-ratio: 85.6 / 54;    /* the real proportions of a bank card */
+            border: 1.5px dashed #3d4452;
+            border-radius: 20px;
+            background: var(--panel);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: flex-end;
+            gap: 0.3rem;
+            padding: 1.75rem;
+            text-align: left;
+        }
+        .card-drop:hover, .card-drop.is-busy { border-color: var(--accent); background: #1a1f29; }
+        .card-drop.is-busy { cursor: wait; }
+        .card-chip {
+            position: absolute;
+            top: 1.75rem;
+            left: 1.75rem;
+            width: 46px;
+            height: 34px;
+            border: 1.5px solid #5b6372;
+            border-radius: 7px;
+            background:
+                linear-gradient(#5b6372, #5b6372) 0 50% / 100% 1.5px no-repeat,
+                linear-gradient(#5b6372, #5b6372) 50% 0 / 1.5px 100% no-repeat;
+        }
+        .card-brand-icon { position: absolute; top: 1.75rem; right: 1.75rem; font-size: 1.5rem; color: var(--accent); }
+        .card-title { font-size: 1.35rem; font-weight: 600; }
+        .card-hint { color: var(--muted); font-size: 0.9rem; }
+        .welcome-note { max-width: 44ch; margin: 0; text-align: center; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+
+        /* ===== With data: overview on top, two lists below ===== */
+        .spending {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+            grid-template-rows: auto minmax(0, 1fr);
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel h2 { margin: 0 0 0.6rem; font-size: 1rem; }
+
+        /* ===== Overview: the total as a sentence, next to the months ===== */
+        .overview {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr);
+            gap: 2rem;
+            align-items: stretch;
+        }
+        .total { display: flex; flex-direction: column; justify-content: center; gap: 0.5rem; }
+        .total-label { color: var(--muted); font-size: 0.9rem; }
+        .total-value {
+            font-size: clamp(2rem, 3.1vw, 2.9rem);
+            font-weight: 700;
+            line-height: 1.05;
+            letter-spacing: -0.02em;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .total-detail { margin: 0; max-width: 34ch; color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+        .total-detail b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+        /* ===== Bars per month. Each height is its amount (--v) over the biggest month (--max) ===== */
+        .chart {
+            list-style: none;
+            margin: 0;
+            padding: 1.5rem 0 0;
+            height: 190px;
+            display: flex;
+            gap: 2px;
+        }
+        .chart-column {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            border-radius: 4px;
+            cursor: default;
+        }
+        .chart-plot {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .chart-bar {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            width: min(70%, 34px);
+            transform: translateX(-50%);
+            height: max(2px, calc(var(--v) / var(--max) * 100%));
+            border-radius: 4px 4px 0 0;
+            background: #3b6ea5;
+        }
+        .chart-column.is-peak .chart-bar { background: var(--accent); }
+        .chart-column:hover .chart-bar, .chart-column:focus-visible .chart-bar { background: #93c5fd; }
+
+        .chart-value, .chart-tip {
+            position: absolute;
+            left: 50%;
+            bottom: calc(max(2px, var(--v) / var(--max) * 100%) + 0.3rem);
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .chart-value { color: var(--text); font-weight: 600; }
+        .chart-tip {
+            z-index: 1;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #252a34;
+            color: var(--text);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .chart-column:hover .chart-tip, .chart-column:focus-visible .chart-tip { opacity: 1; }
+        /* At both ends of the chart the tip opens inwards, so it never leaves the screen */
+        .chart-column:nth-child(-n+3) .chart-tip { left: 0; transform: none; }
+        .chart-column:nth-last-child(-n+3) .chart-tip { left: auto; right: 0; transform: none; }
+        /* The month's tip replaces the fixed label of the peak, so they do not overlap */
+        .chart-column:hover .chart-value, .chart-column:focus-visible .chart-value { opacity: 0; }
+
+        .chart-axis {
+            height: 2.1rem;
+            padding-top: 0.3rem;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.72rem;
+            line-height: 1.25;
+        }
+        .chart-year { display: block; color: var(--text); font-variant-numeric: tabular-nums; }
+
+        /* Only on load, and only if the person has not asked for reduced motion */
+        @media (prefers-reduced-motion: no-preference) {
+            .chart-bar { transform-origin: bottom; animation: grow 0.5s ease-out both; }
+            @keyframes grow {
+                from { transform: translateX(-50%) scaleY(0); }
+                to { transform: translateX(-50%) scaleY(1); }
+            }
+        }
+
+        /* ===== Ranked lists: categories and merchants ===== */
+        .rank-list { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+        .rank-list {
+            scrollbar-width: thin;
+            scrollbar-color: transparent transparent;
+        }
+        .rank-list:hover { scrollbar-color: #3a3f4b transparent; }
+
+        .rank-row {
+            display: grid;
+            grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+            column-gap: 0.75rem;
+            align-items: center;
+            padding: 0.5rem 0.25rem 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .rank-row:last-child { border-bottom: none; }
+        .rank-symbol {
+            grid-row: span 2;
+            width: 2.25rem;
+            height: 2.25rem;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            background: var(--accent-bg);
+            color: #93c5fd;
+            font-size: 1.05rem;
+        }
+        .rank-initial { font-size: 0.85rem; font-weight: 600; }
+        .rank-name { min-width: 0; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rank-amount { font-size: 0.9rem; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .rank-track { display: block; height: 4px; margin-top: 0.3rem; }
+        .rank-fill {
+            display: block;
+            height: 100%;
+            min-width: 3px;
+            width: calc(var(--v) / var(--max) * 100%);
+            border-radius: 2px;
+            background: #3b6ea5;
+        }
+        .rank-detail { color: var(--muted); font-size: 0.75rem; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+        /* ===== Dragging a file over the page ===== */
+        .drop-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            display: none;
+            place-items: center;
+            background: rgba(15, 17, 21, 0.88);
+            border: 3px dashed var(--accent);
+            color: var(--text);
+            font-size: 1.5rem;
+            font-weight: 600;
+            pointer-events: none;
+        }
+        body.is-dragging .drop-overlay { display: grid; }
+
+        /* ===== Narrow screens: a single column ===== */
+        @media (max-width: 900px) {
+            .notice { margin: 1rem 1rem 0; }
+            .spending { display: block; padding: 1rem; }
+            .spending > .panel + .panel { margin-top: 1rem; }
+            .overview { grid-template-columns: 1fr; gap: 1rem; }
+            .chart-axis { font-size: 0.65rem; }
+            .chart-value { display: none; }
+            .rank-list { overflow-y: visible; }
+            .welcome { padding-block: 2rem; }
+        }
+    </style>
+</head>
+<body th:with="hasData=${spending != null and spending.payments() > 0}">
+
+    <header class="topbar">
+        <th:block th:replace="~{fragments/topbar :: bar('expenses')}"></th:block>
+        <button type="button" class="topbar-action" id="import-button" title="Import CSV" th:if="${hasData}">
+            <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 9l5-5 5 5M12 4v12"/></svg>
+            <span class="action-label" id="import-button-label">Import CSV</span>
+        </button>
+    </header>
+
+    <!-- The icons of each T212 merchant category. A category without an icon uses the three dots. -->
+    <svg class="sprite" aria-hidden="true">
+        <symbol id="cat-RETAIL_STORES" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="17" cy="19" r="2"/><path d="M17 17H6V3H4M6 5l14 1-1 7H6"/></symbol>
+        <symbol id="cat-RESTAURANTS" viewBox="0 0 24 24"><path d="M4 3v7a3 3 0 0 0 6 0V3M7 3v18M17 21V3c-3 1-4 4-4 8h4"/></symbol>
+        <symbol id="cat-TRANSPORT" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="13" rx="2"/><path d="M4 11h16M12 4v7M7 17v3M17 17v3"/></symbol>
+        <symbol id="cat-CLOTHING_STORES" viewBox="0 0 24 24"><path d="M15 4l6 2-1 5-3-1v10H7V10l-3 1-1-5 6-2a3 3 0 0 0 6 0"/></symbol>
+        <symbol id="cat-ENTERTAINMENT" viewBox="0 0 24 24"><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7a2 2 0 0 1 2-2"/></symbol>
+        <symbol id="cat-HOTELS" viewBox="0 0 24 24"><path d="M3 7v11M3 14h18M21 18v-7a3 3 0 0 0-3-3h-7v6"/><circle cx="7" cy="10" r="2"/></symbol>
+        <symbol id="cat-SERVICE_PROVIDERS" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></symbol>
+        <symbol id="cat-PERSONAL_SERVICES" viewBox="0 0 24 24"><circle cx="6" cy="7" r="3"/><circle cx="6" cy="17" r="3"/><path d="M8.5 8.5L20 19M8.5 15.5L20 5"/></symbol>
+        <symbol id="cat-AUTOMOBILE_RENTAL" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/></symbol>
+        <symbol id="cat-AUTOMOBILE" viewBox="0 0 24 24"><path d="M5 17H4a1 1 0 0 1-1-1v-4l2-6h14l2 6v4a1 1 0 0 1-1 1h-1M3 12h18M9 17h6"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></symbol>
+        <symbol id="cat-BUSINESS_SERVICES" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></symbol>
+        <symbol id="cat-GOVERNMENT_SERVICES" viewBox="0 0 24 24"><path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M3 10l9-6 9 6"/></symbol>
+        <symbol id="cat-OTHER" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    </svg>
+
+    <!-- The form has no visible parts: the button, the card and dragging a file all fill it in -->
+    <form id="import-form" class="hidden" method="post" action="/expenses/import" enctype="multipart/form-data">
+        <input type="file" id="csv-file" name="file" accept=".csv,text/csv">
+    </form>
+
+    <!-- ===== What happened with the last file (only right after importing) ===== -->
+    <section class="notice notice-error" role="alert" th:if="${importError != null}">
+        <strong th:text="${importError}">This file could not be read.</strong>
+    </section>
+    <section class="notice notice-error hidden" role="alert" id="file-type-error">
+        <strong>Only CSV files can be imported. Export your history from Trading 212 as CSV and try again.</strong>
+    </section>
+
+    <section class="notice" role="status" th:if="${importResult != null}"
+             th:classappend="${importResult.imported() > 0} ? 'notice-success'"
+             th:with="imported=${importResult.imported()}, known=${importResult.alreadyKnown()}, skipped=${importResult.ignoredByAction()}">
+        <strong th:if="${imported > 0}" th:text="'Imported ' + ${imported} + (${imported == 1} ? ' new card payment.' : ' new card payments.')">Imported 12 new card payments.</strong>
+        <strong th:if="${imported == 0 and known > 0}">Nothing new in this file.</strong>
+        <strong th:if="${imported == 0 and known == 0}">This file has no card payments. Check that you exported the transactions.</strong>
+        <span th:if="${known > 0}" th:text="${known} + (${known == 1} ? ' payment was already saved.' : ' payments were already saved.')">3 payments were already saved.</span>
+        <details th:unless="${skipped.isEmpty()}">
+            <summary th:text="'Skipped ' + ${#numbers.formatInteger(#aggregates.sum(skipped.values()), 1, 'COMMA')} + ' rows that are not card payments'">Skipped 20 rows that are not card payments</summary>
+            <ul class="skipped">
+                <li th:each="entry : ${skipped}"><span th:text="${entry.key}">Market buy</span> <b th:text="${entry.value}">20</b></li>
+            </ul>
+        </details>
+    </section>
+
+    <!-- ===== No data yet: invite to import ===== -->
+    <main class="welcome" th:unless="${hasData}">
+        <button type="button" class="card-drop" id="card-drop">
+            <span class="card-chip" aria-hidden="true"></span>
+            <svg class="icon card-brand-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 9l5-5 5 5M12 4v12"/></svg>
+            <span class="card-title" id="card-drop-title">Drop your T212 CSV here</span>
+            <span class="card-hint">or click to choose the file</span>
+        </button>
+        <p class="welcome-note">Export your history from Trading 212 as CSV to see where your card money goes. You can import overlapping files: a payment is never counted twice.</p>
+    </main>
+
+    <!-- ===== With data: the summary ===== -->
+    <main class="spending" th:if="${hasData}">
+
+        <section class="panel overview" aria-labelledby="total-heading">
+            <div class="total">
+                <span class="total-label" id="total-heading">Spent with your card</span>
+                <span class="total-value" th:text="${#numbers.formatDecimal(spending.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
+                <p class="total-detail">
+                    <b th:text="${#numbers.formatInteger(spending.payments(), 1, 'COMMA')}">0</b> payments from
+                    <b th:text="${#temporals.format(spending.firstPayment(), 'dd/MM/yyyy')}">01/01/2026</b> to
+                    <b th:text="${#temporals.format(spending.lastPayment(), 'dd/MM/yyyy')}">01/01/2026</b>,
+                    about <b th:text="${#numbers.formatDecimal(spending.monthlyAverage(), 1, 'COMMA', 0, 'POINT')} + ' €'">0 €</b> a month.
+                </p>
+            </div>
+
+            <div>
+                <!-- The bars are for the eye; the table below gives screen readers the same figures -->
+                <ol class="chart" aria-hidden="true" th:style="'--max:' + ${spending.biggestMonth()}">
+                    <li class="chart-column" tabindex="0" th:each="m, stat : ${spending.months()}"
+                        th:with="isPeak=${m.total().compareTo(spending.biggestMonth()) == 0},
+                                 monthName=${#strings.substring(m.month().getMonth().name(), 0, 3)}"
+                        th:classappend="${isPeak} ? 'is-peak'"
+                        th:style="'--v:' + ${m.total()}">
+                        <div class="chart-plot">
+                            <span class="chart-bar" th:style="'animation-delay:' + ${stat.index * 25} + 'ms'"></span>
+                            <span class="chart-value" th:if="${isPeak}" th:text="${#numbers.formatDecimal(m.total(), 1, 'COMMA', 0, 'POINT')} + ' €'">0 €</span>
+                            <span class="chart-tip" th:text="${#strings.capitalize(#strings.toLowerCase(monthName))} + ' ' + ${m.month().getYear()} + ': ' + ${#numbers.formatDecimal(m.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">Jan 2026: 0.00 €</span>
+                        </div>
+                        <div class="chart-axis">
+                            <span th:text="${#strings.capitalize(#strings.toLowerCase(monthName))}">Jan</span>
+                            <span class="chart-year" th:if="${stat.first or m.month().getMonthValue() == 1}" th:text="${m.month().getYear()}">2026</span>
+                        </div>
+                    </li>
+                </ol>
+                <table class="visually-hidden">
+                    <caption>Card spending per month</caption>
+                    <tr><th scope="col">Month</th><th scope="col">Spent</th></tr>
+                    <tr th:each="m : ${spending.months()}">
+                        <td th:text="${m.month()}">2026-01</td>
+                        <td th:text="${#numbers.formatDecimal(m.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</td>
+                    </tr>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel" aria-labelledby="categories-heading">
+            <h2 id="categories-heading">Categories</h2>
+            <ul class="rank-list" th:if="${!spending.categories().isEmpty()}"
+                th:style="'--max:' + ${spending.categories()[0].total()}"
+                th:with="knownIcons=${ {'RETAIL_STORES','RESTAURANTS','TRANSPORT','CLOTHING_STORES','ENTERTAINMENT','HOTELS','SERVICE_PROVIDERS','PERSONAL_SERVICES','AUTOMOBILE_RENTAL','AUTOMOBILE','BUSINESS_SERVICES','GOVERNMENT_SERVICES'} }">
+                <li class="rank-row" th:each="c : ${spending.categories()}" th:style="'--v:' + ${c.total()}"
+                    th:with="share=${c.total() * 100 / spending.total()}">
+                    <span class="rank-symbol" aria-hidden="true">
+                        <svg class="icon"><use th:href="${knownIcons.contains(c.category())} ? ${'#cat-' + c.category()} : '#cat-OTHER'"/></svg>
+                    </span>
+                    <span class="rank-name" th:with="name=${c.category() == null ? 'Uncategorised' : #strings.capitalize(#strings.toLowerCase(#strings.replace(c.category(), '_', ' ')))}" th:text="${name}" th:title="${name}">Retail stores</span>
+                    <span class="rank-amount" th:text="${#numbers.formatDecimal(c.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
+                    <span class="rank-track" aria-hidden="true"><span class="rank-fill"></span></span>
+                    <span class="rank-detail" th:text="${c.payments()} + (${c.payments() == 1} ? ' payment, ' : ' payments, ') + ${share < 1 ? '<1' : #numbers.formatDecimal(share, 1, 0)} + ' %'">0 payments, 0 %</span>
+                </li>
+            </ul>
+        </section>
+
+        <section class="panel" aria-labelledby="merchants-heading">
+            <h2 id="merchants-heading">Top merchants</h2>
+            <ol class="rank-list" th:if="${!spending.topMerchants().isEmpty()}"
+                th:style="'--max:' + ${spending.topMerchants()[0].total()}">
+                <li class="rank-row" th:each="merchant : ${spending.topMerchants()}" th:style="'--v:' + ${merchant.total()}">
+                    <span class="rank-symbol rank-initial" aria-hidden="true" th:text="${#strings.toUpperCase(#strings.substring(merchant.name(), 0, 1))}">M</span>
+                    <span class="rank-name" th:text="${merchant.name()}" th:title="${merchant.name()}">Merchant</span>
+                    <span class="rank-amount" th:text="${#numbers.formatDecimal(merchant.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
+                    <span class="rank-track" aria-hidden="true"><span class="rank-fill"></span></span>
+                    <span class="rank-detail" th:text="${merchant.payments()} + (${merchant.payments() == 1} ? ' payment' : ' payments')">0 payments</span>
+                </li>
+            </ol>
+        </section>
+    </main>
+
+    <div class="drop-overlay" aria-hidden="true">Drop the CSV to import it</div>
+
+    <script>
+        const form = document.getElementById('import-form');
+        const fileInput = document.getElementById('csv-file');
+        const importButton = document.getElementById('import-button');   // only exists with data
+        const cardDrop = document.getElementById('card-drop');           // only exists without data
+        const fileTypeError = document.getElementById('file-type-error');
+
+        // Both controls open the browser's file picker
+        [importButton, cardDrop].forEach(control => {
+            if (control) control.addEventListener('click', () => fileInput.click());
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) sendFile();
+        });
+
+        function sendFile() {
+            // A dragged file can be anything; the picker's filter does not apply to it
+            if (!fileInput.files[0].name.toLowerCase().endsWith('.csv')) {
+                fileTypeError.classList.remove('hidden');
+                return;
+            }
+            fileTypeError.classList.add('hidden');
+
+            // Disabled while importing, to avoid sending the file twice
+            if (importButton) {
+                importButton.disabled = true;
+                document.getElementById('import-button-label').textContent = 'Importing…';
+            }
+            if (cardDrop) {
+                cardDrop.disabled = true;
+                cardDrop.classList.add('is-busy');
+                document.getElementById('card-drop-title').textContent = 'Importing…';
+            }
+            form.submit();
+        }
+
+        // Dragging a file: the whole page accepts it.
+        // The browser fires enter/leave for every element it crosses, so they are counted.
+        let dragDepth = 0;
+        const hasFile = event => event.dataTransfer && event.dataTransfer.types.includes('Files');
+
+        window.addEventListener('dragenter', event => {
+            if (!hasFile(event)) return;
+            event.preventDefault();
+            dragDepth++;
+            document.body.classList.add('is-dragging');
+        });
+        window.addEventListener('dragover', event => {
+            if (hasFile(event)) event.preventDefault();     // without this, the browser would open the file
+        });
+        window.addEventListener('dragleave', event => {
+            if (!hasFile(event)) return;
+            dragDepth--;
+            if (dragDepth === 0) document.body.classList.remove('is-dragging');
+        });
+        window.addEventListener('drop', event => {
+            if (!hasFile(event)) return;
+            event.preventDefault();
+            dragDepth = 0;
+            document.body.classList.remove('is-dragging');
+            fileInput.files = event.dataTransfer.files;
+            sendFile();
+        });
+    </script>
+</body>
+</html>

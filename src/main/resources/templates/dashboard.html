@@ -4,65 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>T212 Visualizer</title>
+    <link rel="stylesheet" href="/css/common.css">
     <style>
-        /* ===== App colours (change them here and the whole page follows) ===== */
-        :root {
-            color-scheme: dark;     /* tells the browser the page is dark, so its controls (scrollbars, search box...) match */
-            --bg: #0f1115;          /* page background */
-            --panel: #171a21;       /* card background */
-            --border: #2a2d35;      /* borders and separators */
-            --text: #e6e6e6;        /* main text */
-            --muted: #9aa0ab;       /* secondary text (grey) */
-            --accent: #60a5fa;      /* highlight blue */
-            --accent-bg: #1e3a5f;   /* dark blue for backgrounds (badges, chips) */
-            --green: #4ade80;
-            --red: #f87171;
-        }
-
-        /* ===== Overall layout: the page fills the screen exactly, with no page scroll ===== */
-        * { box-sizing: border-box; }
-        html, body { height: 100%; }
-        body {
-            margin: 0;
-            font-family: system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            flex-direction: column;     /* bar on top, content below */
-            overflow: hidden;           /* the page does not scroll: each card scrolls on its own */
-        }
-
-        /* ===== Top bar ===== */
-        .topbar {
-            display: flex;
-            align-items: center;
-            gap: 2rem;
-            padding: 0.75rem 1.5rem;
-            border-bottom: 1px solid var(--border);
-            background: var(--panel);
-        }
-        .brand { font-weight: 700; font-size: 1.05rem; }
-        .brand span { color: var(--accent); }
-        .nav { display: flex; gap: 1.25rem; flex: 1; }   /* flex: 1 pushes the button to the right */
-        .nav a, .nav span { font-size: 0.9rem; text-decoration: none; }
-        .nav a { color: var(--text); }
-        .nav a.active { color: var(--accent); }
-        .nav .soon { color: var(--muted); opacity: 0.5; cursor: default; }   /* sections not built yet */
-
-        button { font: inherit; border: none; cursor: pointer; }
-        /* No white outline on mouse click; with the keyboard (Tab) it shows in blue, for accessibility */
-        button:focus { outline: none; }
-        button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-        .refresh-btn {
-            background: #2563eb;
-            color: white;
-            padding: 0.45rem 1rem;
-            border-radius: 6px;
-            font-size: 0.85rem;
-        }
-        .refresh-btn:hover { background: #1d4ed8; }
-        .refresh-btn:disabled { opacity: 0.6; cursor: wait; }
-
         /* ===== Content: two columns that fill the rest of the screen ===== */
         .layout {
             flex: 1;                    /* takes all the height the bar leaves */
@@ -141,6 +84,9 @@
         /* ===== News ===== */
         .tabs { display: flex; gap: 1rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
         .tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
             background: transparent;
             color: var(--muted);
             padding: 0.4rem 0.25rem;
@@ -202,18 +148,6 @@
         }
         .ticker-badge:hover { background: #2563eb; color: white; }
 
-        /* ===== Demo mode notice ===== */
-        .demo-badge {
-            margin-left: 0.6rem;
-            padding: 0.15rem 0.55rem;
-            border-radius: 999px;
-            background: var(--accent-bg);
-            color: var(--accent);
-            font-size: 0.75rem;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
         /* ===== Account summary cards ===== */
         .stats {
             display: grid;
@@ -234,16 +168,11 @@
         .stat-value { font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums; }
         .stat-sub { color: var(--muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 
-        /* Hide: !important so it always wins, even over a rule that says display:flex */
-        .hidden { display: none !important; }
-
-        /* ===== Narrow screens (phone, small window): a single column, and the page does scroll ===== */
+        /* ===== Narrow screens (phone, small window): a single column ===== */
         @media (max-width: 900px) {
-            body { overflow: auto; height: auto; }
             .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .layout { grid-template-columns: 1fr; }
+            .layout { grid-template-columns: minmax(0, 1fr); }   /* minmax: a wide table scrolls inside its card */
             .card { max-height: 70vh; }
-            .nav { display: none; }
         }
     </style>
 </head>
@@ -251,14 +180,11 @@
 
     <!-- ===== Top bar ===== -->
     <header class="topbar">
-        <div class="brand">T212 <span>Visualizer</span><small class="demo-badge" th:if="${#arrays.contains(@environment.getActiveProfiles(), 'demo')}">Demo mode: invented data</small></div>
-        <nav class="nav">
-            <a href="/" class="active">Portfolio</a>
-            <span class="soon" title="Coming soon">Calendar</span>
-            <span class="soon" title="Coming soon">Sectors</span>
-            <span class="soon" title="Coming soon">Expenses</span>
-        </nav>
-        <button id="refresh-btn" class="refresh-btn" onclick="refresh()">⟳ Refresh</button>
+        <th:block th:replace="~{fragments/topbar :: bar('portfolio')}"></th:block>
+        <button id="refresh-btn" class="topbar-action" title="Refresh" onclick="refresh()">
+            <svg class="icon" aria-hidden="true"><use href="#icon-refresh"/></svg>
+            <span class="action-label" id="refresh-label">Refresh</span>
+        </button>
     </header>
 
     <!-- ===== Account summary cards ===== -->
@@ -361,8 +287,12 @@
         <!-- ===== Right column: news ===== -->
         <section class="card">
             <div class="tabs">
-                <button class="tab active" onclick="showTab('portfolio', this)">My portfolio</button>
-                <button class="tab" onclick="showTab('market', this)">Market</button>
+                <button class="tab active" onclick="showTab('portfolio', this)">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-briefcase"/></svg>My portfolio
+                </button>
+                <button class="tab" onclick="showTab('market', this)">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-globe"/></svg>Market
+                </button>
             </div>
 
             <div id="portfolio">
@@ -396,8 +326,9 @@
         function refresh() {
             // The button is disabled while refreshing, to avoid repeated clicks going over the T212 limit
             const button = document.getElementById('refresh-btn');
+            const label = document.getElementById('refresh-label');
             button.disabled = true;
-            button.textContent = 'Refreshing…';
+            label.textContent = 'Refreshing…';
 
             fetch('/api/refresh', { method: 'POST' }).then(response => {
                 if (response.ok) {
@@ -405,7 +336,7 @@
                 } else {
                     response.text().then(message => alert('Refresh failed: ' + message));
                     button.disabled = false;
-                    button.textContent = '⟳ Refresh';
+                    label.textContent = 'Refresh';
                 }
             });
         }

@@ -32,11 +32,7 @@ public class PositionService {
         return positionRepository.findAll();
     }
 
-    /**
-     * Pulls fresh data from T212 and upserts it into Postgres.
-     * Rate limit on /equity/positions is a generous 1 req/1s, so a 5-minute
-     * cycle is conservative — tighten it later if you want closer-to-live data.
-     */
+
     @Scheduled(fixedRate = 5 * 60 * 1000, initialDelay = 0)
     @Transactional
     public void refreshFromT212() {
