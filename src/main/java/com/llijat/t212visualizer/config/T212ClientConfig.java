@@ -34,4 +34,15 @@ public class T212ClientConfig {
                 .defaultHeaders(headers -> headers.setBasicAuth(apiKey, apiSecret))
                 .build();
     }
+
+    /** For the download links of the reports: they point outside T212, so this client must not carry the credentials. */
+    @Bean
+    public RestClient t212DownloadRestClient() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(5));
+        requestFactory.setReadTimeout(Duration.ofSeconds(30));
+        return RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
+    }
 }

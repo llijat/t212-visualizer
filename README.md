@@ -32,7 +32,7 @@ docker compose -f docker-compose.demo.yml down
 - **Total account return:** account value minus net deposits, so it includes closed positions, dividends, interest and fees, not only open positions.
 - **News:** market news and news about the US companies in your portfolio, with filters by ticker and text search.
 - **Incremental sync:** account movements are stored in PostgreSQL, so after the first load only new ones are requested.
-- **Expenses:** import the CSV exported from Trading 212 to see your card spending by month, category and merchant.
+- **Expenses:** your card spending by month, category and merchant. New payments are imported automatically once a day through the Trading 212 export API, and you can also upload an exported CSV by hand.
 
 ## Tech stack
 
@@ -62,6 +62,7 @@ The services depend on interfaces, and a Spring profile chooses the implementati
 - **Honest loading states.** The return is hidden until the first sync after startup finishes, because stale movements would show a false figure.
 - **Isolated demo.** Demo mode has its own in-memory database and does not create HTTP clients for the real APIs, so it cannot touch real data.
 - **Expenses from the CSV export.** The API returns card payments without merchant or category, and does not separate them from bank withdrawals, so they come from the CSV export instead. Columns are read by name because they change between exports, and each payment's ID makes importing overlapping files safe.
+- **No credentials on report downloads.** Report download links point outside Trading 212, so they use a separate HTTP client without the API key. The signed links are never written to the logs.
 
 ## Running it with your own account
 
@@ -91,13 +92,13 @@ To run it from an IDE instead, copy `src/main/resources/application-local.exampl
 mvn test
 ```
 
-The tests use JUnit 5 and Mockito, and need neither a database nor network access. GitHub Actions runs them and builds the Docker image on every push. They cover the sync algorithm (pagination, stopping at known movements, all-or-nothing, retries), P/L calculations, exact amount parsing, CSV import, the expense summary and the consistency of the demo data.
+The tests use JUnit 5 and Mockito, and need neither a database nor network access. GitHub Actions runs them and builds the Docker image on every push. They cover the sync algorithm (pagination, stopping at known movements, all-or-nothing, retries), P/L calculations, exact amount parsing, CSV import, the expense summary, the automatic import and the consistency of the demo data.
 
 ## Known limitations
 
 - **Pending card payments:** Trading 212 subtracts them from its net deposits straight away, but they do not appear in the API until they settle. Until then, the return shown here can be lower than the one in the app.
 - **Cashback heuristic:** the API does not distinguish card cashback from real deposits, so deposits under 5 € are treated as cashback. This can misclassify the odd movement, so net deposits can differ slightly from the Trading 212 figure.
-- **Expenses:** the CSV is imported by hand. A reverted payment never appears in it, so it does not count. How the refund of a settled payment appears has not been checked yet: the import reports the rows it skips, by type.
+- **Expenses:** payments appear once they settle, and the automatic import only runs while the app is on. A reverted payment never appears in the export, so it does not count. How the refund of a settled payment appears has not been checked yet: the import reports the rows it skips, by type.
 - **Percentage:** the return percentage is a simple division over net deposits, not time-weighted like the one in the Trading 212 app.
 - **News:** company news only covers US stocks, because of the Finnhub free plan.
 - **Single user:** one account per installation, with no login.
@@ -106,7 +107,6 @@ The tests use JUnit 5 and Mockito, and need neither a database nor network acces
 
 - Economic calendar with dividends and earnings
 - Sector view
-- Automatic expense import through the Trading 212 export API
 - Multi-user support with login
 
 ## License
