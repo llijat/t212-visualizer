@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calendar · T212 Visualizer</title>
+    <link rel="stylesheet" href="/css/common.css">
+    <style>
+        /* ===== Colours of each type of event (dividends will get their own) ===== */
+        :root {
+            --earnings: var(--accent);
+            --earnings-bg: #172a45;
+            --dividend: #fbbf24;
+        }
+
+        /* ===== Page: the calendar on the left, the side panel on the right ===== */
+        .calendar-page {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+        }
+        .calendar {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        /* ===== Header: month, arrows and legend ===== */
+        .calendar-head {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem 1.25rem;
+        }
+        .calendar-head h1 { margin: 0; font-size: 1.35rem; font-weight: 600; min-width: 10.5rem; }
+        .calendar-head h1 span { color: var(--muted); font-weight: 400; }
+        .month-nav { display: flex; gap: 0.25rem; }
+        .month-nav a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2rem;
+            height: 2rem;
+            padding: 0 0.6rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .month-nav a:hover { color: var(--text); background: #1f232c; }
+
+        .legend { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-left: auto; }
+        .filter {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.3rem 0.7rem;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--text);
+            font-size: 0.8rem;
+        }
+        .filter .swatch { width: 0.55rem; height: 0.55rem; border-radius: 2px; background: var(--swatch); }
+        .filter[aria-pressed="false"] { color: var(--muted); }
+        .filter[aria-pressed="false"] .swatch { background: transparent; outline: 1px solid var(--swatch); }
+        .filter:disabled { opacity: 0.45; cursor: default; }
+        .legend-hint { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted); font-size: 0.78rem; padding: 0 0.3rem; }
+
+        /* ===== The grid: 7 columns, the rows share the height ===== */
+        .weekdays, .grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+        }
+        .weekdays div {
+            padding: 0 0.5rem;
+            color: var(--muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .grid {
+            flex: 1;
+            min-height: 0;
+            grid-auto-rows: minmax(0, 1fr);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            background: var(--border);
+            gap: 1px;                    /* the 1px gaps show the background: thin lines between days */
+        }
+        .day {
+            background: var(--panel);
+            padding: 0.3rem 0.4rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.18rem;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .day.outside { background: #13161c; }
+        .day.outside .day-number { opacity: 0.4; }
+        .day.outside .chip { opacity: 0.55; }
+        .day-head { display: flex; align-items: center; gap: 0.4rem; min-height: 1.3rem; }
+        .day-number {
+            font-size: 0.75rem;
+            color: var(--muted);
+            font-variant-numeric: tabular-nums;
+            line-height: 1.3rem;
+            min-width: 1.3rem;
+            text-align: center;
+        }
+        .day.today .day-number {
+            background: var(--accent);
+            color: #0b1220;
+            border-radius: 999px;
+            font-weight: 700;
+        }
+        .day-label { display: none; }    /* only shown in the phone list */
+
+        /* ===== Event chips: colour + text, so they do not depend on colour alone ===== */
+        .chip {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            width: 100%;
+            flex: none;
+            padding: 0.08rem 0.4rem;
+            border-radius: 5px;
+            border-left: 3px solid var(--earnings);
+            background: var(--earnings-bg);
+            color: var(--text);
+            font-size: 0.76rem;
+            text-align: left;
+            line-height: 1.3;
+        }
+        .chip:hover { filter: brightness(1.25); }
+        .chip.selected { outline: 1px solid var(--earnings); outline-offset: 1px; }
+        .chip.upcoming {                 /* not published yet: dashed outline */
+            background: transparent;
+            border: 1px dashed #355a8a;
+            border-left: 3px solid var(--earnings);
+        }
+        .chip-ticker { font-weight: 600; letter-spacing: 0.01em; }
+        .chip-type { color: var(--muted); font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chip-end { margin-left: auto; display: inline-flex; align-items: center; gap: 0.3rem; }
+        .session { width: 0.85rem; height: 0.85rem; color: var(--muted); opacity: 0.75; stroke-width: 1.6; }
+        .result-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; flex: none; }
+        .result-dot.beat { background: var(--green); }
+        .result-dot.miss { background: var(--red); }
+        .chip.extra { display: none; }   /* did not fit in the day: reached through "+N more" */
+        .more {                          /* top right of the day, next to its number */
+            margin-left: auto;
+            background: #1f232c;
+            color: var(--muted);
+            font-size: 0.7rem;
+            line-height: 1.2rem;
+            padding: 0 0.45rem;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+        .more:hover { color: var(--text); background: #2a2f3a; }
+
+        /* Filters: a hidden type disappears from the grid */
+        .calendar.hide-earnings .chip[data-type="earnings"] { display: none; }
+        .calendar.hide-earnings .more[data-type="earnings"] { display: none; }
+
+        .empty-month {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        /* ===== Side panel ===== */
+        .side {
+            width: 340px;
+            flex: none;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.1rem 1.25rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .side-head { display: flex; align-items: flex-start; gap: 0.75rem; }
+        .side-head h2 { margin: 0; font-size: 1.3rem; }
+        .side-sub { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.82rem; }
+        .close {
+            margin-left: auto;
+            background: none;
+            color: var(--muted);
+            width: 2rem;
+            height: 2rem;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .close:hover { color: var(--text); background: #1f232c; }
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            background: var(--earnings-bg);
+            color: var(--earnings);
+        }
+        .tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .tag.neutral { background: #1f232c; color: var(--muted); }
+        .tag.beat { background: #143323; color: var(--green); }
+        .tag.miss { background: #3a1b1b; color: var(--red); }
+
+        .metric { border-top: 1px solid var(--border); padding-top: 0.9rem; }
+        .metric h3 { margin: 0 0 0.6rem; font-size: 0.78rem; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        .metric-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0.2rem 0; font-size: 0.9rem; }
+        .metric-row span:first-child { color: var(--muted); }
+        .metric-row b { font-weight: 600; font-variant-numeric: tabular-nums; }
+        .metric-main { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+        .surprise { font-size: 0.85rem; font-weight: 600; margin-left: 0.4rem; }
+        .up { color: var(--green); }
+        .down { color: var(--red); }
+        .note { color: var(--muted); font-size: 0.8rem; margin: 0; }
+
+        .day-list { display: flex; flex-direction: column; gap: 0.35rem; }
+        .day-list .chip { font-size: 0.85rem; padding: 0.4rem 0.6rem; }
+
+        .side-empty { margin: auto 0; text-align: center; color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+        .side-empty .icon { width: 2rem; height: 2rem; margin-bottom: 0.4rem; opacity: 0.6; }
+
+        /* ===== Narrower screens: the panel goes over the calendar ===== */
+        @media (max-width: 1100px) {
+            .side {
+                position: fixed;
+                top: 4rem;
+                right: 1rem;
+                bottom: 1rem;
+                z-index: 10;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+            }
+            .side.idle { display: none; }
+        }
+
+        /* ===== Phones: a list of the days that have events ===== */
+        @media (max-width: 700px) {
+            .calendar-page { padding: 1rem; }
+            .calendar-head h1 { min-width: 0; font-size: 1.2rem; }
+            .legend { margin-left: 0; width: 100%; }
+            .weekdays { display: none; }
+            .grid { display: flex; flex-direction: column; background: none; border: none; gap: 0.5rem; overflow: visible; }
+            .day { border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; gap: 0.35rem; }
+            .day.no-events, .day.outside { display: none; }
+            .day-number { display: none; }
+            .day-label { display: block; font-size: 0.8rem; color: var(--muted); }
+            .day.today .day-label { color: var(--accent); font-weight: 600; }
+            .chip { font-size: 0.85rem; padding: 0.35rem 0.55rem; }
+            .chip.extra { display: flex; }
+            .more { display: none; }
+            .side { left: 1rem; right: 1rem; top: auto; width: auto; max-height: 75vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="topbar">
+        <th:block th:replace="~{fragments/topbar :: bar('calendar')}"></th:block>
+    </header>
+
+    <!-- Sun: results before the US market opens. Moon: after it closes. -->
+    <svg class="sprite" aria-hidden="true">
+        <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+        <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+        <symbol id="icon-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+        <symbol id="icon-pointer" viewBox="0 0 24 24"><path d="M9 3v10l-3-2-1 1 5 6h7l1-7-6-1V3z"/></symbol>
+    </svg>
+
+    <main class="calendar-page">
+        <section class="calendar" id="calendar" aria-labelledby="month-title"
+                 th:with="month=${calendar.month()},
+                          monthName=${#strings.capitalize(#strings.toLowerCase(calendar.month().getMonth().name()))}">
+
+            <div class="calendar-head">
+                <h1 id="month-title"><th:block th:text="${monthName}">November</th:block> <span th:text="${month.getYear()}">2026</span></h1>
+                <nav class="month-nav" aria-label="Months">
+                    <a th:href="@{/calendar(month=${month.minusMonths(1)})}" title="Previous month" aria-label="Previous month">&#8249;</a>
+                    <a th:href="@{/calendar}" title="This month">Today</a>
+                    <a th:href="@{/calendar(month=${month.plusMonths(1)})}" title="Next month" aria-label="Next month">&#8250;</a>
+                </nav>
+
+                <div class="legend" aria-label="Show or hide">
+                    <button type="button" class="filter" data-filter="earnings" aria-pressed="true" style="--swatch: var(--earnings)">
+                        <span class="swatch"></span>Earnings
+                    </button>
+                    <button type="button" class="filter" disabled aria-pressed="false" title="Dividends: coming soon" style="--swatch: var(--dividend)">
+                        <span class="swatch"></span>Dividends
+                    </button>
+                    <span class="legend-hint" title="Before the US market opens"><svg class="icon session" aria-hidden="true"><use href="#icon-sun"/></svg>Pre-market</span>
+                    <span class="legend-hint" title="After the US market closes"><svg class="icon session" aria-hidden="true"><use href="#icon-moon"/></svg>After close</span>
+                </div>
+            </div>
+
+            <p class="empty-month"
+               th:if="${#lists.isEmpty(calendar.days().?[!earnings().isEmpty()])}">
+                No earnings this month for the US stocks you hold.
+            </p>
+
+            <div class="weekdays" aria-hidden="true">
+                <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+            </div>
+
+            <div class="grid">
+                <div class="day" th:each="day : ${calendar.days()}"
+                     th:classappend="${(day.inMonth() ? '' : 'outside ') + (day.today() ? 'today ' : '') + (day.earnings().isEmpty() ? 'no-events' : '')}"
+                     th:attr="data-date=${day.date()}">
+                    <div class="day-head">
+                        <span class="day-number" th:text="${day.date().getDayOfMonth()}">1</span>
+                        <span class="day-label" th:text="${#strings.capitalize(#strings.toLowerCase(day.date().getDayOfWeek().name())) + ' ' + day.date().getDayOfMonth() + (day.today() ? ' · Today' : '')}">Monday 1</span>
+                        <!-- The script shows it, with the right number, when the chips do not fit in the day -->
+                        <button type="button" class="more hidden" data-type="earnings"
+                                th:unless="${day.earnings().isEmpty()}">more</button>
+                    </div>
+
+                    <button type="button" class="chip" data-type="earnings"
+                            th:each="event : ${day.earnings()}"
+                            th:with="published=${event.epsActual != null},
+                                     symbol=${#strings.contains(event.ticker, '_') ? #strings.substringBefore(event.ticker, '_') : event.ticker}"
+                            th:classappend="${published ? '' : 'upcoming'}"
+                            th:data-symbol="${symbol}"
+                            th:data-date="${event.reportDate}"
+                            th:data-hour="${event.reportHour}"
+                            th:data-year="${event.fiscalYear}"
+                            th:data-quarter="${event.fiscalQuarter}"
+                            th:data-eps-estimate="${event.epsEstimate}"
+                            th:data-eps-actual="${event.epsActual}"
+                            th:data-revenue-estimate="${event.revenueEstimate}"
+                            th:data-revenue-actual="${event.revenueActual}"
+                            th:data-eps-yoy="${event.epsYoy}"
+                            th:data-revenue-yoy="${event.revenueYoy}"
+                            th:title="${symbol + ' earnings' + (published ? '' : ' (not published yet)')}">
+                        <span class="chip-ticker" th:text="${symbol}">MU</span>
+                        <span class="chip-type">Earnings</span>
+                        <span class="chip-end">
+                            <svg class="icon session" th:if="${event.reportHour == 'bmo'}" role="img" aria-label="Before market open"><use href="#icon-sun"/></svg>
+                            <svg class="icon session" th:if="${event.reportHour == 'amc'}" role="img" aria-label="After market close"><use href="#icon-moon"/></svg>
+                            <span class="result-dot" role="img"
+                                  th:if="${published and event.epsEstimate != null}"
+                                  th:classappend="${event.epsActual.compareTo(event.epsEstimate) >= 0} ? 'beat' : 'miss'"
+                                  th:attr="aria-label=${event.epsActual.compareTo(event.epsEstimate) >= 0} ? 'Beat the EPS estimate' : 'Missed the EPS estimate'"></span>
+                        </span>
+                    </button>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Side panel: filled in by the script below when a chip is clicked -->
+        <aside class="side idle" id="side" aria-live="polite" aria-label="Details">
+            <div class="side-empty" id="side-empty">
+                <svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg><br>
+                Click an event to see its details.<br>
+                Published results show revenue and EPS against the estimates.
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        (function () {
+            const calendar = document.getElementById('calendar');
+            const side = document.getElementById('side');
+            const sideEmpty = document.getElementById('side-empty');
+
+            // ----- Formatting -----
+            const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const bigMoney = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 });
+            const longDate = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+            const number = value => (value === undefined || value === '' ? null : Number(value));
+            const dateOf = text => new Date(text + 'T00:00:00Z');
+
+            function signed(value, digits) {
+                const text = Math.abs(value).toFixed(digits) + '%';
+                return (value > 0 ? '+' : value < 0 ? '−' : '') + text;
+            }
+
+            // How far the actual figure was from the estimate, in %
+            function surprise(actual, estimate) {
+                if (actual === null || estimate === null || estimate === 0) return null;
+                return (actual - estimate) / Math.abs(estimate) * 100;
+            }
+
+            function element(tag, className, text) {
+                const node = document.createElement(tag);
+                if (className) node.className = className;
+                if (text !== undefined) node.textContent = text;
+                return node;
+            }
+
+            function row(label, value) {
+                const line = element('div', 'metric-row');
+                line.append(element('span', '', label), element('b', '', value));
+                return line;
+            }
+
+            function sessionText(hour) {
+                if (hour === 'bmo') return 'Before market open';
+                if (hour === 'amc') return 'After market close';
+                if (hour === 'dmh') return 'During market hours';
+                return 'Time not announced';
+            }
+
+            // One block: revenue or EPS, with the actual figure, the estimate and the surprise
+            function metric(title, actual, estimate, format) {
+                const block = element('section', 'metric');
+                block.append(element('h3', '', title));
+                if (actual !== null) {
+                    const main = element('div', 'metric-main', format(actual));
+                    const difference = surprise(actual, estimate);
+                    if (difference !== null) {
+                        main.append(element('span', 'surprise ' + (difference >= 0 ? 'up' : 'down'), signed(difference, 1) + ' vs estimate'));
+                    }
+                    block.append(main, row('Estimate', estimate === null ? '—' : format(estimate)));
+                } else {
+                    block.append(row('Estimate', estimate === null ? 'Not available' : format(estimate)));
+                    block.append(element('p', 'note', 'Not published yet.'));
+                }
+                return block;
+            }
+
+            function closeButton() {
+                const button = element('button', 'close');
+                button.type = 'button';
+                button.setAttribute('aria-label', 'Close');
+                button.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg>';
+                button.addEventListener('click', closePanel);
+                return button;
+            }
+
+            function openPanel(children) {
+                side.replaceChildren(...children);
+                side.classList.remove('idle');
+            }
+
+            function closePanel() {
+                side.replaceChildren(sideEmpty);
+                side.classList.add('idle');
+                calendar.querySelectorAll('.chip.selected').forEach(chip => chip.classList.remove('selected'));
+            }
+
+            // ----- Details of one result -----
+            function showEarnings(chip) {
+                const data = chip.dataset;
+                const epsActual = number(data.epsActual);
+                const epsEstimate = number(data.epsEstimate);
+                const published = epsActual !== null;
+
+                const head = element('div', 'side-head');
+                const titles = element('div');
+                titles.append(element('h2', '', data.symbol),
+                              element('p', 'side-sub', 'Q' + data.quarter + ' ' + data.year + ' · ' + longDate.format(dateOf(data.date))));
+                head.append(titles, closeButton());
+
+                const tags = element('div', 'tags');
+                tags.append(element('span', 'tag', 'Earnings'), element('span', 'tag neutral', sessionText(data.hour)));
+                if (published && epsEstimate !== null) {
+                    const beat = epsActual >= epsEstimate;
+                    tags.append(element('span', 'tag ' + (beat ? 'beat' : 'miss'), beat ? 'Beat' : 'Missed'));
+                } else if (!published) {
+                    tags.append(element('span', 'tag neutral', 'Upcoming'));
+                }
+
+                const revenue = metric('Revenue', number(data.revenueActual), number(data.revenueEstimate), value => bigMoney.format(value));
+                const eps = metric('EPS', epsActual, epsEstimate, value => money.format(value));
+
+                const yoy = element('section', 'metric');
+                yoy.append(element('h3', '', 'Year over year'));
+                const revenueYoy = number(data.revenueYoy);
+                const epsYoy = number(data.epsYoy);
+                if (revenueYoy === null && epsYoy === null) {
+                    yoy.append(element('p', 'note', 'Not available yet.'));
+                } else {
+                    yoy.append(row('Revenue', revenueYoy === null ? '—' : signed(revenueYoy, 1)),
+                               row('EPS', epsYoy === null ? '—' : signed(epsYoy, 1)));
+                }
+
+                calendar.querySelectorAll('.chip.selected').forEach(other => other.classList.remove('selected'));
+                chip.classList.add('selected');
+                openPanel([head, tags, revenue, eps, yoy]);
+            }
+
+            // ----- Every event of a busy day ("+N more") -----
+            function showDay(day) {
+                const head = element('div', 'side-head');
+                const titles = element('div');
+                const chips = day.querySelectorAll('.chip');
+                titles.append(element('h2', '', longDate.format(dateOf(day.dataset.date))),
+                              element('p', 'side-sub', chips.length + ' events'));
+                head.append(titles, closeButton());
+
+                const list = element('div', 'day-list');
+                chips.forEach(chip => {
+                    const copy = chip.cloneNode(true);
+                    copy.classList.remove('extra', 'selected');
+                    copy.addEventListener('click', () => showEarnings(chip));
+                    list.append(copy);
+                });
+                openPanel([head, list]);
+            }
+
+            calendar.addEventListener('click', event => {
+                const chip = event.target.closest('.chip');
+                if (chip) { showEarnings(chip); return; }
+                const more = event.target.closest('.more');
+                if (more) showDay(more.closest('.day'));
+            });
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && !side.classList.contains('idle')) closePanel();
+            });
+
+            // ----- Filters in the legend, remembered in this browser -----
+            const STORAGE_KEY = 'calendar-hidden-types';
+            function readHidden() {
+                try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch (error) { return []; }
+            }
+            function saveHidden(hidden) {
+                try { localStorage.setItem(STORAGE_KEY, JSON.stringify(hidden)); } catch (error) { /* private window: not remembered */ }
+            }
+            function applyFilters(hidden) {
+                document.querySelectorAll('.filter[data-filter]').forEach(button => {
+                    const type = button.dataset.filter;
+                    const isHidden = hidden.includes(type);
+                    button.setAttribute('aria-pressed', String(!isHidden));
+                    calendar.classList.toggle('hide-' + type, isHidden);
+                });
+            }
+            document.querySelectorAll('.filter[data-filter]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const type = button.dataset.filter;
+                    const hidden = readHidden();
+                    const next = hidden.includes(type) ? hidden.filter(item => item !== type) : hidden.concat(type);
+                    saveHidden(next);
+                    applyFilters(next);
+                });
+            });
+            applyFilters(readHidden());
+
+            // ----- Each day shows the chips that fit; the rest go to "+N more" -----
+            // The height of a day depends on the window, so it is measured instead of assumed.
+            const phone = window.matchMedia('(max-width: 700px)');
+            function fitDays() {
+                calendar.querySelectorAll('.day').forEach(day => {
+                    const more = day.querySelector('.more');
+                    if (!more) return;
+                    const chips = [...day.querySelectorAll('.chip')];
+                    chips.forEach(chip => chip.classList.remove('extra'));
+                    more.classList.add('hidden');
+                    if (phone.matches || calendar.classList.contains('hide-earnings')) return;   // the phone list shows them all
+
+                    let hiddenCount = 0;
+                    while (day.scrollHeight > day.clientHeight && hiddenCount < chips.length) {
+                        chips[chips.length - 1 - hiddenCount].classList.add('extra');
+                        hiddenCount++;
+                        more.textContent = '+' + hiddenCount + ' more';
+                        more.classList.remove('hidden');
+                    }
+                });
+            }
+            // While the window is being resized, wait until it stops for a moment before measuring again
+            let fitTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(fitTimer);
+                fitTimer = setTimeout(fitDays, 100);
+            });
+            phone.addEventListener('change', fitDays);
+            window.addEventListener('load', fitDays);   // measure again once everything has been drawn
+            document.querySelectorAll('.filter[data-filter]').forEach(button => button.addEventListener('click', fitDays));
+            fitDays();
+        })();
+    </script>
+</body>
+</html>
