@@ -1,5 +1,6 @@
 package com.llijat.t212visualizer.service;
 
+import com.llijat.t212visualizer.dto.FinnhubEarningsDto;
 import com.llijat.t212visualizer.dto.FinnhubNewsDto;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -35,4 +36,10 @@ public class DemoFinnhubClient implements FinnhubClient {
         long datetime = Instant.now().minusSeconds(hoursAgo * 3600L).getEpochSecond();
         return new FinnhubNewsDto(category, datetime, headline, "#", id, related, "", "Sample text from demo mode.");
     }
+
+    @Override
+    public List<FinnhubEarningsDto> fetchEarnings(String symbol, LocalDate from, LocalDate to) {
+        return List.of();
+    }
+
 }

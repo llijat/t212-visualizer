@@ -1,5 +1,7 @@
 package com.llijat.t212visualizer.service;
 
+import com.llijat.t212visualizer.dto.FinnhubEarningsCalendarDto;
+import com.llijat.t212visualizer.dto.FinnhubEarningsDto;
 import com.llijat.t212visualizer.dto.FinnhubNewsDto;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
@@ -12,8 +14,9 @@ import java.util.List;
 @Service
 @Profile("!demo")
 public class LiveFinnhubClient implements FinnhubClient {
-
     private final RestClient finnhubRestClient;
+
+
 
     public LiveFinnhubClient(@Qualifier("finnhubRestClient") RestClient finnhubRestClient) {
         this.finnhubRestClient = finnhubRestClient;
@@ -38,4 +41,15 @@ public class LiveFinnhubClient implements FinnhubClient {
 
         return response == null ? List.of() : List.of(response);
     }
+
+    @Override
+    public List<FinnhubEarningsDto> fetchEarnings(String symbol, LocalDate from, LocalDate to) {
+        FinnhubEarningsCalendarDto response = finnhubRestClient.get()
+                .uri("/calendar/earnings?symbol={symbol}&from={from}&to={to}", symbol, from, to)
+                .retrieve()
+                .body(FinnhubEarningsCalendarDto.class);
+        if (response == null || response.earningsCalendar() == null) return List.of();
+        else return response.earningsCalendar();
+    }
+
 }
