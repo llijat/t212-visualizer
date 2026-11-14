@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Expenses · T212 Visualizer</title>
-    <link rel="stylesheet" href="/css/common.css">
+    <!-- @{...} adds a fingerprint of the file to its name, so a changed stylesheet is never taken from the cache -->
+    <link rel="stylesheet" th:href="@{/css/common.css}" href="/css/common.css">
     <style>
         /* ===== Import result, above the content ===== */
         .notice {

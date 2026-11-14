@@ -8,6 +8,18 @@ spring:
     scheduling:
       pool:
         size: 4
+  # Static files (CSS) get a fingerprint of their content in their name, for example common-3f9a2c.css.
+  # A changed file gets a new name, so browsers can keep each version for a year without ever showing a stale one.
+  web:
+    resources:
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /**
+      cache:
+        cachecontrol:
+          max-age: 365d
   servlet:
     multipart:
       max-file-size: 10MB
