@@ -29,4 +29,15 @@ public class FinnhubClientConfig {
                 .defaultHeader("X-Finnhub-token", apiKey)
                 .build();
     }
+
+    /** For the logo images: they are on another server, so this client must not carry the API key. */
+    @Bean
+    public RestClient finnhubDownloadRestClient() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(5));
+        requestFactory.setReadTimeout(Duration.ofSeconds(15));
+        return RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
+    }
 }

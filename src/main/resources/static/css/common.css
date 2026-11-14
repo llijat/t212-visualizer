@@ -100,6 +100,34 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
     white-space: nowrap;
 }
 
+/* ===== Company logos: a circle with the initial, and the logo on top when there is one ===== */
+/* The image is removed if /logos/... answers 404, so the initial shows instead */
+.logo {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35em;
+    height: 1.35em;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #2a3140;
+    color: var(--muted);
+    font-size: 1em;
+    font-weight: 700;
+    line-height: 1;
+}
+.logo-initial { font-size: 0.6em; }
+.logo img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #fff;           /* most logos are drawn for a light background */
+}
+
 /* Hide: !important so it always wins, even over a rule that says display:flex */
 .hidden { display: none !important; }
 

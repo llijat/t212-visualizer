@@ -147,6 +147,11 @@
             border-left: 3px solid var(--earnings);
         }
         .chip-ticker { font-weight: 600; letter-spacing: 0.01em; }
+        .chip .logo { font-size: 0.85rem; }
+        /* The word "Earnings" only shows when it fits whole; the colour and the panel still tell the type */
+        .day { container-type: inline-size; }
+        @container (max-width: 175px) { .chip-type { display: none; } }
+        .side-head .logo { font-size: 2.4rem; }
         .chip-type { color: var(--muted); font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .chip-end { margin-left: auto; display: inline-flex; align-items: center; gap: 0.3rem; }
         .session { width: 0.85rem; height: 0.85rem; color: var(--muted); opacity: 0.75; stroke-width: 1.6; }
@@ -189,7 +194,7 @@
             flex-direction: column;
             gap: 1rem;
         }
-        .side-head { display: flex; align-items: flex-start; gap: 0.75rem; }
+        .side-head { display: flex; align-items: center; gap: 0.75rem; }
         .side-head h2 { margin: 0; font-size: 1.3rem; }
         .side-sub { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.82rem; }
         .close {
@@ -334,6 +339,7 @@
                                      symbol=${#strings.contains(event.ticker, '_') ? #strings.substringBefore(event.ticker, '_') : event.ticker}"
                             th:classappend="${published ? '' : 'upcoming'}"
                             th:data-symbol="${symbol}"
+                            th:data-ticker="${event.ticker}"
                             th:data-date="${event.reportDate}"
                             th:data-hour="${event.reportHour}"
                             th:data-year="${event.fiscalYear}"
@@ -345,6 +351,10 @@
                             th:data-eps-yoy="${event.epsYoy}"
                             th:data-revenue-yoy="${event.revenueYoy}"
                             th:title="${symbol + ' earnings' + (published ? '' : ' (not published yet)')}">
+                        <span class="logo" aria-hidden="true">
+                            <span class="logo-initial" th:text="${#strings.substring(symbol, 0, 1)}">M</span>
+                            <img th:src="@{/logos/{ticker}(ticker=${event.ticker})}" alt="" loading="lazy" onerror="this.remove()">
+                        </span>
                         <span class="chip-ticker" th:text="${symbol}">MU</span>
                         <span class="chip-type">Earnings</span>
                         <span class="chip-end">
@@ -462,6 +472,8 @@
                 const published = epsActual !== null;
 
                 const head = element('div', 'side-head');
+                const logo = chip.querySelector('.logo');
+                if (logo) head.append(logo.cloneNode(true));
                 const titles = element('div');
                 titles.append(element('h2', '', data.symbol),
                               element('p', 'side-sub', 'Q' + data.quarter + ' ' + data.year + ' · ' + longDate.format(dateOf(data.date))));

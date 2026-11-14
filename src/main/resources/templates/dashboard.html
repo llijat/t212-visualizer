@@ -67,6 +67,8 @@
             font-variant-numeric: tabular-nums; /* all digits the same width, so columns line up */
             white-space: nowrap;
         }
+        .holding { display: flex; align-items: center; gap: 0.6rem; font-size: 1.45rem; }
+        .holding > div { font-size: 0.875rem; min-width: 0; }
         .symbol { font-weight: 600; }
         .company {
             display: block;
@@ -266,8 +268,17 @@
                     <tbody>
                     <tr th:each="p : ${positions}">
                         <td>
-                            <span class="symbol" th:text="${p.symbol}">AAPL</span>
-                            <span class="company" th:text="${p.name}">Apple Inc.</span>
+                            <div class="holding">
+                                <span class="logo" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(p.symbol, 0, 1)}">A</span>
+                                    <img th:if="${#strings.contains(p.ticker, '_US_')}" th:src="@{/logos/{ticker}(ticker=${p.ticker})}"
+                                         alt="" loading="lazy" onerror="this.remove()">
+                                </span>
+                                <div>
+                                    <span class="symbol" th:text="${p.symbol}">AAPL</span>
+                                    <span class="company" th:text="${p.name}">Apple Inc.</span>
+                                </div>
+                            </div>
                         </td>
                         <td class="num" th:text="${#numbers.formatDecimal(p.quantity, 1, 'COMMA', 4, 'POINT')}">0</td>
                         <td class="num" th:text="${#numbers.formatDecimal(p.averagePricePaid, 1, 'COMMA', 2, 'POINT')}">0</td>

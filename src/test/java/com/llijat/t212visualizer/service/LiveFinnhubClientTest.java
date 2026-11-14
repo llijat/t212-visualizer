@@ -1,9 +1,12 @@
 package com.llijat.t212visualizer.service;
 
+import com.llijat.t212visualizer.dto.FinnhubCompanyProfileDto;
 import com.llijat.t212visualizer.dto.FinnhubEarningsDto;
+import com.llijat.t212visualizer.dto.LogoImage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -11,12 +14,16 @@ import org.springframework.web.client.RestClient;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /** MockRestServiceServer pretends to be Finnhub: no real request leaves the test. */
@@ -24,14 +31,21 @@ class LiveFinnhubClientTest {
 
     private static final String BASE_URL = "https://finnhub.example.test/api/v1";
 
+    private static final String LOGO_URL = "https://static.example.test/logos/MU.png";
+    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G'};
+
     private MockRestServiceServer server;
+    private MockRestServiceServer downloadServer;
     private LiveFinnhubClient client;
 
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
+        // Like the real configuration: the API client carries the key, the download client does not
+        RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL).defaultHeader("X-Finnhub-Token", "test-key");
+        RestClient.Builder downloadBuilder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new LiveFinnhubClient(builder.build());
+        downloadServer = MockRestServiceServer.bindTo(downloadBuilder).build();
+        client = new LiveFinnhubClient(builder.build(), downloadBuilder.build());
     }
 
     @Test
@@ -96,5 +110,92 @@ class LiveFinnhubClientTest {
         List<FinnhubEarningsDto> earnings = client.fetchEarnings("MU", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 12, 31));
 
         assertTrue(earnings.isEmpty());
+    }
+
+    @Test
+    void fetchCompanyProfile_readsTheNameAndTheLogoLink_andIgnoresTheOtherFields() {
+        String json = """
+                {"country": "US", "currency": "USD", "exchange": "NASDAQ", "finnhubIndustry": "Semiconductors",
+                 "logo": "https://static.example.test/logos/MU.png", "marketCapitalization": 100000,
+                 "name": "Micron Technology, Inc.", "ticker": "MU", "weburl": "https://example.test"}
+                """;
+        server.expect(requestTo(BASE_URL + "/stock/profile2?symbol=MU"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+        FinnhubCompanyProfileDto profile = client.fetchCompanyProfile("MU");
+
+        server.verify();
+        assertEquals("Micron Technology, Inc.", profile.name());
+        assertEquals("https://static.example.test/logos/MU.png", profile.logo());
+    }
+
+    @Test
+    void fetchCompanyProfile_ofAnUnknownSymbol_leavesBothFieldsEmpty() {
+        // Finnhub answers 200 with an empty object for symbols it does not know
+        server.expect(requestTo(BASE_URL + "/stock/profile2?symbol=NOPE"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        FinnhubCompanyProfileDto profile = client.fetchCompanyProfile("NOPE");
+
+        assertNull(profile.name());
+        assertNull(profile.logo());
+    }
+
+    @Test
+    void downloadLogo_returnsTheImageAndItsType_withoutSendingTheApiKey() {
+        downloadServer.expect(requestTo(LOGO_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(headerDoesNotExist("X-Finnhub-Token"))
+                .andRespond(withSuccess(PNG, MediaType.IMAGE_PNG));
+
+        Optional<LogoImage> logo = client.downloadLogo(LOGO_URL);
+
+        downloadServer.verify();
+        assertTrue(logo.isPresent());
+        assertArrayEquals(PNG, logo.get().bytes());
+        assertEquals("image/png", logo.get().contentType());
+    }
+
+    @Test
+    void downloadLogo_keepsOnlyTheMainType_withoutParameters() {
+        downloadServer.expect(requestTo(LOGO_URL))
+                .andRespond(withSuccess(PNG, MediaType.parseMediaType("image/png;charset=UTF-8")));
+
+        Optional<LogoImage> logo = client.downloadLogo(LOGO_URL);
+
+        assertEquals("image/png", logo.orElseThrow().contentType());
+    }
+
+    @Test
+    void downloadLogo_rejectsAPageInsteadOfAnImage() {
+        downloadServer.expect(requestTo(LOGO_URL))
+                .andRespond(withSuccess("<script>alert(1)</script>", MediaType.TEXT_HTML));
+
+        assertTrue(client.downloadLogo(LOGO_URL).isEmpty());
+    }
+
+    @Test
+    void downloadLogo_rejectsSvg_becauseItCanContainScripts() {
+        downloadServer.expect(requestTo(LOGO_URL))
+                .andRespond(withSuccess("<svg><script>alert(1)</script></svg>", MediaType.parseMediaType("image/svg+xml")));
+
+        assertTrue(client.downloadLogo(LOGO_URL).isEmpty());
+    }
+
+    @Test
+    void downloadLogo_withoutContentType_returnsEmpty() {
+        downloadServer.expect(requestTo(LOGO_URL))
+                .andRespond(withStatus(HttpStatus.OK).body(PNG));
+
+        assertTrue(client.downloadLogo(LOGO_URL).isEmpty());
+    }
+
+    @Test
+    void downloadLogo_withAnEmptyBody_returnsEmpty() {
+        downloadServer.expect(requestTo(LOGO_URL))
+                .andRespond(withSuccess(new byte[0], MediaType.IMAGE_PNG));
+
+        assertTrue(client.downloadLogo(LOGO_URL).isEmpty());
     }
 }

@@ -1,13 +1,16 @@
 package com.llijat.t212visualizer.service;
 
+import com.llijat.t212visualizer.dto.FinnhubCompanyProfileDto;
 import com.llijat.t212visualizer.dto.FinnhubEarningsDto;
 import com.llijat.t212visualizer.dto.FinnhubNewsDto;
+import com.llijat.t212visualizer.dto.LogoImage;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /** Sample news, labelled as such, about the invented companies in DemoT212Client. */
 @Service
@@ -42,4 +45,13 @@ public class DemoFinnhubClient implements FinnhubClient {
         return List.of();
     }
 
+    @Override
+    public FinnhubCompanyProfileDto fetchCompanyProfile(String symbol) {
+        return new FinnhubCompanyProfileDto(null, null);
+    }
+
+    @Override
+    public Optional<LogoImage> downloadLogo(String url) {
+        return Optional.empty();
+    }
 }
