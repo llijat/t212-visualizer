@@ -1,0 +1,1 @@
+alter table positions add column isin varchar(12);

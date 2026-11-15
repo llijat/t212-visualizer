@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,6 +42,10 @@ class EarningsImportServiceTest {
     @Mock
     private EarningsEventRepository repository;
 
+    // Without stubbing, it answers an empty Map: no ticker resolved yet, so the T212 one is used
+    @Mock
+    private CompanyProfileService companyProfileService;
+
     @Captor
     private ArgumentCaptor<EarningsEvent> savedCaptor;
 
@@ -48,13 +53,13 @@ class EarningsImportServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EarningsImportService(finnhubClient, positionService, repository);
+        service = new EarningsImportService(finnhubClient, positionService, repository, companyProfileService);
     }
 
     // Only the ticker matters to the service; the figures are invented
     private static Position position(String ticker) {
         BigDecimal one = BigDecimal.ONE;
-        return new Position(ticker, ticker + " Inc.", one, one, one, one, BigDecimal.ZERO, null, one, "USD", "EUR");
+        return new Position(ticker, ticker + " Inc.", "US0000000001", one, one, one, one, BigDecimal.ZERO, null, one, "USD", "EUR");
     }
 
     private static FinnhubEarningsDto published(String symbol, int year, int quarter) {
@@ -155,5 +160,41 @@ class EarningsImportServiceTest {
         service.importEarnings();
 
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void meta_isAskedByItsCurrentTicker_butSavedUnderTheT212One() {
+        // The calendar looks results up by the T212 ticker, so that one must not change
+        when(positionService.getAllPositions()).thenReturn(List.of(position("FB_US_EQ")));
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of("FB_US_EQ", "META"));
+        when(finnhubClient.fetchEarnings(eq("META"), any(), any())).thenReturn(List.of(published("META", 2026, 3)));
+        when(repository.findByTickerAndFiscalYearAndFiscalQuarter("FB_US_EQ", 2026, 3)).thenReturn(Optional.empty());
+
+        service.importEarnings();
+
+        verify(finnhubClient, never()).fetchEarnings(eq("FB"), any(), any());
+        verify(repository).save(savedCaptor.capture());
+        assertEquals("FB_US_EQ", savedCaptor.getValue().getTicker());
+    }
+
+    @Test
+    void stocksWithoutAResolvedTicker_keepUsingTheT212One() {
+        when(positionService.getAllPositions()).thenReturn(List.of(position("FB_US_EQ"), position("MU_US_EQ")));
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of("FB_US_EQ", "META"));
+
+        service.importEarnings();
+
+        verify(finnhubClient).fetchEarnings(eq("META"), any(), any());
+        verify(finnhubClient).fetchEarnings(eq("MU"), any(), any());
+    }
+
+    @Test
+    void theResolvedTickers_areReadOnce_notOncePerStock() {
+        when(positionService.getAllPositions())
+                .thenReturn(List.of(position("MU_US_EQ"), position("ORCL_US_EQ"), position("NVDA_US_EQ")));
+
+        service.importEarnings();
+
+        verify(companyProfileService, times(1)).currentSymbols();
     }
 }

@@ -342,18 +342,20 @@
                     </tr>
                     </thead>
                     <tbody>
+                    <!-- symbol: the current ticker resolved with OpenFIGI (META), or the T212 one (FB) until there is one -->
                     <tr th:each="p : ${positions}" class="position-row"
-                        th:data-symbol="${p.symbol}" th:data-value="${p.currentValue}"
-                        th:with="weight=${summary != null and summary.totalValue() > 0 ? p.currentValue * 100 / summary.totalValue() : null}">
+                        th:with="symbol=${symbols.getOrDefault(p.ticker, p.symbol)},
+                                 weight=${summary != null and summary.totalValue() > 0 ? p.currentValue * 100 / summary.totalValue() : null}"
+                        th:data-symbol="${symbol}" th:data-value="${p.currentValue}">
                         <td>
                             <div class="holding">
                                 <span class="logo" aria-hidden="true">
-                                    <span class="logo-initial" th:text="${#strings.substring(p.symbol, 0, 1)}">A</span>
+                                    <span class="logo-initial" th:text="${#strings.substring(symbol, 0, 1)}">A</span>
                                     <img th:if="${#strings.contains(p.ticker, '_US_')}" th:src="@{/logos/{ticker}(ticker=${p.ticker})}"
                                          alt="" loading="lazy" onerror="this.remove()">
                                 </span>
                                 <div>
-                                    <span class="symbol" th:text="${p.symbol}">AAPL</span>
+                                    <span class="symbol" th:text="${symbol}">AAPL</span>
                                     <span class="company" th:text="${p.name}">Apple Inc.</span>
                                 </div>
                             </div>

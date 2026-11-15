@@ -1,6 +1,7 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.FinnhubEarningsDto;
+import com.llijat.t212visualizer.model.CompanyProfile;
 import com.llijat.t212visualizer.model.EarningsEvent;
 import com.llijat.t212visualizer.model.Position;
 import com.llijat.t212visualizer.repository.EarningsEventRepository;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class EarningsImportService {
@@ -21,11 +23,13 @@ public class EarningsImportService {
     private final FinnhubClient finnhubClient;
     private final PositionService positionService;
     private final EarningsEventRepository earningsEventRepository;
+    private final CompanyProfileService companyProfileService;
 
-    public EarningsImportService(FinnhubClient finnhubClient, PositionService positionService, EarningsEventRepository earningsEventRepository) {
+    public EarningsImportService(FinnhubClient finnhubClient, PositionService positionService, EarningsEventRepository earningsEventRepository, CompanyProfileService companyProfileService) {
         this.finnhubClient = finnhubClient;
         this.positionService = positionService;
         this.earningsEventRepository = earningsEventRepository;
+        this.companyProfileService = companyProfileService;
     }
 
     @Scheduled(fixedRate = 12*60*60*1000, initialDelay = 60*1000)
@@ -35,17 +39,19 @@ public class EarningsImportService {
         LocalDate to = today.plusDays(DAYS_AHEAD);
 
         int imported = 0;
+        Map<String, String> symbols = companyProfileService.currentSymbols();
         for (Position position : positionService.getAllPositions()) {
             if (position.getTicker().contains("_US_")) {
                 try {
-                    List<FinnhubEarningsDto> earningsList = finnhubClient.fetchEarnings(position.getSymbol(), from, to);
+                    String symbol = symbols.getOrDefault(position.getTicker(), position.getSymbol());
+                    List<FinnhubEarningsDto> earningsList = finnhubClient.fetchEarnings(symbol, from, to);
                     for (FinnhubEarningsDto earningsDto : earningsList) {
                         saveEarnings(position.getTicker(), earningsDto);
                     }
                     ++imported;
                 }
                 catch (Exception e) {
-                    log.warn("Could not import the earnings of {}: {}",position.getSymbol(),e.getMessage());
+                    log.warn("Could not import the earnings of {}: {}",position.getTicker(),e.getMessage());
                 }
             }
         }

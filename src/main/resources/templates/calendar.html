@@ -337,7 +337,7 @@
                     <button type="button" class="chip" data-type="earnings"
                             th:each="event : ${day.earnings()}"
                             th:with="published=${event.epsActual != null},
-                                     symbol=${#strings.contains(event.ticker, '_') ? #strings.substringBefore(event.ticker, '_') : event.ticker}"
+                                     symbol=${symbols.getOrDefault(event.ticker, #strings.contains(event.ticker, '_') ? #strings.substringBefore(event.ticker, '_') : event.ticker)}"
                             th:classappend="${published ? '' : 'upcoming'}"
                             th:data-symbol="${symbol}"
                             th:data-ticker="${event.ticker}"

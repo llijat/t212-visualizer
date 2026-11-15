@@ -49,6 +49,7 @@ public class PositionService {
             if (existing.isPresent()) {
                 existing.get().updateFrom(
                         dto.instrument().name(),
+                        dto.instrument().isin(),
                         dto.quantity(),
                         dto.averagePricePaid(),
                         dto.currentPrice(),
@@ -64,6 +65,7 @@ public class PositionService {
                 Position created = new Position(
                         ticker,
                         dto.instrument().name(),
+                        dto.instrument().isin(),
                         dto.quantity(),
                         dto.averagePricePaid(),
                         dto.currentPrice(),
@@ -79,11 +81,9 @@ public class PositionService {
         }
 
         // Delete every position whose ticker was not returned (it has been closed)
-        
         for (Position position : positionRepository.findAll()) {
             if (!tickers.contains(position.getTicker()))positionRepository.delete(position);
         }
-        
 
         log.info("Refreshed {} positions.", fetched.size());
     }

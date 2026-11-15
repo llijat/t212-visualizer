@@ -18,10 +18,12 @@ public class NewsService {
     private List<FinnhubNewsDto> generalNews = List.of();
     private List<FinnhubNewsDto> portfolioNews = List.of();
     private final PositionService positionService;
+    private final CompanyProfileService companyProfileService;
 
-    public NewsService(FinnhubClient finnhubClient, PositionService positionService) {
+    public NewsService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService) {
         this.finnhubClient = finnhubClient;
         this.positionService = positionService;
+        this.companyProfileService = companyProfileService;
     }
 
     public List<FinnhubNewsDto> getNews() {
@@ -64,14 +66,16 @@ public class NewsService {
         List<FinnhubNewsDto> collected = new ArrayList<>();
         Set<Long> seenIds = new HashSet<>();
 
+        Map<String, String> symbols = companyProfileService.currentSymbols();
         for (Position position : positionService.getAllPositions()) {
             if (position.getTicker().contains("_US_")) {
                 try {
-                    for (FinnhubNewsDto news : finnhubClient.fetchCompanyNews(position.getSymbol(), from, to)) {
+                    String symbol = symbols.getOrDefault(position.getTicker(), position.getSymbol());
+                    for (FinnhubNewsDto news : finnhubClient.fetchCompanyNews(symbol, from, to)) {
                         if (seenIds.add(news.id())) collected.add(news);
                     }
                 } catch (Exception e) {
-                    log.warn("Could not load news for {}: {}", position.getSymbol(), e.getMessage());
+                    log.warn("Could not load news for {}: {}", position.getTicker(), e.getMessage());
                 }
             }
         }

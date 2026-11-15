@@ -14,9 +14,10 @@ import java.time.Instant;
 public class Position {
 
     @Id
-    private String ticker; // T212's instrument.ticker (e.g. "AAPL_US_EQ") — unique, fine as PK
+    private String ticker;
 
     private String name;
+    private String isin;
     @Column(precision = 24, scale = 10)
     private BigDecimal quantity;
     @Column(precision = 24, scale = 10)
@@ -39,11 +40,12 @@ public class Position {
         // required by JPA
     }
 
-    public Position(String ticker, String name, BigDecimal quantity, BigDecimal averagePricePaid,
+    public Position(String ticker, String name, String isin, BigDecimal quantity, BigDecimal averagePricePaid,
                     BigDecimal currentPrice, BigDecimal currentValue, BigDecimal unrealizedProfitLoss,
                     BigDecimal fxImpact, BigDecimal totalCost, String currencyType, String accountCurrency) {
         this.ticker = ticker;
         this.name = name;
+        this.isin = isin;
         this.quantity = quantity;
         this.averagePricePaid = averagePricePaid;
         this.currentPrice = currentPrice;
@@ -58,6 +60,7 @@ public class Position {
 
     public String getTicker() { return ticker; }
     public String getName() { return name; }
+    public String getIsin() { return isin;}
     public BigDecimal getQuantity() { return quantity; }
     public BigDecimal getAveragePricePaid() { return averagePricePaid; }
     public BigDecimal getCurrentPrice() { return currentPrice; }
@@ -69,10 +72,11 @@ public class Position {
     public String getCurrencyType() {return currencyType; }
     public String getAccountCurrency() {return accountCurrency; }
 
-    public void updateFrom(String name, BigDecimal quantity, BigDecimal averagePricePaid, BigDecimal currentPrice,
+    public void updateFrom(String name, String isin, BigDecimal quantity, BigDecimal averagePricePaid, BigDecimal currentPrice,
                            BigDecimal currentValue, BigDecimal unrealizedProfitLoss, BigDecimal fxImpact, BigDecimal totalCost,
                             String currencyType, String accountCurrency) {
         this.name = name;
+        this.isin = isin;
         this.quantity = quantity;
         this.averagePricePaid = averagePricePaid;
         this.currentPrice = currentPrice;

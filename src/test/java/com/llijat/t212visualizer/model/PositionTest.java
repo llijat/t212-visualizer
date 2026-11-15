@@ -9,13 +9,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class PositionTest {
     private Position positionWithTicker(String ticker) {
-        return new Position(ticker, "Test Inc.", new BigDecimal("1"), new BigDecimal("100"),
+        return new Position(ticker, "Test Inc.", "US0000000001", new BigDecimal("1"), new BigDecimal("100"),
                 new BigDecimal("110"), new BigDecimal("110"), new BigDecimal("10"), null,
                 new BigDecimal("100"), "USD", "EUR");
     }
 
     private Position positionWithPl(String unrealizedProfitLoss, String totalCost) {
-        return new Position("TEST_US_EQ", "Test Inc.", new BigDecimal("1"), new BigDecimal("100"),
+        return new Position("TEST_US_EQ", "Test Inc.", "US0000000001", new BigDecimal("1"), new BigDecimal("100"),
                 new BigDecimal("110"), new BigDecimal("110"), new BigDecimal(unrealizedProfitLoss), null,
                 new BigDecimal(totalCost), "USD", "EUR");
     }

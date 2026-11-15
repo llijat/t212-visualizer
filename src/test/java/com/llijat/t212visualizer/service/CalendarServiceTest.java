@@ -44,7 +44,7 @@ class CalendarServiceTest {
 
     private static Position position(String ticker) {
         BigDecimal one = BigDecimal.ONE;
-        return new Position(ticker, ticker + " Inc.", one, one, one, one, BigDecimal.ZERO, null, one, "USD", "EUR");
+        return new Position(ticker, ticker + " Inc.", "US0000000001", one, one, one, one, BigDecimal.ZERO, null, one, "USD", "EUR");
     }
 
     private static EarningsEvent earnings(String ticker, LocalDate date) {

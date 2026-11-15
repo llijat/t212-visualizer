@@ -23,6 +23,8 @@ class CompanyProfileTest {
         assertNull(profile.getName());
         assertNull(profile.getFetchedAt());
         assertFalse(profile.hasLogo());
+        assertNull(profile.getSymbol());
+        assertNull(profile.getExchange());
     }
 
     @Test
@@ -61,5 +63,45 @@ class CompanyProfileTest {
 
         assertFalse(profile.hasLogo());
         assertEquals(Instant.parse("2026-11-14T10:00:00Z"), profile.getFetchedAt());
+    }
+
+    @Test
+    void updateListing_savesTheCurrentTickerAndItsExchange() {
+        // T212 still calls Meta by its old ticker; OpenFIGI gives the current one
+        CompanyProfile profile = new CompanyProfile("FB_US_EQ");
+
+        profile.updateListing("META", "UW");
+
+        assertEquals("FB_US_EQ", profile.getTicker());
+        assertEquals("META", profile.getSymbol());
+        assertEquals("UW", profile.getExchange());
+    }
+
+    @Test
+    void updateListing_andUpdateProfile_doNotTouchEachOther() {
+        // They come from different sources: refreshing one must keep the other
+        CompanyProfile profile = new CompanyProfile("FB_US_EQ");
+        Instant now = Instant.parse("2026-11-15T10:00:00Z");
+        profile.updateProfile("Meta Platforms Inc", PNG, "image/png", now);
+
+        profile.updateListing("META", "UW");
+        assertEquals("Meta Platforms Inc", profile.getName());
+        assertTrue(profile.hasLogo());
+        assertEquals(now, profile.getFetchedAt());
+
+        profile.updateProfile("Meta Platforms, Inc.", null, null, now.plusSeconds(60));
+        assertEquals("META", profile.getSymbol());
+        assertEquals("UW", profile.getExchange());
+    }
+
+    @Test
+    void aListingThatIsNoLongerFound_canBeCleared() {
+        CompanyProfile profile = new CompanyProfile("FB_US_EQ");
+        profile.updateListing("META", "UW");
+
+        profile.updateListing(null, null);
+
+        assertNull(profile.getSymbol());
+        assertNull(profile.getExchange());
     }
 }

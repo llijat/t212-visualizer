@@ -15,6 +15,8 @@ public class CompanyProfile {
     private byte[] logo;
     private String logoContentType;
     private Instant fetchedAt;
+    private String symbol;
+    private String exchange;
 
     protected CompanyProfile() {
         //required by JPA
@@ -31,6 +33,11 @@ public class CompanyProfile {
         this.fetchedAt = fetchedAt;
     }
 
+    public void updateListing(String symbol, String exchange) {
+        this.symbol = symbol;
+        this.exchange = exchange;
+    }
+
     public boolean hasLogo() {
         return logo != null;
     }
@@ -40,4 +47,6 @@ public class CompanyProfile {
     public byte[] getLogo() {return logo;}
     public String getLogoContentType() {return logoContentType;}
     public Instant getFetchedAt() {return fetchedAt;}
+    public String getSymbol() {return symbol;}
+    public String getExchange() {return exchange;}
 }
