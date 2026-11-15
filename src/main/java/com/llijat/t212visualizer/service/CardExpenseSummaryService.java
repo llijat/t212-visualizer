@@ -191,4 +191,8 @@ public class CardExpenseSummaryService {
         int daysLeft = month.lengthOfMonth() - today.getDayOfMonth();
         return spent.add(perDay.multiply(BigDecimal.valueOf(daysLeft)));
     }
+
+    public List<Subscription> getSubscriptions(LocalDate today) {
+        return SubscriptionDetector.detect(cardExpenseRepository.findAll(), today);
+    }
 }

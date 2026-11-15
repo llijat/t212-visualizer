@@ -29,6 +29,7 @@ public class ExpenseController {
     private final BudgetService budgetService;
     private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
 
+
     public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService, BudgetService budgetService) {
         this.cardExpenseImportService = cardExpenseImportService;
         this.cardExpenseSummaryService = cardExpenseSummaryService;
@@ -45,6 +46,7 @@ public class ExpenseController {
         MonthReport report = cardExpenseSummaryService.getMonthReport(month, today);
         model.addAttribute("report", report);
         model.addAttribute("budgets", budgetService.getProgress(report));
+        model.addAttribute("subscriptions", cardExpenseSummaryService.getSubscriptions(today));
         return "expenses";
     }
 

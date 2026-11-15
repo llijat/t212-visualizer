@@ -89,8 +89,8 @@
             flex: 1;
             min-height: 0;
             display: grid;
-            grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);   /* budgets · categories · merchants */
-            grid-template-rows: auto minmax(0, 1fr);
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);   /* budgets and subscriptions · categories · merchants */
+            grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
             gap: 1rem;
             padding: 1rem 1.5rem;
         }
@@ -104,6 +104,11 @@
             flex-direction: column;
         }
         .panel h2 { margin: 0 0 0.6rem; font-size: 1rem; }
+        /* The first column stacks budgets over subscriptions; the other two lists take its whole height */
+        .panel-budgets { grid-column: 1; grid-row: 2; }
+        .panel-subscriptions { grid-column: 1; grid-row: 3; }
+        .panel-categories { grid-column: 2; grid-row: 2 / span 2; }
+        .panel-merchants { grid-column: 3; grid-row: 2 / span 2; }
 
         /* ===== Overview: the total as a sentence, next to the months ===== */
         .overview {
@@ -324,6 +329,28 @@
         .budget-form select { flex: 1.5; }
         .budget-form input { flex: 1; width: 0; }
         .budget-form select:focus-visible, .budget-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        /* ===== Subscriptions: monthly payments found in the whole history ===== */
+        .subscription-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            column-gap: 0.75rem;
+            row-gap: 0.15rem;
+            padding: 0.5rem 0.25rem 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .subscription-row:last-child { border-bottom: none; }
+        .subscription-next { color: var(--muted); font-size: 0.75rem; }
+        .price-change {
+            justify-self: end;
+            padding: 0.05rem 0.45rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .price-change.is-up { background: #3b2a12; color: #fbbf24; }
+        .price-change.is-down { background: #13321f; color: var(--green); }
+
         .budget-form button {
             height: 2.1rem;
             padding: 0 0.9rem;
@@ -505,7 +532,7 @@
         </section>
 
         <!-- ===== Budgets: a monthly limit per category, against what the shown month spent ===== -->
-        <section class="panel" aria-labelledby="budgets-heading">
+        <section class="panel panel-budgets" aria-labelledby="budgets-heading">
             <h2 id="budgets-heading">Budgets <span class="panel-month" th:text="'· ' + ${shownMonth}">· November</span></h2>
             <p class="budget-error" role="alert" th:if="${budgetError != null}" th:text="${budgetError}">The monthly limit must be more than 0.</p>
             <p class="budget-empty" th:if="${budgets.isEmpty()}">Set a monthly limit for a category to see how close you are to it.</p>
@@ -549,7 +576,26 @@
             </form>
         </section>
 
-        <section class="panel" aria-labelledby="categories-heading">
+        <!-- ===== Subscriptions: found in the whole history, so they do not depend on the month shown ===== -->
+        <section class="panel panel-subscriptions" aria-labelledby="subscriptions-heading">
+            <h2 id="subscriptions-heading">Subscriptions
+                <span class="panel-month" th:unless="${subscriptions.isEmpty()}"
+                      th:text="'· ' + ${#numbers.formatDecimal(#aggregates.sum(subscriptions.![amount()]), 1, 'COMMA', 2, 'POINT')} + ' € a month'">· 47.38 € a month</span>
+            </h2>
+            <p class="budget-empty" th:if="${subscriptions.isEmpty()}">Payments to the same merchant, for about the same amount every month, show up here after the third one.</p>
+            <ul class="rank-list" th:unless="${subscriptions.isEmpty()}">
+                <li class="subscription-row" th:each="s : ${subscriptions}">
+                    <span class="rank-name" th:text="${s.merchant()}" th:title="${s.merchant()}">Music streaming</span>
+                    <span class="rank-amount" th:text="${#numbers.formatDecimal(s.amount(), 1, 'COMMA', 2, 'POINT')} + ' €'">10.99 €</span>
+                    <span class="subscription-next" th:text="'Next around ' + ${s.nextPayment().getDayOfMonth()} + ' ' + ${#strings.capitalize(#strings.toLowerCase(#strings.substring(s.nextPayment().getMonth().name(), 0, 3)))}">Next around 3 Dec</span>
+                    <span class="price-change" th:if="${s.priceChanged()}"
+                          th:classappend="${s.amount().compareTo(s.previousAmount()) > 0} ? 'is-up' : 'is-down'"
+                          th:text="${s.amount().compareTo(s.previousAmount()) > 0 ? 'Price up' : 'Price down'} + ' from ' + ${#numbers.formatDecimal(s.previousAmount(), 1, 'COMMA', 2, 'POINT')} + ' €'">Price up from 12.99 €</span>
+                </li>
+            </ul>
+        </section>
+
+        <section class="panel panel-categories" aria-labelledby="categories-heading">
             <h2 id="categories-heading">Categories <span class="panel-month" th:text="'· ' + ${shownMonth}">· November</span></h2>
             <p class="empty-month" th:if="${report.categories().isEmpty()}">No card payments in this month.</p>
             <ul class="rank-list" th:if="${!report.categories().isEmpty()}"
@@ -567,7 +613,7 @@
             </ul>
         </section>
 
-        <section class="panel" aria-labelledby="merchants-heading">
+        <section class="panel panel-merchants" aria-labelledby="merchants-heading">
             <h2 id="merchants-heading">Top merchants <span class="panel-month" th:text="'· ' + ${shownMonth}">· November</span></h2>
             <p class="empty-month" th:if="${report.topMerchants().isEmpty()}">No card payments in this month.</p>
             <ol class="rank-list" th:if="${!report.topMerchants().isEmpty()}"

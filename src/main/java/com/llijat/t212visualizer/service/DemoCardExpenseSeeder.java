@@ -44,6 +44,14 @@ public class DemoCardExpenseSeeder implements ApplicationRunner {
             new RecurringPayment("Dunder Car Rental", "AUTOMOBILE_RENTAL", "65.00", 21, 6),
             new RecurringPayment("City Hall", "GOVERNMENT_SERVICES", "15.00", 5, 12));
 
+    // Same price every month, so the expenses page can detect them as subscriptions.
+    // The last one costs more in the current month, to show a price rise.
+    private static final List<DemoSubscription> SUBSCRIPTIONS = List.of(
+            new DemoSubscription("Hooli Music", "ENTERTAINMENT", "10.99", 3, "10.99"),
+            new DemoSubscription("Pied Piper Cloud", "SERVICE_PROVIDERS", "2.99", 8, "2.99"),
+            new DemoSubscription("Globo Gym", "PERSONAL_SERVICES", "29.90", 26, "29.90"),
+            new DemoSubscription("Wonka Streaming", "ENTERTAINMENT", "12.99", 1, "13.99"));
+
     private final CardExpenseRepository cardExpenseRepository;
 
     public DemoCardExpenseSeeder(CardExpenseRepository cardExpenseRepository) {
@@ -70,6 +78,15 @@ public class DemoCardExpenseSeeder implements ApplicationRunner {
                     expenses.add(toExpense(payment, date, MONTH_FACTORS.get(i), expenses.size() + 1));
                 }
             }
+            for (DemoSubscription subscription : SUBSCRIPTIONS) {
+                LocalDate date = month.atDay(subscription.dayOfMonth());
+                if (!date.isAfter(today)) {
+                    String amount = i == MONTHS - 1 ? subscription.currentAmount() : subscription.amount();
+                    expenses.add(new CardExpense("demo-expense-" + (expenses.size() + 1), "Card debit",
+                            date.atTime(12, 0).toInstant(ZoneOffset.UTC), new BigDecimal(amount).negate(), "EUR",
+                            subscription.merchant(), subscription.category()));
+                }
+            }
         }
         return expenses;
     }
@@ -81,5 +98,8 @@ public class DemoCardExpenseSeeder implements ApplicationRunner {
     }
 
     private record RecurringPayment(String merchant, String category, String amount, int dayOfMonth, int everyMonths) {
+    }
+
+    private record DemoSubscription(String merchant, String category, String amount, int dayOfMonth, String currentAmount) {
     }
 }

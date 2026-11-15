@@ -97,4 +97,15 @@ class DemoCardExpenseSeederTest {
         // Assert
         verify(repository, never()).saveAll(any());
     }
+
+    @Test
+    void theDemo_hasSubscriptionsToShow_oneOfThemWithAPriceRise() {
+        // Whatever day the demo starts, its fixed-price payments must pass the detector's rules
+        for (LocalDate today = LocalDate.of(2026, 1, 1); today.isBefore(LocalDate.of(2027, 1, 1)); today = today.plusDays(1)) {
+            List<com.llijat.t212visualizer.dto.Subscription> found = SubscriptionDetector.detect(seeder.buildExpenses(today), today);
+
+            assertEquals(4, found.size(), "on " + today + " found " + found);
+            assertEquals(1, found.stream().filter(com.llijat.t212visualizer.dto.Subscription::priceChanged).count(), "on " + today);
+        }
+    }
 }
