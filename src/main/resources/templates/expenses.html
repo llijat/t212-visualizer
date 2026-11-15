@@ -89,7 +89,7 @@
             flex: 1;
             min-height: 0;
             display: grid;
-            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);   /* budgets · categories · merchants */
             grid-template-rows: auto minmax(0, 1fr);
             gap: 1rem;
             padding: 1rem 1.5rem;
@@ -285,6 +285,55 @@
         }
         .rank-detail { color: var(--muted); font-size: 0.75rem; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+        /* ===== Budgets: the same rows, measured against the limit (--p, in %), with a button to remove ===== */
+        .budget-row { grid-template-columns: 2.25rem minmax(0, 1fr) auto 1.75rem; }
+        .budget-row .rank-fill { width: min(calc(var(--p) * 1%), 100%); background: var(--accent); }
+        .budget-row.is-over .rank-fill { background: var(--red); }
+        .budget-row.is-over .rank-amount, .budget-row.is-over .rank-detail { color: var(--red); }
+        .budget-delete { grid-column: 4; grid-row: 1 / span 2; margin: 0; }
+        .budget-delete button {
+            width: 1.75rem;
+            height: 1.75rem;
+            display: grid;
+            place-items: center;
+            border-radius: 6px;
+            background: none;
+            color: var(--muted);
+        }
+        .budget-delete button:hover, .budget-delete button:focus-visible { background: #252a34; color: var(--red); }
+        .budget-empty { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+        .budget-error { margin: 0 0 0.6rem; color: var(--red); font-size: 0.85rem; }
+        .budget-form {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+        .budget-form select, .budget-form input {
+            min-width: 0;
+            height: 2.1rem;
+            padding: 0 0.6rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            font: inherit;
+            font-size: 0.85rem;
+        }
+        .budget-form select { flex: 1.5; }
+        .budget-form input { flex: 1; width: 0; }
+        .budget-form select:focus-visible, .budget-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .budget-form button {
+            height: 2.1rem;
+            padding: 0 0.9rem;
+            border-radius: 8px;
+            background: var(--accent);
+            color: var(--bg);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
         /* ===== Dragging a file over the page ===== */
         .drop-overlay {
             position: fixed;
@@ -381,7 +430,9 @@
     </main>
 
     <!-- ===== With data: the summary ===== -->
-    <main class="spending" th:if="${hasData}">
+    <main class="spending" th:if="${hasData}"
+          th:with="knownIcons=${ {'RETAIL_STORES','RESTAURANTS','TRANSPORT','CLOTHING_STORES','ENTERTAINMENT','HOTELS','SERVICE_PROVIDERS','PERSONAL_SERVICES','AUTOMOBILE_RENTAL','AUTOMOBILE','BUSINESS_SERVICES','GOVERNMENT_SERVICES'} },
+                   shownMonth=${#strings.capitalize(#strings.toLowerCase(report.month().getMonth().name()))}">
 
         <!-- report: the month shown (?month=2026-11, the running month by default). spending: the whole history -->
         <section class="panel overview" aria-labelledby="total-heading"
@@ -453,12 +504,56 @@
             </div>
         </section>
 
+        <!-- ===== Budgets: a monthly limit per category, against what the shown month spent ===== -->
+        <section class="panel" aria-labelledby="budgets-heading">
+            <h2 id="budgets-heading">Budgets <span class="panel-month" th:text="'· ' + ${shownMonth}">· November</span></h2>
+            <p class="budget-error" role="alert" th:if="${budgetError != null}" th:text="${budgetError}">The monthly limit must be more than 0.</p>
+            <p class="budget-empty" th:if="${budgets.isEmpty()}">Set a monthly limit for a category to see how close you are to it.</p>
+
+            <ul class="rank-list" th:unless="${budgets.isEmpty()}">
+                <li class="rank-row budget-row" th:each="b : ${budgets}"
+                    th:with="name=${#strings.capitalize(#strings.toLowerCase(#strings.replace(b.category(), '_', ' ')))}"
+                    th:classappend="${b.isOver()} ? 'is-over'"
+                    th:style="'--p:' + ${b.percent()}">
+                    <span class="rank-symbol" aria-hidden="true">
+                        <svg class="icon"><use th:href="${knownIcons.contains(b.category())} ? ${'#cat-' + b.category()} : '#cat-OTHER'"/></svg>
+                    </span>
+                    <span class="rank-name" th:text="${name}" th:title="${name}">Restaurants</span>
+                    <span class="rank-amount"
+                          th:text="${#numbers.formatDecimal(b.spent(), 1, 'COMMA', 2, 'POINT')} + ' / ' + ${#numbers.formatDecimal(b.limit(), 1, 'COMMA', 0, 'POINT')} + ' €'">164.00 / 200 €</span>
+                    <form class="budget-delete" method="post" th:action="@{/expenses/budgets/delete}">
+                        <input type="hidden" name="category" th:value="${b.category()}">
+                        <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                        <button type="submit" th:aria-label="'Remove the budget for ' + ${name}" th:title="'Remove the budget for ' + ${name}">
+                            <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                        </button>
+                    </form>
+                    <span class="rank-track" aria-hidden="true"><span class="rank-fill"></span></span>
+                    <span class="rank-detail"
+                          th:text="${b.isOver()}
+                                   ? ${#numbers.formatDecimal(b.spent().subtract(b.limit()), 1, 'COMMA', 2, 'POINT')} + ' € over'
+                                   : ${#numbers.formatDecimal(b.limit().subtract(b.spent()), 1, 'COMMA', 2, 'POINT')} + ' € left, ' + ${b.percent()} + ' % used'">36.00 € left, 82 % used</span>
+                </li>
+            </ul>
+
+            <!-- Saving a category that already has a budget changes its limit -->
+            <form class="budget-form" method="post" th:action="@{/expenses/budgets}">
+                <select name="category" aria-label="Category" required>
+                    <option value="" disabled selected>Category</option>
+                    <option th:each="c : ${spending.categories()}" th:value="${c.category()}"
+                            th:text="${#strings.capitalize(#strings.toLowerCase(#strings.replace(c.category(), '_', ' ')))}">Restaurants</option>
+                </select>
+                <input type="number" name="monthlyLimit" min="0.01" step="0.01" placeholder="€ a month" aria-label="Monthly limit in euros" required>
+                <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                <button type="submit">Save</button>
+            </form>
+        </section>
+
         <section class="panel" aria-labelledby="categories-heading">
-            <h2 id="categories-heading">Categories <span class="panel-month" th:text="'· ' + ${#strings.capitalize(#strings.toLowerCase(report.month().getMonth().name()))}">· November</span></h2>
+            <h2 id="categories-heading">Categories <span class="panel-month" th:text="'· ' + ${shownMonth}">· November</span></h2>
             <p class="empty-month" th:if="${report.categories().isEmpty()}">No card payments in this month.</p>
             <ul class="rank-list" th:if="${!report.categories().isEmpty()}"
-                th:style="'--max:' + ${report.categories()[0].total()}"
-                th:with="knownIcons=${ {'RETAIL_STORES','RESTAURANTS','TRANSPORT','CLOTHING_STORES','ENTERTAINMENT','HOTELS','SERVICE_PROVIDERS','PERSONAL_SERVICES','AUTOMOBILE_RENTAL','AUTOMOBILE','BUSINESS_SERVICES','GOVERNMENT_SERVICES'} }">
+                th:style="'--max:' + ${report.categories()[0].total()}">
                 <li class="rank-row" th:each="c : ${report.categories()}" th:style="'--v:' + ${c.total()}"
                     th:with="share=${c.total() * 100 / report.spent()}">
                     <span class="rank-symbol" aria-hidden="true">
@@ -473,7 +568,7 @@
         </section>
 
         <section class="panel" aria-labelledby="merchants-heading">
-            <h2 id="merchants-heading">Top merchants <span class="panel-month" th:text="'· ' + ${#strings.capitalize(#strings.toLowerCase(report.month().getMonth().name()))}">· November</span></h2>
+            <h2 id="merchants-heading">Top merchants <span class="panel-month" th:text="'· ' + ${shownMonth}">· November</span></h2>
             <p class="empty-month" th:if="${report.topMerchants().isEmpty()}">No card payments in this month.</p>
             <ol class="rank-list" th:if="${!report.topMerchants().isEmpty()}"
                 th:style="'--max:' + ${report.topMerchants()[0].total()}">

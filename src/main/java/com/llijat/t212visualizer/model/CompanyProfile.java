@@ -49,4 +49,6 @@ public class CompanyProfile {
     public Instant getFetchedAt() {return fetchedAt;}
     public String getSymbol() {return symbol;}
     public String getExchange() {return exchange;}
+
+
 }

@@ -1,5 +1,7 @@
 package com.llijat.t212visualizer.controller;
 
+import com.llijat.t212visualizer.dto.MonthReport;
+import com.llijat.t212visualizer.service.BudgetService;
 import com.llijat.t212visualizer.service.CardExpenseImportService;
 import com.llijat.t212visualizer.service.CardExpenseSummaryService;
 import org.springframework.stereotype.Controller;
@@ -13,6 +15,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -23,11 +26,13 @@ import java.time.format.DateTimeParseException;
 public class ExpenseController {
     private final CardExpenseImportService cardExpenseImportService;
     private final CardExpenseSummaryService cardExpenseSummaryService;
+    private final BudgetService budgetService;
     private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
 
-    public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService) {
+    public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService, BudgetService budgetService) {
         this.cardExpenseImportService = cardExpenseImportService;
         this.cardExpenseSummaryService = cardExpenseSummaryService;
+        this.budgetService = budgetService;
     }
 
     @GetMapping("/expenses")
@@ -37,7 +42,9 @@ public class ExpenseController {
             month = YearMonth.from(today);
         }
         model.addAttribute("spending", cardExpenseSummaryService.getSummary());
-        model.addAttribute("report", cardExpenseSummaryService.getMonthReport(month, today));
+        MonthReport report = cardExpenseSummaryService.getMonthReport(month, today);
+        model.addAttribute("report", report);
+        model.addAttribute("budgets", budgetService.getProgress(report));
         return "expenses";
     }
 
@@ -51,5 +58,29 @@ public class ExpenseController {
         }
 
         return "redirect:/expenses";
+    }
+
+    @PostMapping("/expenses/budgets")
+    public String saveBudget(@RequestParam String category,
+                             @RequestParam BigDecimal monthlyLimit,
+                             @RequestParam(required = false) YearMonth month,
+                             RedirectAttributes redirect) {
+        try {
+            budgetService.saveBudget(category, monthlyLimit);
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("budgetError", e.getMessage());
+        }
+        return redirectToMonth(month);
+    }
+
+    @PostMapping("/expenses/budgets/delete")
+    public String deleteBudget(@RequestParam String category,
+                               @RequestParam(required = false) YearMonth month) {
+        budgetService.deleteBudget(category);
+        return redirectToMonth(month);
+    }
+
+    private String redirectToMonth(YearMonth month) {
+        return month == null ? "redirect:/expenses" : "redirect:/expenses?month=" + month;
     }
 }

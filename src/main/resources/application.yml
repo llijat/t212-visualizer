@@ -1,5 +1,10 @@
 server:
   port: 8080
+  # The session (used to carry a message across a redirect) travels only in a cookie, never as ;jsessionid=... in the URL,
+  # where it would end up in the browser history
+  servlet:
+    session:
+      tracking-modes: cookie
 
 spring:
   profiles:
