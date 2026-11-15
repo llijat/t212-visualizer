@@ -34,7 +34,8 @@ docker compose -f docker-compose.demo.yml down
 - **Incremental sync:** account movements are stored in PostgreSQL, so after the first load only new ones are requested.
 - **Expenses:** your card spending by month, category and merchant. New payments are imported automatically once a day through the Trading 212 export API, and you can also upload an exported CSV by hand.
 - **Earnings calendar:** a month view with the quarterly results of the US companies you hold, before or after the market, and a side panel with revenue and EPS against the estimates.
-- **Company logos:** shown next to each holding and in the calendar, downloaded once and served by the app itself.
+- **Company logos:** shown next to each US holding and in the calendar, downloaded once and served by the app itself. Other holdings show their initial.
+- **Current tickers:** Trading 212 keeps some old tickers (FB for Meta, UTX for RTX). The app looks up the current one by ISIN and uses it everywhere, including the requests for news and earnings.
 
 ## Tech stack
 
@@ -95,13 +96,12 @@ Your browser only talks to your own installation of the app. The app's server is
 | Service | What it receives | What for |
 |---|---|---|
 | [Trading 212](https://www.trading212.com) | Your API key and secret | Positions, account summary, account movements and card payment reports |
-| [Finnhub](https://finnhub.io) | Your API key and the tickers of your US holdings | Market and company news, earnings and company profiles |
+| [Finnhub](https://finnhub.io) | Your API key and the tickers of your US holdings | Market and company news, earnings, company names and logos |
 | [OpenFIGI](https://www.openfigi.com) | The ISINs of all your holdings | The current ticker and exchange of each one, because Trading 212 keeps some old tickers |
-| [Parqet](https://www.parqet.com) | The ISINs of all your holdings | Company logos |
 
 None of them receives quantities, prices or amounts. A list of tickers or ISINs does reveal **which** companies you hold, so do not use the app if that is a problem for you.
 
-Report downloads go to the storage link that Trading 212 provides, without your credentials. Company logos are downloaded by the server and stored in the database, so viewing a page never sends a request to a logo service.
+Report downloads go to the storage link that Trading 212 provides, without your credentials. Company logos are downloaded by the server and stored in the database, so viewing a page never sends a request to Finnhub or any other logo service.
 
 ## Tests
 
