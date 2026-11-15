@@ -167,7 +167,8 @@ public class CardExpenseSummaryService {
                 calculateTotal(inPrevious),
                 projected,
                 calculateCategories(inMonth),
-                calculateTopMerchants(inMonth));
+                calculateTopMerchants(inMonth),
+                calculateDays(inMonth,month,lastDay));
     }
 
     private List<CardExpense> between(List<CardExpense> expenses, LocalDate from, LocalDate to) {
@@ -194,5 +195,19 @@ public class CardExpenseSummaryService {
 
     public List<Subscription> getSubscriptions(LocalDate today) {
         return SubscriptionDetector.detect(cardExpenseRepository.findAll(), today);
+    }
+
+    private List<DailySpending> calculateDays(List<CardExpense> inMonth, YearMonth month, int lastDay) {
+        Map<LocalDate, BigDecimal> totals = new HashMap<>();
+        for (CardExpense expense : inMonth) {
+            totals.merge(dateOf(expense), spentOn(expense), BigDecimal::add);
+        }
+
+        List<DailySpending> days = new ArrayList<>();
+        for (int day = 1; day <= lastDay; ++day) {
+            LocalDate date = month.atDay(day);
+            days.add(new DailySpending(date, totals.getOrDefault(date, BigDecimal.ZERO)));
+        }
+        return days;
     }
 }

@@ -13,7 +13,7 @@ class MonthReportTest {
 
     private static MonthReport report(String spent, String previousSameDays) {
         return new MonthReport(YearMonth.of(2026, 11), true, new BigDecimal(spent), new BigDecimal(previousSameDays),
-                null, List.of(), List.of());
+                null, List.of(), List.of(), List.of());
     }
 
     @Test
@@ -44,5 +44,27 @@ class MonthReportTest {
         // Going from 0 to 50 is not "5000 % more": there is simply no percentage
         assertNull(report("50", "0").changePercent());
         assertNull(report("0", "0.00").changePercent());
+    }
+
+    // ===== biggestDay: the scale of the heat map =====
+
+    private static MonthReport reportWithDays(String... totals) {
+        List<DailySpending> days = new java.util.ArrayList<>();
+        for (int i = 0; i < totals.length; i++) {
+            days.add(new DailySpending(java.time.LocalDate.of(2026, 11, i + 1), new BigDecimal(totals[i])));
+        }
+        return new MonthReport(YearMonth.of(2026, 11), true, BigDecimal.ZERO, BigDecimal.ZERO, null,
+                List.of(), List.of(), days);
+    }
+
+    @Test
+    void theBiggestDay_isTheDayThatSpentMost() {
+        assertEquals(new BigDecimal("62.40"), reportWithDays("0", "12.50", "62.40", "4.20").biggestDay());
+    }
+
+    @Test
+    void aMonthWithoutPayments_hasZeroAsItsBiggestDay() {
+        assertEquals(0, BigDecimal.ZERO.compareTo(reportWithDays("0", "0", "0").biggestDay()));
+        assertEquals(BigDecimal.ZERO, reportWithDays().biggestDay());
     }
 }

@@ -3,6 +3,7 @@ package com.llijat.t212visualizer.service;
 import com.llijat.t212visualizer.dto.CardExpenseSummary;
 import com.llijat.t212visualizer.dto.CategorySpending;
 import com.llijat.t212visualizer.dto.MerchantSpending;
+import com.llijat.t212visualizer.dto.DailySpending;
 import com.llijat.t212visualizer.dto.MonthReport;
 import com.llijat.t212visualizer.dto.MonthlySpending;
 import com.llijat.t212visualizer.model.CardExpense;
@@ -302,5 +303,46 @@ class CardExpenseSummaryServiceTest {
         assertAmount("0", report.projected());
         assertNull(report.changePercent());
         assertTrue(report.categories().isEmpty());
+    }
+
+    // ===== The days of the month, for the heat map =====
+
+    @Test
+    void theRunningMonth_hasOneEntryPerDayUpToToday_withZeroOnDaysWithoutPayments() {
+        // Days 16 to 30 have not happened yet: they must not look like days without spending
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-10.00", "2026-11-03T09:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-52.40", "2026-11-03T18:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-4.20", "2026-11-15T12:00:00Z", "Bar", "RESTAURANTS")));
+
+        List<DailySpending> days = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15).days();
+
+        assertEquals(15, days.size());
+        assertEquals(LocalDate.of(2026, 11, 1), days.get(0).date());
+        assertEquals(LocalDate.of(2026, 11, 15), days.get(14).date());
+        assertAmount("0", days.get(0).total());
+        assertAmount("62.40", days.get(2).total());   // two payments on the 3rd, added up
+        assertAmount("4.20", days.get(14).total());
+    }
+
+    @Test
+    void aPastMonth_hasEveryOneOfItsDays() {
+        when(repository.findAll()).thenReturn(List.of(expense("-20.00", "2026-09-30T12:00:00Z", "Bar", "RESTAURANTS")));
+
+        List<DailySpending> days = summaryService.getMonthReport(YearMonth.of(2026, 9), NOV_15).days();
+
+        assertEquals(30, days.size());
+        assertAmount("20.00", days.get(29).total());
+    }
+
+    @Test
+    void aPaymentLateAtNightInSpain_countsOnTheSpanishDay() {
+        // 2 November 23:30 UTC is already 3 November 00:30 in Madrid
+        when(repository.findAll()).thenReturn(List.of(expense("-15.00", "2026-11-02T23:30:00Z", "Bar", "RESTAURANTS")));
+
+        List<DailySpending> days = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15).days();
+
+        assertAmount("0", days.get(1).total());
+        assertAmount("15.00", days.get(2).total());
     }
 }
