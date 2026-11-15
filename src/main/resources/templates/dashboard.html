@@ -60,6 +60,7 @@
             font-size: 0.7rem;
             position: sticky;           /* the header stays in place while scrolling */
             top: 0;
+            z-index: 1;                 /* above the rows, so the logos slide under it */
             background: var(--panel);
         }
         tbody tr:hover { background: #1c2029; }
@@ -332,12 +333,12 @@
                     <thead>
                     <tr>
                         <th>Holding</th>
-                        <th class="num">Weight</th>
+                        <th class="num" title="Share of your account value. The bar compares each position with your largest one.">Weight</th>
                         <th class="num">Quantity</th>
                         <th class="num">Avg. price</th>
                         <th class="num">Current price</th>
                         <th class="num">Total value</th>
-                        <th class="num">P/L %</th>
+                        <th class="num" title="Unrealized profit or loss since you bought it, as a % of what you paid">P/L %</th>
                     </tr>
                     </thead>
                     <tbody>

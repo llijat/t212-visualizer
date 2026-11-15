@@ -33,6 +33,8 @@ docker compose -f docker-compose.demo.yml down
 - **News:** market news and news about the US companies in your portfolio, with filters by ticker and text search.
 - **Incremental sync:** account movements are stored in PostgreSQL, so after the first load only new ones are requested.
 - **Expenses:** your card spending by month, category and merchant. New payments are imported automatically once a day through the Trading 212 export API, and you can also upload an exported CSV by hand.
+- **Earnings calendar:** a month view with the quarterly results of the US companies you hold, before or after the market, and a side panel with revenue and EPS against the estimates.
+- **Company logos:** shown next to each holding and in the calendar, downloaded once and served by the app itself.
 
 ## Tech stack
 
@@ -86,6 +88,21 @@ You need a Trading 212 API key and secret, and a [Finnhub](https://finnhub.io) A
 
 To run it from an IDE instead, copy `src/main/resources/application-local.example.yml` to `application-local.yml` in the same folder, fill it in and start a local PostgreSQL with a `t212_viewdb` database.
 
+## Third-party services and your data
+
+Your browser only talks to your own installation of the app. The app's server is what contacts these services, and this is what each one receives:
+
+| Service | What it receives | What for |
+|---|---|---|
+| [Trading 212](https://www.trading212.com) | Your API key and secret | Positions, account summary, account movements and card payment reports |
+| [Finnhub](https://finnhub.io) | Your API key and the tickers of your US holdings | Market and company news, earnings and company profiles |
+| [OpenFIGI](https://www.openfigi.com) | The ISINs of all your holdings | The current ticker and exchange of each one, because Trading 212 keeps some old tickers |
+| [Parqet](https://www.parqet.com) | The ISINs of all your holdings | Company logos |
+
+None of them receives quantities, prices or amounts. A list of tickers or ISINs does reveal **which** companies you hold, so do not use the app if that is a problem for you.
+
+Report downloads go to the storage link that Trading 212 provides, without your credentials. Company logos are downloaded by the server and stored in the database, so viewing a page never sends a request to a logo service.
+
 ## Tests
 
 ```bash
@@ -105,7 +122,9 @@ The tests use JUnit 5 and Mockito, and need neither a database nor network acces
 
 ## Roadmap
 
-- Economic calendar with dividends and earnings
+- Dividends in the calendar: announced ones and the real amount received
+- Account value history chart
+- Live chart of each stock
 - Sector view
 - Multi-user support with login
 
