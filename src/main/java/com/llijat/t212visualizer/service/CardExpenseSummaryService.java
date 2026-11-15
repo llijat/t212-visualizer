@@ -1,12 +1,8 @@
 package com.llijat.t212visualizer.service;
 
-import com.llijat.t212visualizer.dto.CardExpenseSummary;
-import com.llijat.t212visualizer.dto.CategorySpending;
-import com.llijat.t212visualizer.dto.MerchantSpending;
-import com.llijat.t212visualizer.dto.MonthlySpending;
+import com.llijat.t212visualizer.dto.*;
 import com.llijat.t212visualizer.model.CardExpense;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
-import jakarta.validation.constraints.Null;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -15,11 +11,13 @@ import java.time.LocalDate;
 import java.time.Month;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Service
 public class CardExpenseSummaryService {
     private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private static final int TYPICAL_MONTHS = 3;
 
     private final CardExpenseRepository cardExpenseRepository;
 
@@ -145,5 +143,52 @@ public class CardExpenseSummaryService {
         }
         merchants.sort(Comparator.comparing(MerchantSpending::total).reversed());
         return merchants.stream().limit(10).toList();
+    }
+
+
+    public MonthReport getMonthReport(YearMonth month, LocalDate today) {
+        List<CardExpense> expenses = cardExpenseRepository.findAll();
+        boolean current = month.equals(YearMonth.from(today));
+
+        int lastDay = current ? today.getDayOfMonth() : month.lengthOfMonth();
+        YearMonth previousMonth = month.minusMonths(1);
+        int previousLastDay = current ? Math.min(lastDay, previousMonth.lengthOfMonth()) : previousMonth.lengthOfMonth();
+
+        List<CardExpense> inMonth = between(expenses, month.atDay(1), month.atDay(lastDay));
+        List<CardExpense> inPrevious = between(expenses, previousMonth.atDay(1),previousMonth.atDay(previousLastDay));
+
+        BigDecimal spent = calculateTotal(inMonth);
+        BigDecimal projected = current ? project(expenses, spent, month, today) : null;
+
+        return new MonthReport(
+                month,
+                current,
+                spent,
+                calculateTotal(inPrevious),
+                projected,
+                calculateCategories(inMonth),
+                calculateTopMerchants(inMonth));
+    }
+
+    private List<CardExpense> between(List<CardExpense> expenses, LocalDate from, LocalDate to) {
+        List<CardExpense> result = new ArrayList<>();
+        for (CardExpense expense : expenses) {
+            LocalDate date = dateOf(expense);
+            if (!date.isBefore(from) && !date.isAfter(to)) {
+                result.add(expense);
+            }
+        }
+        return result;
+    }
+
+    private BigDecimal project(List<CardExpense> expenses, BigDecimal spent, YearMonth month, LocalDate today) {
+        LocalDate typicalFrom = month.minusMonths(TYPICAL_MONTHS).atDay(1);
+        LocalDate typicalTo = month.atDay(1).minusDays(1);
+        BigDecimal typicalTotal = calculateTotal(between(expenses, typicalFrom, typicalTo));
+        long typicalDays = ChronoUnit.DAYS.between(typicalFrom, typicalTo) + 1;
+        BigDecimal perDay = typicalTotal.divide(BigDecimal.valueOf(typicalDays), 2, RoundingMode.HALF_UP);
+
+        int daysLeft = month.lengthOfMonth() - today.getDayOfMonth();
+        return spent.add(perDay.multiply(BigDecimal.valueOf(daysLeft)));
     }
 }

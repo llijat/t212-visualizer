@@ -14,12 +14,16 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 
 @Controller
 public class ExpenseController {
     private final CardExpenseImportService cardExpenseImportService;
     private final CardExpenseSummaryService cardExpenseSummaryService;
+    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
 
     public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService) {
         this.cardExpenseImportService = cardExpenseImportService;
@@ -27,8 +31,13 @@ public class ExpenseController {
     }
 
     @GetMapping("/expenses")
-    public String expenses(Model model) {
+    public String expenses(@RequestParam(required = false) YearMonth month, Model model) {
+        LocalDate today = LocalDate.now(SPAIN);
+        if (month == null) {
+            month = YearMonth.from(today);
+        }
         model.addAttribute("spending", cardExpenseSummaryService.getSummary());
+        model.addAttribute("report", cardExpenseSummaryService.getMonthReport(month, today));
         return "expenses";
     }
 

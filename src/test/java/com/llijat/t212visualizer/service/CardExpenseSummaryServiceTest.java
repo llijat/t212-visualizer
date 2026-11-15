@@ -3,6 +3,7 @@ package com.llijat.t212visualizer.service;
 import com.llijat.t212visualizer.dto.CardExpenseSummary;
 import com.llijat.t212visualizer.dto.CategorySpending;
 import com.llijat.t212visualizer.dto.MerchantSpending;
+import com.llijat.t212visualizer.dto.MonthReport;
 import com.llijat.t212visualizer.dto.MonthlySpending;
 import com.llijat.t212visualizer.model.CardExpense;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
@@ -20,6 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -184,5 +187,120 @@ class CardExpenseSummaryServiceTest {
         assertTrue(summary.months().isEmpty());
         assertTrue(summary.categories().isEmpty());
         assertTrue(summary.topMerchants().isEmpty());
+    }
+
+    // ===== getMonthReport: one month, compared with the one before =====
+
+    private static final LocalDate NOV_15 = LocalDate.of(2026, 11, 15);
+
+    @Test
+    void theRunningMonth_countsUpToToday_andComparesWithTheSameDaysOfTheMonthBefore() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-100.00", "2026-11-03T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-60.00", "2026-11-15T12:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-80.00", "2026-10-10T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-500.00", "2026-10-20T12:00:00Z", "Shop", "RETAIL_STORES")));  // after day 15: not compared
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertTrue(report.current());
+        assertAmount("160.00", report.spent());
+        assertAmount("80.00", report.previousSameDays());
+        assertAmount("100.0", report.changePercent());
+    }
+
+    @Test
+    void aPastMonth_isComparedWithTheWholeMonthBefore_andHasNoProjection() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-90.00", "2026-09-30T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-80.00", "2026-08-31T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-20.00", "2026-08-02T12:00:00Z", "Bar", "RESTAURANTS")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 9), NOV_15);
+
+        assertFalse(report.current());
+        assertAmount("90.00", report.spent());
+        assertAmount("100.00", report.previousSameDays());
+        assertNull(report.projected());
+    }
+
+    @Test
+    void on31March_februaryIsComparedUpToThe28th_withoutFailing() {
+        // Without Math.min, February 31 would throw a DateTimeException
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-40.00", "2026-03-31T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-25.00", "2026-02-28T12:00:00Z", "Market", "RETAIL_STORES")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 3), LocalDate.of(2026, 3, 31));
+
+        assertAmount("40.00", report.spent());
+        assertAmount("25.00", report.previousSameDays());
+    }
+
+    @Test
+    void aPaymentJustAfterMidnightInSpain_belongsToTheSpanishDay() {
+        // 31 October 23:30 UTC is already 1 November 00:30 in Madrid
+        when(repository.findAll()).thenReturn(List.of(expense("-15.00", "2026-10-31T23:30:00Z", "Bar", "RESTAURANTS")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertAmount("15.00", report.spent());
+        assertAmount("0", report.previousSameDays());
+    }
+
+    @Test
+    void theProjection_addsTheUsualDailySpendingOfTheLast3FullMonths_forTheDaysLeft() {
+        // August to October: 920 EUR in 92 days = 10 EUR a day.
+        // On 15 November, with 200 spent and 15 days left: 200 + 15 * 10 = 350
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-200.00", "2026-11-03T12:00:00Z", "Shop", "RETAIL_STORES"),
+                expense("-300.00", "2026-08-01T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-300.00", "2026-09-15T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-320.00", "2026-10-31T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-1000.00", "2026-07-31T12:00:00Z", "Travel", "HOTELS")));  // before August: not counted
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertAmount("350.00", report.projected());
+    }
+
+    @Test
+    void onTheLastDayOfTheMonth_theProjectionIsWhatWasSpent() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-70.00", "2026-11-30T12:00:00Z", "Shop", "RETAIL_STORES"),
+                expense("-920.00", "2026-09-15T12:00:00Z", "Market", "RETAIL_STORES")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 30));
+
+        assertAmount("70.00", report.projected());
+    }
+
+    @Test
+    void categoriesAndMerchants_onlyIncludeThePaymentsOfThatMonth() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-30.00", "2026-11-05T12:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-10.00", "2026-11-06T12:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-99.00", "2026-10-05T12:00:00Z", "Cinema", "ENTERTAINMENT")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertEquals(1, report.categories().size());
+        assertEquals("RESTAURANTS", report.categories().get(0).category());
+        assertAmount("40.00", report.categories().get(0).total());
+        assertEquals(1, report.topMerchants().size());
+        assertEquals("Bar", report.topMerchants().get(0).name());
+    }
+
+    @Test
+    void withNoPaymentsAtAll_everythingIsZero_andThereIsNoChange() {
+        when(repository.findAll()).thenReturn(List.of());
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertAmount("0", report.spent());
+        assertAmount("0", report.previousSameDays());
+        assertAmount("0", report.projected());
+        assertNull(report.changePercent());
+        assertTrue(report.categories().isEmpty());
     }
 }

@@ -126,6 +126,30 @@
         .total-detail { margin: 0; max-width: 34ch; color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
         .total-detail b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
 
+        /* ===== The month shown: arrows to move, and how it compares ===== */
+        .month-nav { display: flex; align-items: center; gap: 0.4rem; }
+        .month-name { margin: 0; min-width: 9.5rem; text-align: center; font-size: 1.05rem; font-weight: 600; }
+        .month-step {
+            display: grid;
+            place-items: center;
+            width: 1.9rem;
+            height: 1.9rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+        }
+        .month-step:hover, .month-step:focus-visible { border-color: var(--accent); color: var(--accent); }
+        .month-step.is-placeholder { visibility: hidden; }      /* keeps the name in place in the running month */
+        .month-today { margin-left: 0.4rem; color: var(--accent); font-size: 0.8rem; text-decoration: none; }
+        .month-today:hover { text-decoration: underline; }
+        .total-change { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+        .total-change b { font-weight: 600; font-variant-numeric: tabular-nums; }
+        .total-change.is-up b { color: var(--red); }            /* spending more */
+        .total-change.is-down b { color: var(--green); }        /* spending less */
+        .all-time { margin-top: 0.3rem; padding-top: 0.6rem; border-top: 1px solid var(--border); }
+        .panel-month { color: var(--muted); font-weight: 400; }
+        .empty-month { margin: 0; color: var(--muted); font-size: 0.9rem; }
+
         /* ===== Bars per month. Each height is its amount (--v) over the biggest month (--max) ===== */
         .chart {
             list-style: none;
@@ -141,8 +165,18 @@
             display: flex;
             flex-direction: column;
             border-radius: 4px;
-            cursor: default;
         }
+        /* Each month is a link to that month */
+        .chart-link {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            border-radius: 4px;
+            color: inherit;
+            text-decoration: none;
+        }
+        .chart-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .chart-plot {
             position: relative;
             flex: 1;
@@ -159,8 +193,9 @@
             border-radius: 4px 4px 0 0;
             background: #3b6ea5;
         }
-        .chart-column.is-peak .chart-bar { background: var(--accent); }
-        .chart-column:hover .chart-bar, .chart-column:focus-visible .chart-bar { background: #93c5fd; }
+        .chart-column.is-selected .chart-bar { background: var(--accent); }
+        .chart-column:hover .chart-bar, .chart-column:focus-within .chart-bar { background: #93c5fd; }
+        .chart-column.is-selected .chart-axis { color: var(--text); font-weight: 600; }
 
         .chart-value, .chart-tip {
             position: absolute;
@@ -182,12 +217,12 @@
             opacity: 0;
             pointer-events: none;
         }
-        .chart-column:hover .chart-tip, .chart-column:focus-visible .chart-tip { opacity: 1; }
+        .chart-column:hover .chart-tip, .chart-column:focus-within .chart-tip { opacity: 1; }
         /* At both ends of the chart the tip opens inwards, so it never leaves the screen */
         .chart-column:nth-child(-n+3) .chart-tip { left: 0; transform: none; }
         .chart-column:nth-last-child(-n+3) .chart-tip { left: auto; right: 0; transform: none; }
         /* The month's tip replaces the fixed label of the peak, so they do not overlap */
-        .chart-column:hover .chart-value, .chart-column:focus-visible .chart-value { opacity: 0; }
+        .chart-column:hover .chart-value, .chart-column:focus-within .chart-value { opacity: 0; }
 
         .chart-axis {
             height: 2.1rem;
@@ -348,55 +383,84 @@
     <!-- ===== With data: the summary ===== -->
     <main class="spending" th:if="${hasData}">
 
-        <section class="panel overview" aria-labelledby="total-heading">
+        <!-- report: the month shown (?month=2026-11, the running month by default). spending: the whole history -->
+        <section class="panel overview" aria-labelledby="total-heading"
+                 th:with="monthName=${#strings.capitalize(#strings.toLowerCase(report.month().getMonth().name()))},
+                          previousName=${#strings.capitalize(#strings.toLowerCase(report.month().minusMonths(1).getMonth().name()))},
+                          change=${report.changePercent()}">
             <div class="total">
-                <span class="total-label" id="total-heading">Spent with your card</span>
-                <span class="total-value" th:text="${#numbers.formatDecimal(spending.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
-                <p class="total-detail">
-                    <b th:text="${#numbers.formatInteger(spending.payments(), 1, 'COMMA')}">0</b> payments from
-                    <b th:text="${#temporals.format(spending.firstPayment(), 'dd/MM/yyyy')}">01/01/2026</b> to
-                    <b th:text="${#temporals.format(spending.lastPayment(), 'dd/MM/yyyy')}">01/01/2026</b>,
+                <nav class="month-nav" aria-label="Month">
+                    <a class="month-step" th:href="@{/expenses(month=${report.month().minusMonths(1)})}" aria-label="Previous month">
+                        <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+                    </a>
+                    <h2 class="month-name" id="total-heading" th:text="${monthName + ' ' + report.month().getYear()}">November 2026</h2>
+                    <a class="month-step" th:unless="${report.current()}" th:href="@{/expenses(month=${report.month().plusMonths(1)})}" aria-label="Next month">
+                        <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+                    </a>
+                    <span class="month-step is-placeholder" th:if="${report.current()}" aria-hidden="true"></span>
+                    <a class="month-today" th:unless="${report.current()}" th:href="@{/expenses}">This month</a>
+                </nav>
+
+                <span class="total-label" th:text="${report.current()} ? 'Spent so far' : 'Spent in the month'">Spent so far</span>
+                <span class="total-value" th:text="${#numbers.formatDecimal(report.spent(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
+
+                <!-- In the running month, against the same days of the month before; otherwise against the whole month -->
+                <p class="total-change" th:if="${change == null}" th:text="'Nothing spent in ' + ${previousName} + ' to compare with.'">Nothing spent in October to compare with.</p>
+                <p class="total-change" th:if="${change != null}"
+                   th:classappend="${change.signum() > 0} ? 'is-up' : (${change.signum() < 0} ? 'is-down' : '')"
+                   th:with="than=${(report.current() ? 'the same days of ' : '') + previousName}">
+                    <th:block th:if="${change.signum() == 0}" th:text="'The same as ' + ${than} + '.'">The same as October.</th:block>
+                    <th:block th:unless="${change.signum() == 0}">
+                        <b th:text="${#numbers.formatDecimal(change.abs(), 1, 0)} + ' %'">14 %</b>
+                        <span th:text="${(change.signum() > 0 ? 'more' : 'less') + ' than ' + than + '.'}">more than the same days of October.</span>
+                    </th:block>
+                </p>
+                <p class="total-detail" th:if="${report.projected() != null}">
+                    About <b th:text="${#numbers.formatDecimal(report.projected(), 1, 'COMMA', 0, 'POINT')} + ' €'">0 €</b> by the end of the month, if you spend as usual.
+                </p>
+
+                <p class="total-detail all-time">
+                    All time: <b th:text="${#numbers.formatDecimal(spending.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</b> in
+                    <b th:text="${#numbers.formatInteger(spending.payments(), 1, 'COMMA')}">0</b> payments since
+                    <b th:text="${#temporals.format(spending.firstPayment(), 'dd/MM/yyyy')}">01/01/2026</b>,
                     about <b th:text="${#numbers.formatDecimal(spending.monthlyAverage(), 1, 'COMMA', 0, 'POINT')} + ' €'">0 €</b> a month.
                 </p>
             </div>
 
             <div>
-                <!-- The bars are for the eye; the table below gives screen readers the same figures -->
-                <ol class="chart" aria-hidden="true" th:style="'--max:' + ${spending.biggestMonth()}">
-                    <li class="chart-column" tabindex="0" th:each="m, stat : ${spending.months()}"
+                <!-- Every month is a link to it; the bars and labels inside are for the eye, the link's name says the figure -->
+                <ol class="chart" th:style="'--max:' + ${spending.biggestMonth()}">
+                    <li class="chart-column" th:each="m, stat : ${spending.months()}"
                         th:with="isPeak=${m.total().compareTo(spending.biggestMonth()) == 0},
-                                 monthName=${#strings.substring(m.month().getMonth().name(), 0, 3)}"
-                        th:classappend="${isPeak} ? 'is-peak'"
+                                 selected=${m.month().equals(report.month())},
+                                 shortName=${#strings.capitalize(#strings.toLowerCase(#strings.substring(m.month().getMonth().name(), 0, 3)))},
+                                 label=${shortName + ' ' + m.month().getYear() + ': ' + #numbers.formatDecimal(m.total(), 1, 'COMMA', 2, 'POINT') + ' €'}"
+                        th:classappend="${(isPeak ? 'is-peak ' : '') + (selected ? 'is-selected' : '')}"
                         th:style="'--v:' + ${m.total()}">
-                        <div class="chart-plot">
-                            <span class="chart-bar" th:style="'animation-delay:' + ${stat.index * 25} + 'ms'"></span>
-                            <span class="chart-value" th:if="${isPeak}" th:text="${#numbers.formatDecimal(m.total(), 1, 'COMMA', 0, 'POINT')} + ' €'">0 €</span>
-                            <span class="chart-tip" th:text="${#strings.capitalize(#strings.toLowerCase(monthName))} + ' ' + ${m.month().getYear()} + ': ' + ${#numbers.formatDecimal(m.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">Jan 2026: 0.00 €</span>
-                        </div>
-                        <div class="chart-axis">
-                            <span th:text="${#strings.capitalize(#strings.toLowerCase(monthName))}">Jan</span>
-                            <span class="chart-year" th:if="${stat.first or m.month().getMonthValue() == 1}" th:text="${m.month().getYear()}">2026</span>
-                        </div>
+                        <a class="chart-link" th:href="@{/expenses(month=${m.month()})}" th:aria-label="${label}" th:aria-current="${selected} ? 'true'">
+                            <span class="chart-plot" aria-hidden="true">
+                                <span class="chart-bar" th:style="'animation-delay:' + ${stat.index * 25} + 'ms'"></span>
+                                <span class="chart-value" th:if="${isPeak}" th:text="${#numbers.formatDecimal(m.total(), 1, 'COMMA', 0, 'POINT')} + ' €'">0 €</span>
+                                <span class="chart-tip" th:text="${label}">Jan 2026: 0.00 €</span>
+                            </span>
+                            <span class="chart-axis" aria-hidden="true">
+                                <span th:text="${shortName}">Jan</span>
+                                <span class="chart-year" th:if="${stat.first or m.month().getMonthValue() == 1}" th:text="${m.month().getYear()}">2026</span>
+                            </span>
+                        </a>
                     </li>
                 </ol>
-                <table class="visually-hidden">
-                    <caption>Card spending per month</caption>
-                    <tr><th scope="col">Month</th><th scope="col">Spent</th></tr>
-                    <tr th:each="m : ${spending.months()}">
-                        <td th:text="${m.month()}">2026-01</td>
-                        <td th:text="${#numbers.formatDecimal(m.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</td>
-                    </tr>
-                </table>
             </div>
         </section>
 
         <section class="panel" aria-labelledby="categories-heading">
-            <h2 id="categories-heading">Categories</h2>
-            <ul class="rank-list" th:if="${!spending.categories().isEmpty()}"
-                th:style="'--max:' + ${spending.categories()[0].total()}"
+            <h2 id="categories-heading">Categories <span class="panel-month" th:text="'· ' + ${#strings.capitalize(#strings.toLowerCase(report.month().getMonth().name()))}">· November</span></h2>
+            <p class="empty-month" th:if="${report.categories().isEmpty()}">No card payments in this month.</p>
+            <ul class="rank-list" th:if="${!report.categories().isEmpty()}"
+                th:style="'--max:' + ${report.categories()[0].total()}"
                 th:with="knownIcons=${ {'RETAIL_STORES','RESTAURANTS','TRANSPORT','CLOTHING_STORES','ENTERTAINMENT','HOTELS','SERVICE_PROVIDERS','PERSONAL_SERVICES','AUTOMOBILE_RENTAL','AUTOMOBILE','BUSINESS_SERVICES','GOVERNMENT_SERVICES'} }">
-                <li class="rank-row" th:each="c : ${spending.categories()}" th:style="'--v:' + ${c.total()}"
-                    th:with="share=${c.total() * 100 / spending.total()}">
+                <li class="rank-row" th:each="c : ${report.categories()}" th:style="'--v:' + ${c.total()}"
+                    th:with="share=${c.total() * 100 / report.spent()}">
                     <span class="rank-symbol" aria-hidden="true">
                         <svg class="icon"><use th:href="${knownIcons.contains(c.category())} ? ${'#cat-' + c.category()} : '#cat-OTHER'"/></svg>
                     </span>
@@ -409,10 +473,11 @@
         </section>
 
         <section class="panel" aria-labelledby="merchants-heading">
-            <h2 id="merchants-heading">Top merchants</h2>
-            <ol class="rank-list" th:if="${!spending.topMerchants().isEmpty()}"
-                th:style="'--max:' + ${spending.topMerchants()[0].total()}">
-                <li class="rank-row" th:each="merchant : ${spending.topMerchants()}" th:style="'--v:' + ${merchant.total()}">
+            <h2 id="merchants-heading">Top merchants <span class="panel-month" th:text="'· ' + ${#strings.capitalize(#strings.toLowerCase(report.month().getMonth().name()))}">· November</span></h2>
+            <p class="empty-month" th:if="${report.topMerchants().isEmpty()}">No card payments in this month.</p>
+            <ol class="rank-list" th:if="${!report.topMerchants().isEmpty()}"
+                th:style="'--max:' + ${report.topMerchants()[0].total()}">
+                <li class="rank-row" th:each="merchant : ${report.topMerchants()}" th:style="'--v:' + ${merchant.total()}">
                     <span class="rank-symbol rank-initial" aria-hidden="true" th:text="${#strings.toUpperCase(#strings.substring(merchant.name(), 0, 1))}">M</span>
                     <span class="rank-name" th:text="${merchant.name()}" th:title="${merchant.name()}">Merchant</span>
                     <span class="rank-amount" th:text="${#numbers.formatDecimal(merchant.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
