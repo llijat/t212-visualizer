@@ -12,6 +12,96 @@
     --accent-bg: #1e3a5f;   /* dark blue for backgrounds (badges, chips) */
     --green: #4ade80;
     --red: #f87171;
+    --raised: #1f232c;      /* hover and open menus: one step above the cards */
+    --radius: 10px;         /* cards */
+    --radius-small: 6px;    /* buttons, fields, menus */
+
+    /* Scrollbars: the thumb keeps a 3:1 contrast with the cards, so it is easy to see how far down a list is */
+    --scroll-thumb: #666d7c;
+    --scroll-track: transparent;
+}
+
+/* ===== Scrollbars: thin and in the app's colours, everywhere ===== */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+/* Older Chrome and Safari, which only know their own pseudo-elements */
+@supports not (scrollbar-color: auto) {
+    * { scrollbar-width: auto; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: var(--scroll-track); }
+}
+
+/* ===== Lists that scroll: a soft shadow at the edge where there is more to see ===== */
+/* Add the class to the scrolling element. It needs no script and takes no space. */
+.scroll-hints { container-type: scroll-state; }
+.scroll-hints::before,
+.scroll-hints::after {
+    content: "";
+    display: block;
+    position: sticky;
+    z-index: 1;
+    block-size: 1rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.scroll-hints::before {
+    inset-block-start: 0;
+    margin-block-end: -1rem;
+    background: radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / 0.55), transparent);
+}
+.scroll-hints::after {
+    inset-block-end: 0;
+    margin-block-start: -1rem;
+    background: radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / 0.55), transparent);
+}
+@container scroll-state(scrollable: block-start) { .scroll-hints::before { opacity: 1; } }
+@container scroll-state(scrollable: block-end) { .scroll-hints::after { opacity: 1; } }
+/* Browsers without scroll-state queries: the shadows fade in with the scroll itself */
+@supports not (container-type: scroll-state) {
+    .scroll-hints::before, .scroll-hints::after { animation: show-scroll-hint linear both; animation-timeline: scroll(); }
+    .scroll-hints::before { animation-range: 0 2rem; }
+    .scroll-hints::after { animation-direction: reverse; animation-range: calc(100% - 2rem) 100%; }
+}
+@keyframes show-scroll-hint { to { opacity: 1; } }
+
+/* ===== Moving between pages: a short cross-fade instead of a white flash; the top bar stays still ===== */
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.18s; }
+}
+.topbar { view-transition-name: topbar; }
+
+/* ===== Drop-down menus drawn by the app, not by the operating system =====
+   Browsers that cannot (Firefox today) keep their own menu, which works the same. */
+@supports (appearance: base-select) {
+    select, ::picker(select) { appearance: base-select; }
+    select { cursor: pointer; }
+    select::picker-icon { color: var(--muted); transition: rotate 0.15s; }
+    select:open::picker-icon { rotate: 180deg; }
+    ::picker(select) {
+        margin-block: 4px;
+        padding: 0.3rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-small);
+        background: var(--raised);
+        color: var(--text);
+        box-shadow: 0 12px 28px rgb(0 0 0 / 0.45);
+        max-block-size: min(22rem, 60vh);
+    }
+    option {
+        padding: 0.4rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        background: none;
+        color: var(--text);
+    }
+    option:hover, option:focus-visible { background: var(--accent-bg); color: #dbeafe; outline: none; }
+    option:checked { font-weight: 600; }
+    option::checkmark { color: var(--accent); }
 }
 
 /* ===== Overall layout: the page fills the screen exactly, with no page scroll ===== */
@@ -62,8 +152,9 @@ body {
     color: var(--muted);
     font-size: 0.9rem;
     text-decoration: none;
+    transition: color 0.15s, background-color 0.15s;
 }
-a.nav-item:hover { color: var(--text); background: #1f232c; }
+a.nav-item:hover { color: var(--text); background: var(--raised); }
 .nav-item.active { color: var(--accent); background: var(--accent-bg); }
 .nav-item.soon { opacity: 0.45; cursor: default; }   /* sections not built yet */
 

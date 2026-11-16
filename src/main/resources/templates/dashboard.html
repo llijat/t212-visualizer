@@ -35,20 +35,7 @@
         }
         .card-header h2 { margin: 0; font-size: 1rem; }
         .card-header .count { color: var(--muted); font-size: 0.8rem; }
-        .scroll { flex: 1; min-height: 0; overflow-y: auto; }   /* the scrolling area */
-
-        /* Discreet scrollbars: thin and invisible until the mouse is over the card */
-        .scroll {
-            scrollbar-width: thin;                         /* thin bar */
-            scrollbar-color: transparent transparent;      /* (thumb colour, track colour): invisible */
-        }
-        .scroll:hover { scrollbar-color: #3a3f4b transparent; }   /* on hover: dark grey */
-
-        /* The same for Safari, which still uses its own syntax */
-        .scroll::-webkit-scrollbar { width: 6px; }
-        .scroll::-webkit-scrollbar-track { background: transparent; }
-        .scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
-        .scroll:hover::-webkit-scrollbar-thumb { background: #3a3f4b; }
+        .scroll { flex: 1; min-height: 0; overflow-y: auto; }   /* the scrolling area; its scrollbar comes from common.css */
 
         /* ===== Compact positions table ===== */
         table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
@@ -402,7 +389,7 @@
                     <button class="chip" th:each="t : ${portfolioTickers}" th:data-ticker="${t}" th:text="${t}"
                             onclick="filterNews(this.dataset.ticker)">AAPL</button>
                 </div>
-                <ul class="news-list scroll">
+                <ul class="news-list scroll scroll-hints">
                     <li class="empty" th:if="${portfolioNews.isEmpty()}">Loading your portfolio news… reload in a few seconds.</li>
                     <li th:each="n : ${portfolioNews}" th:data-ticker="${n.related()}">
                         <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
@@ -412,7 +399,7 @@
                 </ul>
             </div>
 
-            <ul class="news-list scroll hidden" id="market">
+            <ul class="news-list scroll scroll-hints hidden" id="market">
                 <li th:each="n : ${news}">
                     <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
                     <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Headline</a>

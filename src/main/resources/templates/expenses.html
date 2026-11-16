@@ -6,6 +6,16 @@
     <title>Expenses · T212 Visualizer</title>
     <!-- @{...} adds a fingerprint of the file to its name, so a changed stylesheet is never taken from the cache -->
     <link rel="stylesheet" th:href="@{/css/common.css}" href="/css/common.css">
+    <script>
+        // Changing month or saving a form reloads this same page: mark it before it is drawn, so the bars do not grow again.
+        // Browsers without the Navigation API simply keep the animation.
+        try {
+            const from = navigation.activation.from;
+            if (from && from.url && new URL(from.url).pathname === location.pathname) {
+                document.documentElement.classList.add('same-page');
+            }
+        } catch (e) { /* no Navigation API: nothing to do */ }
+    </script>
     <style>
         /* ===== Import result, above the content ===== */
         .notice {
@@ -90,9 +100,11 @@
             min-height: 0;
             display: grid;
             grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.25fr);   /* budgets and subscriptions · categories and merchants · payments */
-            grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+            /* Each row of panels keeps room for a few lines; on a short screen this area scrolls instead of squeezing them */
+            grid-template-rows: max-content minmax(19rem, 1fr) minmax(19rem, 1fr);
             gap: 1rem;
             padding: 1rem 1.5rem;
+            overflow-y: auto;
         }
         .panel {
             background: var(--panel);
@@ -278,6 +290,7 @@
         /* Only on load, and only if the person has not asked for reduced motion */
         @media (prefers-reduced-motion: no-preference) {
             .chart-bar { transform-origin: bottom; animation: grow 0.5s ease-out both; }
+            .same-page .chart-bar { animation: none; }     /* only when arriving, not on every change of month */
             @keyframes grow {
                 from { transform: translateX(-50%) scaleY(0); }
                 to { transform: translateX(-50%) scaleY(1); }
@@ -285,12 +298,8 @@
         }
 
         /* ===== Ranked lists: categories and merchants ===== */
+        /* Scrollbars and the shadows at the edges come from common.css (.scroll-hints) */
         .rank-list { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0; overflow-y: auto; }
-        .rank-list {
-            scrollbar-width: thin;
-            scrollbar-color: transparent transparent;
-        }
-        .rank-list:hover { scrollbar-color: #3a3f4b transparent; }
 
         .rank-row {
             display: grid;
@@ -454,7 +463,6 @@
         .payment-category:hover, .payment-category:focus-visible { border-color: var(--border); background: var(--bg); color: var(--text); }
         .payment-category:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
         .payment-category.is-corrected { color: #93c5fd; }
-        .payment-category option { background: var(--panel); color: var(--text); }
         .payment-plain { color: var(--muted); font-size: 0.75rem; padding-left: 0.35rem; }
         .payment-reset {
             height: 1.6rem;
@@ -700,7 +708,7 @@
             <p class="budget-error" role="alert" th:if="${budgetError != null}" th:text="${budgetError}">The monthly limit must be more than 0.</p>
             <p class="budget-empty" th:if="${budgets.isEmpty()}">Set a monthly limit for a category to see how close you are to it.</p>
 
-            <ul class="rank-list" th:unless="${budgets.isEmpty()}">
+            <ul class="rank-list scroll-hints" th:unless="${budgets.isEmpty()}">
                 <li class="rank-row budget-row" th:each="b : ${budgets}"
                     th:with="name=${#strings.capitalize(#strings.toLowerCase(#strings.replace(b.category(), '_', ' ')))}"
                     th:classappend="${b.isOver()} ? 'is-over'"
@@ -746,7 +754,7 @@
                       th:text="'· ' + ${#numbers.formatDecimal(#aggregates.sum(subscriptions.![amount()]), 1, 'COMMA', 2, 'POINT')} + ' € a month'">· 47.38 € a month</span>
             </h2>
             <p class="budget-empty" th:if="${subscriptions.isEmpty()}">Payments to the same merchant, for about the same amount every month, show up here after the third one.</p>
-            <ul class="rank-list" th:unless="${subscriptions.isEmpty()}">
+            <ul class="rank-list scroll-hints" th:unless="${subscriptions.isEmpty()}">
                 <li class="subscription-row" th:each="s : ${subscriptions}">
                     <span class="rank-name" th:text="${s.merchant()}" th:title="${s.merchant()}">Music streaming</span>
                     <span class="rank-amount" th:text="${#numbers.formatDecimal(s.amount(), 1, 'COMMA', 2, 'POINT')} + ' €'">10.99 €</span>
@@ -761,7 +769,7 @@
         <section class="panel panel-categories" aria-labelledby="categories-heading">
             <h2 id="categories-heading">Categories <span class="panel-month" th:text="'· ' + ${shownMonth}">· November</span></h2>
             <p class="empty-month" th:if="${report.categories().isEmpty()}">No card payments in this month.</p>
-            <ul class="rank-list" th:if="${!report.categories().isEmpty()}"
+            <ul class="rank-list scroll-hints" th:if="${!report.categories().isEmpty()}"
                 th:style="'--max:' + ${report.categories()[0].total()}">
                 <li class="rank-row" th:each="c : ${report.categories()}" th:style="'--v:' + ${c.total()}"
                     th:with="share=${c.total() * 100 / report.spent()}">
@@ -779,7 +787,7 @@
         <section class="panel panel-merchants" aria-labelledby="merchants-heading">
             <h2 id="merchants-heading">Top merchants <span class="panel-month" th:text="'· ' + ${shownMonth}">· November</span></h2>
             <p class="empty-month" th:if="${report.topMerchants().isEmpty()}">No card payments in this month.</p>
-            <ol class="rank-list" th:if="${!report.topMerchants().isEmpty()}"
+            <ol class="rank-list scroll-hints" th:if="${!report.topMerchants().isEmpty()}"
                 th:style="'--max:' + ${report.topMerchants()[0].total()}">
                 <li class="rank-row" th:each="merchant : ${report.topMerchants()}" th:style="'--v:' + ${merchant.total()}">
                     <span class="rank-symbol rank-initial" aria-hidden="true" th:text="${#strings.toUpperCase(#strings.substring(merchant.name(), 0, 1))}">M</span>
@@ -808,7 +816,7 @@
                 <p class="payments-count" id="payment-count" aria-live="polite"
                    th:text="${total} + (${total == 1} ? ' payment' : ' payments') + ' · a new category applies to every payment to that merchant'">87 payments · a new category applies to every payment to that merchant</p>
 
-                <ul class="rank-list" id="payment-list">
+                <ul class="rank-list scroll-hints" id="payment-list">
                     <li class="payment-row" th:each="p : ${report.payments()}"
                         th:with="merchantName=${p.merchant() == null ? 'Unknown merchant' : p.merchant()},
                                  categoryName=${#strings.capitalize(#strings.toLowerCase(#strings.replace(p.category(), '_', ' ')))}"
@@ -973,6 +981,30 @@
                 if (!event.target.matches('select.payment-category')) return;
                 event.target.form.requestSubmit();
             });
+        }
+
+        // Saving a form reloads the page: remember where it was, so correcting several payments does not mean scrolling back each time.
+        // Only this browser tab keeps it, and only until the next page; without storage the page simply starts at the top.
+        const spendingArea = document.querySelector('main.spending');
+        const PLACE_KEY = 'expenses-place';
+        if (spendingArea) {
+            spendingArea.addEventListener('submit', () => {
+                try {
+                    sessionStorage.setItem(PLACE_KEY, JSON.stringify({
+                        page: location.pathname + location.search,
+                        area: spendingArea.scrollTop,
+                        payments: paymentList ? paymentList.scrollTop : 0
+                    }));
+                } catch (e) { /* no storage: nothing to remember */ }
+            });
+            try {
+                const place = JSON.parse(sessionStorage.getItem(PLACE_KEY));
+                sessionStorage.removeItem(PLACE_KEY);
+                if (place && place.page === location.pathname + location.search) {
+                    spendingArea.scrollTop = place.area;
+                    if (paymentList) paymentList.scrollTop = place.payments;
+                }
+            } catch (e) { /* no storage or nothing saved: start at the top */ }
         }
 
         // Dragging a file: the whole page accepts it.
