@@ -1,6 +1,8 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.model.CardExpense;
+import com.llijat.t212visualizer.model.CardCashback;
+import com.llijat.t212visualizer.repository.CardCashbackRepository;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,11 +36,14 @@ class DemoCardExpenseSeederTest {
     @Mock
     private CardExpenseRepository repository;
 
+    @Mock
+    private CardCashbackRepository cashbackRepository;
+
     private DemoCardExpenseSeeder seeder;
 
     @BeforeEach
     void setUp() {
-        seeder = new DemoCardExpenseSeeder(repository);
+        seeder = new DemoCardExpenseSeeder(repository, cashbackRepository);
     }
 
     @Test
@@ -107,5 +112,20 @@ class DemoCardExpenseSeederTest {
             assertEquals(4, found.size(), "on " + today + " found " + found);
             assertEquals(1, found.stream().filter(com.llijat.t212visualizer.dto.Subscription::priceChanged).count(), "on " + today);
         }
+    }
+
+    @Test
+    void theDemoCashback_isASmallPositiveShare_paidTheNightAfter_andNeverInTheFuture() {
+        List<CardExpense> expenses = seeder.buildExpenses(TODAY);
+
+        List<CardCashback> cashback = seeder.buildCashback(expenses, TODAY);
+
+        assertFalse(cashback.isEmpty());
+        for (CardCashback c : cashback) {
+            assertEquals(1, c.getAmount().signum());
+            assertEquals(1, c.getDateTime().atZone(ZoneOffset.UTC).getHour());
+            assertFalse(c.getDateTime().isAfter(Instant.parse("2026-11-15T23:59:59Z")));
+        }
+        assertEquals(cashback.size(), cashback.stream().map(CardCashback::getReference).distinct().count());
     }
 }

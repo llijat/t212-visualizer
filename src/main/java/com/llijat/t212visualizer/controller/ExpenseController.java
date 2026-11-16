@@ -47,6 +47,8 @@ public class ExpenseController {
         model.addAttribute("report", report);
         model.addAttribute("budgets", budgetService.getProgress(report));
         model.addAttribute("subscriptions", cardExpenseSummaryService.getSubscriptions(today));
+        model.addAttribute("cashbackMonth", cardExpenseSummaryService.getCashback(month));
+        model.addAttribute("cashbackTotal", cardExpenseSummaryService.getTotalCashback());
         return "expenses";
     }
 

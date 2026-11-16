@@ -100,6 +100,7 @@ class CardExpenseCsvParserTest {
         // Assert
         assertTrue(result.expenses().isEmpty());
         assertTrue(result.ignoredByAction().isEmpty());
+        assertTrue(result.cashback().isEmpty());
     }
 
     @Test
@@ -121,5 +122,23 @@ class CardExpenseCsvParserTest {
 
         // Act and Assert
         assertThrows(IllegalArgumentException.class, () -> parse(csv));
+    }
+
+    @Test
+    void parse_readsTheCashback_apartFromThePayments() throws IOException {
+        // A real cashback row: no merchant, a positive total, paid at night in UTC
+        String csv = HEADER
+                + "Card debit,2026-01-02 18:40:00+00:00,card-1,-12.34,EUR,Test Market,RETAIL_STORES\n"
+                + "Spending cashback,2026-01-03 01:12:30+00:00,cb-1,0.12,EUR,,\n";
+
+        CardExpenseCsvResult result = parse(csv);
+
+        assertEquals(1, result.expenses().size());
+        assertEquals(1, result.cashback().size());
+        assertEquals("cb-1", result.cashback().get(0).getReference());
+        assertEquals(java.time.Instant.parse("2026-01-03T01:12:30Z"), result.cashback().get(0).getDateTime());
+        assertEquals(new java.math.BigDecimal("0.12"), result.cashback().get(0).getAmount());
+        assertEquals("EUR", result.cashback().get(0).getCurrency());
+        assertTrue(result.ignoredByAction().isEmpty());
     }
 }

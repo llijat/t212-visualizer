@@ -6,7 +6,9 @@ import com.llijat.t212visualizer.dto.MerchantSpending;
 import com.llijat.t212visualizer.dto.DailySpending;
 import com.llijat.t212visualizer.dto.MonthReport;
 import com.llijat.t212visualizer.dto.MonthlySpending;
+import com.llijat.t212visualizer.model.CardCashback;
 import com.llijat.t212visualizer.model.CardExpense;
+import com.llijat.t212visualizer.repository.CardCashbackRepository;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,11 +35,14 @@ class CardExpenseSummaryServiceTest {
     @Mock
     private CardExpenseRepository repository;
 
+    @Mock
+    private CardCashbackRepository cashbackRepository;
+
     private CardExpenseSummaryService summaryService;
 
     @BeforeEach
     void setUp() {
-        summaryService = new CardExpenseSummaryService(repository);
+        summaryService = new CardExpenseSummaryService(repository, cashbackRepository);
     }
 
     private CardExpense expense(String amount, String dateTime, String merchant, String category) {
@@ -344,5 +349,42 @@ class CardExpenseSummaryServiceTest {
 
         assertAmount("0", days.get(1).total());
         assertAmount("15.00", days.get(2).total());
+    }
+
+    // ===== Cashback =====
+
+    private static CardCashback cashback(String id, String amount, String dateTime) {
+        return new CardCashback(id, Instant.parse(dateTime), new BigDecimal(amount), "EUR");
+    }
+
+    @Test
+    void theTotalCashback_addsUpEveryPayment() {
+        when(cashbackRepository.findAll()).thenReturn(List.of(
+                cashback("cb-1", "0.08", "2026-10-03T01:10:00Z"),
+                cashback("cb-2", "0.12", "2026-11-04T01:10:00Z"),
+                cashback("cb-3", "5.40", "2026-11-05T01:10:00Z")));
+
+        assertAmount("5.60", summaryService.getTotalCashback());
+    }
+
+    @Test
+    void theCashbackOfAMonth_onlyCountsThatMonth_inSpanishTime() {
+        // 31 October 23:30 UTC is already 1 November in Madrid
+        when(cashbackRepository.findAll()).thenReturn(List.of(
+                cashback("cb-1", "0.08", "2026-10-31T12:00:00Z"),
+                cashback("cb-2", "0.30", "2026-10-31T23:30:00Z"),
+                cashback("cb-3", "0.12", "2026-11-14T01:10:00Z"),
+                cashback("cb-4", "0.50", "2026-12-01T01:10:00Z")));
+
+        assertAmount("0.42", summaryService.getCashback(YearMonth.of(2026, 11)));
+        assertAmount("0.08", summaryService.getCashback(YearMonth.of(2026, 10)));
+    }
+
+    @Test
+    void withoutCashback_bothAreZero() {
+        when(cashbackRepository.findAll()).thenReturn(List.of());
+
+        assertAmount("0", summaryService.getTotalCashback());
+        assertAmount("0", summaryService.getCashback(YearMonth.of(2026, 11)));
     }
 }

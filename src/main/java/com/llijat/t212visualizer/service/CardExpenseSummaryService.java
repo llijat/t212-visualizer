@@ -1,7 +1,9 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.*;
+import com.llijat.t212visualizer.model.CardCashback;
 import com.llijat.t212visualizer.model.CardExpense;
+import com.llijat.t212visualizer.repository.CardCashbackRepository;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
 import org.springframework.stereotype.Service;
 
@@ -20,9 +22,11 @@ public class CardExpenseSummaryService {
     private static final int TYPICAL_MONTHS = 3;
 
     private final CardExpenseRepository cardExpenseRepository;
+    private final CardCashbackRepository cardCashbackRepository;
 
-    public CardExpenseSummaryService(CardExpenseRepository cardExpenseRepository) {
+    public CardExpenseSummaryService(CardExpenseRepository cardExpenseRepository, CardCashbackRepository cardCashbackRepository) {
         this.cardExpenseRepository = cardExpenseRepository;
+        this.cardCashbackRepository = cardCashbackRepository;
     }
 
     public CardExpenseSummary getSummary() {
@@ -209,5 +213,18 @@ public class CardExpenseSummaryService {
             days.add(new DailySpending(date, totals.getOrDefault(date, BigDecimal.ZERO)));
         }
         return days;
+    }
+
+    public BigDecimal getTotalCashback() {
+        return cardCashbackRepository.findAll().stream()
+                .map(CardCashback::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public BigDecimal getCashback(YearMonth month) {
+        return cardCashbackRepository.findAll().stream()
+                .filter(cashback -> YearMonth.from(cashback.getDateTime().atZone(SPAIN)).equals(month))
+                        .map(CardCashback::getAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

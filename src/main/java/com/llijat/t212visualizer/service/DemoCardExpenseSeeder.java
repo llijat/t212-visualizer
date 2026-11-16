@@ -1,6 +1,8 @@
 package com.llijat.t212visualizer.service;
 
+import com.llijat.t212visualizer.model.CardCashback;
 import com.llijat.t212visualizer.model.CardExpense;
+import com.llijat.t212visualizer.repository.CardCashbackRepository;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -52,17 +54,39 @@ public class DemoCardExpenseSeeder implements ApplicationRunner {
             new DemoSubscription("Globo Gym", "PERSONAL_SERVICES", "29.90", 26, "29.90"),
             new DemoSubscription("Wonka Streaming", "ENTERTAINMENT", "12.99", 1, "13.99"));
 
-    private final CardExpenseRepository cardExpenseRepository;
+    // Like the real card: a small share of each payment comes back the following night
+    private static final BigDecimal CASHBACK_RATE = new BigDecimal("0.015");
 
-    public DemoCardExpenseSeeder(CardExpenseRepository cardExpenseRepository) {
+    private final CardExpenseRepository cardExpenseRepository;
+    private final CardCashbackRepository cardCashbackRepository;
+
+    public DemoCardExpenseSeeder(CardExpenseRepository cardExpenseRepository, CardCashbackRepository cardCashbackRepository) {
         this.cardExpenseRepository = cardExpenseRepository;
+        this.cardCashbackRepository = cardCashbackRepository;
     }
 
     @Override
     public void run(ApplicationArguments args) {
         if (cardExpenseRepository.count() == 0) {
-            cardExpenseRepository.saveAll(buildExpenses(LocalDate.now(ZoneOffset.UTC)));
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            List<CardExpense> expenses = buildExpenses(today);
+            cardExpenseRepository.saveAll(expenses);
+            cardCashbackRepository.saveAll(buildCashback(expenses, today));
         }
+    }
+
+    /** 1.5 % of every payment, paid at 01:10 UTC the next day; nothing that would arrive after today. */
+    List<CardCashback> buildCashback(List<CardExpense> expenses, LocalDate today) {
+        List<CardCashback> cashback = new ArrayList<>();
+        for (CardExpense expense : expenses) {
+            LocalDate paidOn = expense.getDateTime().atZone(ZoneOffset.UTC).toLocalDate().plusDays(1);
+            BigDecimal amount = expense.getAmount().negate().multiply(CASHBACK_RATE).setScale(2, RoundingMode.HALF_UP);
+            if (!paidOn.isAfter(today) && amount.signum() > 0) {
+                cashback.add(new CardCashback("demo-cashback-" + (cashback.size() + 1),
+                        paidOn.atTime(1, 10).toInstant(ZoneOffset.UTC), amount, "EUR"));
+            }
+        }
+        return cashback;
     }
 
     /** The payments of the last 12 months, up to today. The dates depend on today, so the demo never looks old. */

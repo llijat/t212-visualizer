@@ -47,7 +47,8 @@ public class CardExpenseAutoImportService {
 
             String csv = exportClient.downloadExport(link);
             CardExpenseImportResult result = importService.importCsv(new StringReader(csv));
-            log.info("Imported {} new card payments. {} were already saved. Skipped: {}", result.imported(), result.alreadyKnown(), result.ignoredByAction());;
+            log.info("Imported {} new card payments and {} cashback. {} were already saved. Skipped: {}",
+                    result.imported(), result.cashbackImported(), result.alreadyKnown(), result.ignoredByAction());
         }
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();

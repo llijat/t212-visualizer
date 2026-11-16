@@ -472,6 +472,8 @@
         <strong th:if="${imported == 0 and known > 0}">Nothing new in this file.</strong>
         <strong th:if="${imported == 0 and known == 0}">This file has no card payments. Check that you exported the transactions.</strong>
         <span th:if="${known > 0}" th:text="${known} + (${known == 1} ? ' payment was already saved.' : ' payments were already saved.')">3 payments were already saved.</span>
+        <span th:if="${importResult.cashbackImported() > 0}"
+              th:text="'Also ' + ${importResult.cashbackImported()} + (${importResult.cashbackImported() == 1} ? ' cashback payment.' : ' cashback payments.')">Also 37 cashback payments.</span>
         <details th:unless="${skipped.isEmpty()}">
             <summary th:text="'Skipped ' + ${#numbers.formatInteger(#aggregates.sum(skipped.values()), 1, 'COMMA')} + ' rows that are not card payments'">Skipped 20 rows that are not card payments</summary>
             <ul class="skipped">
@@ -530,6 +532,13 @@
                 </p>
                 <p class="total-detail" th:if="${report.projected() != null}">
                     About <b th:text="${#numbers.formatDecimal(report.projected(), 1, 'COMMA', 0, 'POINT')} + ' €'">0 €</b> by the end of the month, if you spend as usual.
+                </p>
+
+                <!-- Money the card gave back: it lowers what the spending really cost -->
+                <p class="total-detail" th:if="${cashbackTotal.signum() > 0}">
+                    Cashback: <b th:text="${#numbers.formatDecimal(cashbackMonth, 1, 'COMMA', 2, 'POINT')} + ' €'">0.42 €</b>
+                    in <span th:text="${monthName}">November</span>,
+                    <b th:text="${#numbers.formatDecimal(cashbackTotal, 1, 'COMMA', 2, 'POINT')} + ' €'">127.88 €</b> in total.
                 </p>
 
                 <p class="total-detail all-time">
