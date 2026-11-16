@@ -23,14 +23,17 @@ public class CardExpenseSummaryService {
 
     private final CardExpenseRepository cardExpenseRepository;
     private final CardCashbackRepository cardCashbackRepository;
+    private final MerchantCategoryService merchantCategoryService;
 
-    public CardExpenseSummaryService(CardExpenseRepository cardExpenseRepository, CardCashbackRepository cardCashbackRepository) {
+    public CardExpenseSummaryService(CardExpenseRepository cardExpenseRepository, CardCashbackRepository cardCashbackRepository, MerchantCategoryService merchantCategoryService) {
         this.cardExpenseRepository = cardExpenseRepository;
         this.cardCashbackRepository = cardCashbackRepository;
+        this.merchantCategoryService = merchantCategoryService;
     }
 
     public CardExpenseSummary getSummary() {
         List<CardExpense> expenses = cardExpenseRepository.findAll();
+        Map<String, String> corrections = merchantCategoryService.getCorrections();
         BigDecimal total = calculateTotal(expenses);
         List<MonthlySpending> months = calculateMonths(expenses);
 
@@ -42,7 +45,7 @@ public class CardExpenseSummaryService {
                 calculateMonthlyAverage(total, months),
                 findBiggestMonth(months),
                 months,
-                calculateCategories(expenses),
+                calculateCategories(expenses, corrections),
                 calculateTopMerchants(expenses));
     }
 
@@ -111,14 +114,22 @@ public class CardExpenseSummaryService {
         return months;
     }
 
-    private List<CategorySpending> calculateCategories(List<CardExpense> expenses) {
+    private String categoryOf(CardExpense expense, Map<String, String> corrections) {
+        String merchant = expense.getMerchantName();
+        if (merchant != null && corrections.containsKey(merchant)) return corrections.get(merchant);
+
+        String category = expense.getMerchantCategory();
+        if (category == null || category.isBlank()) return "OTHER";
+        return category;
+    }
+
+    private List<CategorySpending> calculateCategories(List<CardExpense> expenses, Map<String, String> corrections) {
         Map<String, BigDecimal> totals = new HashMap<>();
         Map<String, Long> payments = new HashMap<>();
 
         for (CardExpense expense : expenses) {
-            String category = expense.getMerchantCategory();
-            if (category == null || category.isBlank()) category = "OTHER";
-            totals.merge(category,spentOn(expense), BigDecimal::add);
+            String category = categoryOf(expense, corrections);
+            totals.merge(category, spentOn(expense), BigDecimal::add);
             payments.merge(category, 1L, Long::sum);
         }
 
@@ -152,6 +163,7 @@ public class CardExpenseSummaryService {
 
     public MonthReport getMonthReport(YearMonth month, LocalDate today) {
         List<CardExpense> expenses = cardExpenseRepository.findAll();
+        Map<String, String> corrections = merchantCategoryService.getCorrections();
         boolean current = month.equals(YearMonth.from(today));
 
         int lastDay = current ? today.getDayOfMonth() : month.lengthOfMonth();
@@ -170,9 +182,10 @@ public class CardExpenseSummaryService {
                 spent,
                 calculateTotal(inPrevious),
                 projected,
-                calculateCategories(inMonth),
+                calculateCategories(inMonth, corrections),
                 calculateTopMerchants(inMonth),
-                calculateDays(inMonth,month,lastDay));
+                calculateDays(inMonth,month,lastDay),
+                listPayments(inMonth, corrections));
     }
 
     private List<CardExpense> between(List<CardExpense> expenses, LocalDate from, LocalDate to) {
@@ -226,5 +239,17 @@ public class CardExpenseSummaryService {
                 .filter(cashback -> YearMonth.from(cashback.getDateTime().atZone(SPAIN)).equals(month))
                         .map(CardCashback::getAmount)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private List<PaymentLine> listPayments(List<CardExpense> inMonth, Map<String, String> corrections) {
+        return inMonth.stream()
+                .sorted(Comparator.comparing(CardExpense::getDateTime).reversed())
+                .map(expense -> new PaymentLine(
+                        dateOf(expense),
+                        expense.getMerchantName(),
+                        categoryOf(expense, corrections),
+                        spentOn(expense),
+                        expense.getMerchantName() != null && corrections.containsKey(expense.getMerchantName())))
+                .toList();
     }
 }

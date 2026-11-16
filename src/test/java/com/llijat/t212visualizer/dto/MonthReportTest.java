@@ -13,7 +13,7 @@ class MonthReportTest {
 
     private static MonthReport report(String spent, String previousSameDays) {
         return new MonthReport(YearMonth.of(2026, 11), true, new BigDecimal(spent), new BigDecimal(previousSameDays),
-                null, List.of(), List.of(), List.of());
+                null, List.of(), List.of(), List.of(), List.of());
     }
 
     @Test
@@ -54,7 +54,7 @@ class MonthReportTest {
             days.add(new DailySpending(java.time.LocalDate.of(2026, 11, i + 1), new BigDecimal(totals[i])));
         }
         return new MonthReport(YearMonth.of(2026, 11), true, BigDecimal.ZERO, BigDecimal.ZERO, null,
-                List.of(), List.of(), days);
+                List.of(), List.of(), days, List.of());
     }
 
     @Test

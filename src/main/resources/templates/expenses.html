@@ -89,7 +89,7 @@
             flex: 1;
             min-height: 0;
             display: grid;
-            grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);   /* budgets and subscriptions · categories · merchants */
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.25fr);   /* budgets and subscriptions · categories and merchants · payments */
             grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
             gap: 1rem;
             padding: 1rem 1.5rem;
@@ -104,11 +104,12 @@
             flex-direction: column;
         }
         .panel h2 { margin: 0 0 0.6rem; font-size: 1rem; }
-        /* The first column stacks budgets over subscriptions; the other two lists take its whole height */
+        /* The first two columns stack two panels each; the payments, the longest list, take the whole third one */
         .panel-budgets { grid-column: 1; grid-row: 2; }
         .panel-subscriptions { grid-column: 1; grid-row: 3; }
-        .panel-categories { grid-column: 2; grid-row: 2 / span 2; }
-        .panel-merchants { grid-column: 3; grid-row: 2 / span 2; }
+        .panel-categories { grid-column: 2; grid-row: 2; }
+        .panel-merchants { grid-column: 2; grid-row: 3; }
+        .panel-payments { grid-column: 3; grid-row: 2 / span 2; }
 
         /* ===== Overview: the total as a sentence, next to the months ===== */
         .overview {
@@ -386,6 +387,86 @@
         .price-change.is-up { background: #3b2a12; color: #fbbf24; }
         .price-change.is-down { background: #13321f; color: var(--green); }
 
+        /* ===== Payments of the month: search, filter by day, correct the category of a merchant ===== */
+        .payments-tools { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
+        .payments-search {
+            flex: 1;
+            min-width: 0;
+            height: 2.1rem;
+            padding: 0 0.6rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            font: inherit;
+            font-size: 0.85rem;
+        }
+        .payments-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .payments-day {
+            height: 2.1rem;
+            padding: 0 0.7rem;
+            border: 1px solid var(--accent);
+            border-radius: 999px;
+            background: var(--accent-bg);
+            color: #93c5fd;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        .payments-day:hover, .payments-day:focus-visible { background: #1e3a5f; }
+        .payments-count { margin: 0 0 0.35rem; color: var(--muted); font-size: 0.75rem; }
+
+        .payment-row {
+            display: grid;
+            grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+            column-gap: 0.75rem;
+            align-items: center;
+            padding: 0.45rem 0.25rem 0.45rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .payment-row:last-child { border-bottom: none; }
+        .payment-date {
+            grid-row: span 2;
+            width: 2.25rem;
+            height: 2.25rem;
+            display: grid;
+            place-content: center;
+            border-radius: 8px;
+            background: #20242c;
+            text-align: center;
+            line-height: 1.05;
+        }
+        .payment-date b { font-size: 0.9rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .payment-date small { color: var(--muted); font-size: 0.6rem; }
+        .payment-fix { grid-column: 2 / span 2; display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+        .payment-fix form { margin: 0; min-width: 0; }
+        .payment-category {
+            max-width: 100%;
+            height: 1.6rem;
+            padding: 0 0.3rem;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: none;
+            color: var(--muted);
+            font: inherit;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .payment-category:hover, .payment-category:focus-visible { border-color: var(--border); background: var(--bg); color: var(--text); }
+        .payment-category:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .payment-category.is-corrected { color: #93c5fd; }
+        .payment-category option { background: var(--panel); color: var(--text); }
+        .payment-plain { color: var(--muted); font-size: 0.75rem; padding-left: 0.35rem; }
+        .payment-reset {
+            height: 1.6rem;
+            padding: 0 0.45rem;
+            border-radius: 6px;
+            background: none;
+            color: var(--muted);
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+        .payment-reset:hover, .payment-reset:focus-visible { background: #252a34; color: var(--text); }
+
         .budget-form button {
             height: 2.1rem;
             padding: 0 0.9rem;
@@ -566,7 +647,7 @@
                         <button type="button" class="heatmap-day"
                                 th:classappend="${(d.total().signum() == 0 ? 'is-zero ' : '') + (share > 0.55 ? 'is-strong ' : '') + (stat.last and report.current() ? 'is-today' : '')}"
                                 th:style="'--v:' + ${share}"
-                                th:data-label="${label}" th:data-amount="${amount}"
+                                th:data-label="${label}" th:data-amount="${amount}" th:data-date="${d.date()}"
                                 th:aria-label="${label} + ': ' + ${amount}"
                                 th:text="${d.date().getDayOfMonth()}">1</button>
                     </li>
@@ -709,6 +790,71 @@
                 </li>
             </ol>
         </section>
+
+        <!-- ===== Payments of the month, newest first. A merchant's category can be corrected here:
+                  it changes every payment to that merchant, and every figure on the page ===== -->
+        <section class="panel panel-payments" aria-labelledby="payments-heading"
+                 th:with="choices=${ {'AUTOMOBILE','AUTOMOBILE_RENTAL','BUSINESS_SERVICES','CLOTHING_STORES','ENTERTAINMENT','GOVERNMENT_SERVICES','HOTELS','OTHER','PERSONAL_SERVICES','RESTAURANTS','RETAIL_STORES','SERVICE_PROVIDERS','TRANSPORT'} },
+                          total=${report.payments().size()}">
+            <h2 id="payments-heading">Payments <span class="panel-month" th:text="'· ' + ${shownMonth}">· November</span></h2>
+            <p class="budget-error" role="alert" th:if="${categoryError != null}" th:text="${categoryError}">Choose a category.</p>
+            <p class="empty-month" th:if="${total == 0}">No card payments in this month.</p>
+
+            <th:block th:if="${total > 0}">
+                <div class="payments-tools">
+                    <input type="search" class="payments-search" id="payment-search" placeholder="Search a merchant or category" aria-label="Search the payments" autocomplete="off">
+                    <button type="button" class="payments-day hidden" id="payment-day" aria-label="Show every day again"></button>
+                </div>
+                <p class="payments-count" id="payment-count" aria-live="polite"
+                   th:text="${total} + (${total == 1} ? ' payment' : ' payments') + ' · a new category applies to every payment to that merchant'">87 payments · a new category applies to every payment to that merchant</p>
+
+                <ul class="rank-list" id="payment-list">
+                    <li class="payment-row" th:each="p : ${report.payments()}"
+                        th:with="merchantName=${p.merchant() == null ? 'Unknown merchant' : p.merchant()},
+                                 categoryName=${#strings.capitalize(#strings.toLowerCase(#strings.replace(p.category(), '_', ' ')))}"
+                        th:data-date="${p.date()}"
+                        th:data-search="${#strings.toLowerCase(merchantName + ' ' + categoryName)}">
+                        <span class="payment-date" aria-hidden="true">
+                            <b th:text="${p.date().getDayOfMonth()}">3</b>
+                            <small th:text="${#strings.capitalize(#strings.toLowerCase(#strings.substring(p.date().getDayOfWeek().name(), 0, 3)))}">Tue</small>
+                        </span>
+                        <span class="rank-name" th:text="${merchantName}" th:title="${merchantName}">Ferry Company</span>
+                        <span class="rank-amount" th:text="${#numbers.formatDecimal(p.amount(), 1, 'COMMA', 2, 'POINT')} + ' €'">60.00 €</span>
+
+                        <span class="payment-fix">
+                            <!-- Without a merchant there is nothing to attach a correction to -->
+                            <span class="payment-plain" th:if="${p.merchant() == null}" th:text="${categoryName}">Other</span>
+
+                            <form method="post" th:action="@{/expenses/categories}" th:if="${p.merchant() != null}">
+                                <input type="hidden" name="merchant" th:value="${p.merchant()}">
+                                <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                                <select name="category" class="payment-category" th:classappend="${p.corrected()} ? 'is-corrected'"
+                                        th:aria-label="'Category of ' + ${merchantName}">
+                                    <option th:each="c : ${choices}" th:value="${c}" th:selected="${c == p.category()}"
+                                            th:text="${#strings.capitalize(#strings.toLowerCase(#strings.replace(c, '_', ' ')))}">Transport</option>
+                                    <!-- A category T212 may add one day, so it can still be shown and chosen -->
+                                    <option th:each="c : ${spending.categories()}" th:unless="${choices.contains(c.category())}"
+                                            th:value="${c.category()}" th:selected="${c.category() == p.category()}"
+                                            th:text="${#strings.capitalize(#strings.toLowerCase(#strings.replace(c.category(), '_', ' ')))}">Grocery</option>
+                                </select>
+                                <noscript><button type="submit" class="payment-reset">Save</button></noscript>
+                            </form>
+
+                            <form method="post" th:action="@{/expenses/categories/reset}" th:if="${p.corrected()}">
+                                <input type="hidden" name="merchant" th:value="${p.merchant()}">
+                                <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                                <button type="submit" class="payment-reset"
+                                        th:title="'Go back to the category Trading 212 gives ' + ${merchantName}"
+                                        th:aria-label="'Go back to the category Trading 212 gives ' + ${merchantName}">
+                                    Use T212's
+                                </button>
+                            </form>
+                        </span>
+                    </li>
+                </ul>
+                <p class="empty-month hidden" id="payment-none">No payment matches.</p>
+            </th:block>
+        </section>
     </main>
 
     <div class="drop-overlay" aria-hidden="true">Drop the CSV to import it</div>
@@ -769,6 +915,63 @@
                 amount.textContent = day.dataset.amount;
                 heatmapDetail.replaceChildren(label, amount);
                 heatmapDetail.classList.remove('is-hint');
+
+                showOnlyDay(day.dataset.date, day.dataset.label);
+            });
+        }
+
+        // Payments: the search and the chosen day work together; both only hide rows, nothing is asked to the server
+        const paymentList = document.getElementById('payment-list');         // only exists with payments this month
+        const paymentSearch = document.getElementById('payment-search');
+        const paymentDay = document.getElementById('payment-day');
+        const paymentCount = document.getElementById('payment-count');
+        const paymentNone = document.getElementById('payment-none');
+        const paymentRows = paymentList ? [...paymentList.querySelectorAll('.payment-row')] : [];
+        let chosenDate = null;
+
+        function filterPayments() {
+            const words = paymentSearch.value.trim().toLowerCase();
+            let shown = 0;
+            paymentRows.forEach(row => {
+                const visible = (chosenDate === null || row.dataset.date === chosenDate) && row.dataset.search.includes(words);
+                row.classList.toggle('hidden', !visible);
+                if (visible) shown++;
+            });
+            paymentCount.textContent = shown === paymentRows.length
+                ? paymentRows.length + (paymentRows.length === 1 ? ' payment' : ' payments') + ' · a new category applies to every payment to that merchant'
+                : shown + ' of ' + paymentRows.length + ' payments';
+            paymentNone.classList.toggle('hidden', shown > 0);
+        }
+
+        function showOnlyDay(date, label) {
+            if (!paymentList) return;
+            chosenDate = date;
+            paymentDay.textContent = 'Only ' + label + ' ✕';
+            paymentDay.classList.remove('hidden');
+            filterPayments();
+        }
+
+        if (paymentList) {
+            paymentSearch.addEventListener('input', filterPayments);
+
+            // Clearing the day also clears the heat map, so both always say the same
+            paymentDay.addEventListener('click', () => {
+                chosenDate = null;
+                paymentDay.classList.add('hidden');
+                heatmapGrid.querySelectorAll('.is-selected').forEach(day => {
+                    day.classList.remove('is-selected');
+                    day.removeAttribute('aria-pressed');
+                });
+                heatmapDetail.textContent = 'Choose a day to see what you spent.';
+                heatmapDetail.classList.add('is-hint');
+                filterPayments();
+                paymentSearch.focus();
+            });
+
+            // Choosing a category saves it at once
+            paymentList.addEventListener('change', event => {
+                if (!event.target.matches('select.payment-category')) return;
+                event.target.form.requestSubmit();
             });
         }
 

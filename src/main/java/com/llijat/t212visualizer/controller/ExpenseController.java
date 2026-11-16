@@ -4,6 +4,7 @@ import com.llijat.t212visualizer.dto.MonthReport;
 import com.llijat.t212visualizer.service.BudgetService;
 import com.llijat.t212visualizer.service.CardExpenseImportService;
 import com.llijat.t212visualizer.service.CardExpenseSummaryService;
+import com.llijat.t212visualizer.service.MerchantCategoryService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,13 +28,15 @@ public class ExpenseController {
     private final CardExpenseImportService cardExpenseImportService;
     private final CardExpenseSummaryService cardExpenseSummaryService;
     private final BudgetService budgetService;
+    private final MerchantCategoryService merchantCategoryService;
     private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
 
 
-    public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService, BudgetService budgetService) {
+    public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService, BudgetService budgetService, MerchantCategoryService merchantCategoryService) {
         this.cardExpenseImportService = cardExpenseImportService;
         this.cardExpenseSummaryService = cardExpenseSummaryService;
         this.budgetService = budgetService;
+        this.merchantCategoryService = merchantCategoryService;
     }
 
     @GetMapping("/expenses")
@@ -81,6 +84,26 @@ public class ExpenseController {
     public String deleteBudget(@RequestParam String category,
                                @RequestParam(required = false) YearMonth month) {
         budgetService.deleteBudget(category);
+        return redirectToMonth(month);
+    }
+
+    @PostMapping("/expenses/categories")
+    public String saveCategory(@RequestParam String merchant,
+                               @RequestParam String category,
+                               @RequestParam(required = false) YearMonth month,
+                               RedirectAttributes redirect) {
+        try {
+            merchantCategoryService.saveCategory(merchant, category);
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("categoryError", e.getMessage());
+        }
+        return redirectToMonth(month);
+    }
+
+    @PostMapping("/expenses/categories/reset")
+    public String resetCategory(@RequestParam String merchant,
+                                @RequestParam(required = false) YearMonth month) {
+        merchantCategoryService.resetCategory(merchant);
         return redirectToMonth(month);
     }
 

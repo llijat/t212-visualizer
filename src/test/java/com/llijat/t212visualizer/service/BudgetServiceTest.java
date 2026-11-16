@@ -51,7 +51,7 @@ class BudgetServiceTest {
 
     private static MonthReport monthWith(CategorySpending... categories) {
         return new MonthReport(YearMonth.of(2026, 11), true, BigDecimal.ZERO, BigDecimal.ZERO, null,
-                List.of(categories), List.of(), List.of());
+                List.of(categories), List.of(), List.of(), List.of());
     }
 
     // ===== Saving =====

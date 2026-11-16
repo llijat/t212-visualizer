@@ -6,6 +6,7 @@ import com.llijat.t212visualizer.dto.MerchantSpending;
 import com.llijat.t212visualizer.dto.DailySpending;
 import com.llijat.t212visualizer.dto.MonthReport;
 import com.llijat.t212visualizer.dto.MonthlySpending;
+import com.llijat.t212visualizer.dto.PaymentLine;
 import com.llijat.t212visualizer.model.CardCashback;
 import com.llijat.t212visualizer.model.CardExpense;
 import com.llijat.t212visualizer.repository.CardCashbackRepository;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -38,11 +40,15 @@ class CardExpenseSummaryServiceTest {
     @Mock
     private CardCashbackRepository cashbackRepository;
 
+    // Without stubbing, Mockito answers an empty Map: no corrections, like a fresh install
+    @Mock
+    private MerchantCategoryService merchantCategoryService;
+
     private CardExpenseSummaryService summaryService;
 
     @BeforeEach
     void setUp() {
-        summaryService = new CardExpenseSummaryService(repository, cashbackRepository);
+        summaryService = new CardExpenseSummaryService(repository, cashbackRepository, merchantCategoryService);
     }
 
     private CardExpense expense(String amount, String dateTime, String merchant, String category) {
@@ -386,5 +392,182 @@ class CardExpenseSummaryServiceTest {
 
         assertAmount("0", summaryService.getTotalCashback());
         assertAmount("0", summaryService.getCashback(YearMonth.of(2026, 11)));
+    }
+
+    // ===== Categories corrected by merchant =====
+
+    @Test
+    void aCorrectedMerchant_countsInItsNewCategory_inTheSummaryAndInTheMonth() {
+        // T212 calls the ferry a hotel; the user said it is transport
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-60.00", "2026-11-03T10:00:00Z", "Ferry Company", "HOTELS"),
+                expense("-20.00", "2026-11-04T10:00:00Z", "Ferry Company", "HOTELS")));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        List<CategorySpending> inSummary = summaryService.getSummary().categories();
+        List<CategorySpending> inMonth = summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 16)).categories();
+
+        for (List<CategorySpending> categories : List.of(inSummary, inMonth)) {
+            assertEquals(1, categories.size());
+            assertEquals("TRANSPORT", categories.get(0).category());
+            assertAmount("80.00", categories.get(0).total());
+            assertEquals(2, categories.get(0).payments());
+        }
+    }
+
+    @Test
+    void aCorrection_onlyChangesThatMerchant() {
+        // A real hotel stays a hotel
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-60.00", "2026-11-03T10:00:00Z", "Ferry Company", "HOTELS"),
+                expense("-90.00", "2026-11-05T10:00:00Z", "Seaside Hotel", "HOTELS")));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        List<CategorySpending> categories = summaryService.getSummary().categories();
+
+        assertEquals(2, categories.size());
+        assertEquals("HOTELS", categories.get(0).category());
+        assertAmount("90.00", categories.get(0).total());
+        assertEquals("TRANSPORT", categories.get(1).category());
+        assertAmount("60.00", categories.get(1).total());
+    }
+
+    @Test
+    void aMerchantWithoutCategory_canBeGivenOne() {
+        // Without the correction it would fall into OTHER
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-12.00", "2026-11-03T10:00:00Z", "Street Market", null)));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Street Market", "GROCERY"));
+
+        assertEquals("GROCERY", summaryService.getSummary().categories().get(0).category());
+    }
+
+    @Test
+    void aPaymentWithoutMerchant_doesNotBreakTheCorrections() {
+        // Map.of throws if asked about a null key: the merchant must be checked first
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-5.00", "2026-11-03T10:00:00Z", null, "RESTAURANTS")));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        assertEquals("RESTAURANTS", summaryService.getSummary().categories().get(0).category());
+    }
+
+    @Test
+    void theCorrections_areReadOncePerPage_notOncePerPayment() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-1.00", "2026-11-01T10:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-2.00", "2026-11-02T10:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-3.00", "2026-11-03T10:00:00Z", "Bar", "RESTAURANTS")));
+
+        summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 16));
+
+        org.mockito.Mockito.verify(merchantCategoryService, org.mockito.Mockito.times(1)).getCorrections();
+    }
+
+    // ===== The list of payments of the month =====
+
+    private List<PaymentLine> paymentsOfNovember() {
+        return summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 16)).payments();
+    }
+
+    @Test
+    void thePayments_comeFromTheNewestToTheOldest_evenWithinTheSameDay() {
+        // Three payments on the same day: only the hour can sort them
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-3.00", "2026-11-10T09:00:00Z", "Bakery", "GROCERY"),
+                expense("-30.00", "2026-11-10T19:00:00Z", "Corner Bistro", "RESTAURANTS"),
+                expense("-50.00", "2026-11-02T12:00:00Z", "Market", "GROCERY"),
+                expense("-12.00", "2026-11-10T13:00:00Z", "Bookshop", "RETAIL_STORES")));
+
+        List<PaymentLine> payments = paymentsOfNovember();
+
+        assertEquals(List.of("Corner Bistro", "Bookshop", "Bakery", "Market"),
+                payments.stream().map(PaymentLine::merchant).toList());
+    }
+
+    @Test
+    void eachPayment_showsItsSpanishDate_andWhatWasSpent_asAPositiveAmount() {
+        // 23:30 UTC on 4 November is already 5 November in Spain
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-18.40", "2026-11-04T23:30:00Z", "Night Bar", "RESTAURANTS")));
+
+        PaymentLine payment = paymentsOfNovember().get(0);
+
+        assertEquals(LocalDate.of(2026, 11, 5), payment.date());
+        assertAmount("18.40", payment.amount());
+        assertEquals("RESTAURANTS", payment.category());
+        assertFalse(payment.corrected());
+    }
+
+    @Test
+    void onlyThePaymentsOfTheMonth_areListed() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-10.00", "2026-10-31T10:00:00Z", "Market", "GROCERY"),
+                expense("-20.00", "2026-11-01T10:00:00Z", "Market", "GROCERY"),
+                expense("-30.00", "2026-12-01T10:00:00Z", "Market", "GROCERY")));
+
+        List<PaymentLine> payments = paymentsOfNovember();
+
+        assertEquals(1, payments.size());
+        assertAmount("20.00", payments.get(0).amount());
+    }
+
+    @Test
+    void aCorrectedMerchant_showsItsNewCategory_andIsMarkedAsCorrected() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-60.00", "2026-11-03T10:00:00Z", "Ferry Company", "HOTELS"),
+                expense("-90.00", "2026-11-05T10:00:00Z", "Seaside Hotel", "HOTELS")));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        List<PaymentLine> payments = paymentsOfNovember();
+
+        assertEquals("Seaside Hotel", payments.get(0).merchant());
+        assertEquals("HOTELS", payments.get(0).category());
+        assertFalse(payments.get(0).corrected());
+        assertEquals("Ferry Company", payments.get(1).merchant());
+        assertEquals("TRANSPORT", payments.get(1).category());
+        assertTrue(payments.get(1).corrected());
+    }
+
+    @Test
+    void aPaymentWithoutMerchantOrCategory_isListedAsOther_andNotCorrected() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-5.00", "2026-11-03T10:00:00Z", null, null)));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        PaymentLine payment = paymentsOfNovember().get(0);
+
+        assertEquals("OTHER", payment.category());
+        assertFalse(payment.corrected());
+    }
+
+    @Test
+    void theListAndTheCategories_alwaysAgree() {
+        // Adding up the list by category must give exactly the category totals
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-60.00", "2026-11-03T10:00:00Z", "Ferry Company", "HOTELS"),
+                expense("-25.00", "2026-11-04T10:00:00Z", "Bus Line", "TRANSPORT"),
+                expense("-90.00", "2026-11-05T10:00:00Z", "Seaside Hotel", "HOTELS"),
+                expense("-7.00", "2026-11-06T10:00:00Z", "Kiosk", null)));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 16));
+
+        for (CategorySpending category : report.categories()) {
+            BigDecimal fromTheList = report.payments().stream()
+                    .filter(payment -> payment.category().equals(category.category()))
+                    .map(PaymentLine::amount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            assertAmount(category.total().toPlainString(), fromTheList);
+        }
+        assertAmount("85.00", report.categories().stream()
+                .filter(category -> category.category().equals("TRANSPORT")).findFirst().orElseThrow().total());
+    }
+
+    @Test
+    void aMonthWithoutPayments_hasAnEmptyList() {
+        when(repository.findAll()).thenReturn(List.of());
+
+        assertTrue(paymentsOfNovember().isEmpty());
     }
 }

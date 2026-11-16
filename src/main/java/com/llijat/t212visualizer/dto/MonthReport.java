@@ -14,7 +14,8 @@ public record MonthReport(
         BigDecimal projected,
         List<CategorySpending> categories,
         List<MerchantSpending> topMerchants,
-        List<DailySpending> days
+        List<DailySpending> days,
+        List<PaymentLine> payments
 ) {
     public BigDecimal changePercent() {
         if (previousSameDays.signum() == 0) return null;

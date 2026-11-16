@@ -3,6 +3,7 @@ package com.llijat.t212visualizer.controller;
 import com.llijat.t212visualizer.service.BudgetService;
 import com.llijat.t212visualizer.service.CardExpenseImportService;
 import com.llijat.t212visualizer.service.CardExpenseSummaryService;
+import com.llijat.t212visualizer.service.MerchantCategoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,11 +37,14 @@ class ExpenseControllerBudgetTest {
     @Mock
     private BudgetService budgetService;
 
+    @Mock
+    private MerchantCategoryService merchantCategoryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new ExpenseController(importService, summaryService, budgetService)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new ExpenseController(importService, summaryService, budgetService, merchantCategoryService)).build();
     }
 
     @Test
