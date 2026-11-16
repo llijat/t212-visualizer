@@ -123,20 +123,32 @@
         .heatmap { display: flex; flex-direction: column; justify-content: center; gap: 0.35rem; }
         .heatmap-head, .heatmap-grid {
             display: grid;
-            grid-template-columns: repeat(7, 18px);
+            grid-template-columns: repeat(7, 24px);
             gap: 3px;
         }
         .heatmap-head { color: var(--muted); font-size: 0.65rem; text-align: center; }
         .heatmap-grid { list-style: none; margin: 0; padding: 0; }
         .heatmap-grid > :first-child { grid-column-start: var(--start); }
         .heatmap-day {
-            height: 18px;
-            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            display: grid;
+            place-items: center;
+            border-radius: 5px;
             background: color-mix(in srgb, var(--accent) calc(18% + var(--v) * 82%), var(--panel));
+            color: var(--text);
+            font-size: 0.65rem;
+            font-variant-numeric: tabular-nums;
         }
-        .heatmap-day.is-zero { background: #20242c; }
-        .heatmap-day.is-future { background: none; border: 1px dashed var(--border); }
-        .heatmap-day.is-today { outline: 1.5px solid var(--text); outline-offset: 1px; }
+        .heatmap-day.is-strong { color: var(--bg); font-weight: 600; }     /* dark number on the brightest days */
+        .heatmap-day.is-zero { background: #20242c; color: var(--muted); }
+        .heatmap-day.is-future { background: none; border: 1px dashed var(--border); color: #4b5260; }
+        .heatmap-day.is-today { box-shadow: 0 0 0 1.5px var(--text); }
+        button.heatmap-day:hover { filter: brightness(1.2); }
+        .heatmap-day.is-selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent); }
+        .heatmap-detail { margin: 0; min-height: 1.2em; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+        .heatmap-detail b { font-weight: 600; }
+        .heatmap-detail.is-hint { color: var(--muted); font-size: 0.75rem; }
         .heatmap-legend { display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 0.65rem; }
         .heatmap-legend i { width: 10px; height: 10px; border-radius: 2px; }
         .heatmap-legend span:first-child { margin-right: 0.2rem; }
@@ -534,18 +546,28 @@
                           length=${report.month().lengthOfMonth()},
                           shown=${report.days().size()}">
                 <div class="heatmap-head" aria-hidden="true"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
-                <ol class="heatmap-grid" role="img"
-                    th:aria-label="'Spending per day in ' + ${monthName} + '. The most in one day: ' + ${#numbers.formatDecimal(max, 1, 'COMMA', 2, 'POINT')} + ' €'"
+                <!-- Every day is a button: choosing one writes what it spent below the grid -->
+                <ol class="heatmap-grid" id="heatmap-grid"
+                    th:aria-label="'Spending per day in ' + ${monthName}"
                     th:style="'--start:' + ${report.month().atDay(1).getDayOfWeek().getValue()}">
-                    <li class="heatmap-day" th:each="d, stat : ${report.days()}"
-                        th:classappend="${(d.total().signum() == 0 ? 'is-zero ' : '') + (stat.last and report.current() ? 'is-today' : '')}"
-                        th:style="'--v:' + ${max.signum() == 0 ? 0 : d.total() / max}"
-                        th:title="${d.date().getDayOfMonth()} + ' ' + ${#strings.capitalize(#strings.toLowerCase(#strings.substring(d.date().getMonth().name(), 0, 3)))} + ': ' + ${#numbers.formatDecimal(d.total(), 1, 'COMMA', 2, 'POINT')} + ' €'"></li>
+                    <li th:each="d, stat : ${report.days()}"
+                        th:with="share=${max.signum() == 0 ? 0 : d.total() / max},
+                                 label=${#strings.capitalize(#strings.toLowerCase(#strings.substring(d.date().getDayOfWeek().name(), 0, 3)))} + ' ' + ${d.date().getDayOfMonth()} + ' ' + ${#strings.capitalize(#strings.toLowerCase(#strings.substring(d.date().getMonth().name(), 0, 3)))},
+                                 amount=${#numbers.formatDecimal(d.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">
+                        <button type="button" class="heatmap-day"
+                                th:classappend="${(d.total().signum() == 0 ? 'is-zero ' : '') + (share > 0.55 ? 'is-strong ' : '') + (stat.last and report.current() ? 'is-today' : '')}"
+                                th:style="'--v:' + ${share}"
+                                th:data-label="${label}" th:data-amount="${amount}"
+                                th:aria-label="${label} + ': ' + ${amount}"
+                                th:text="${d.date().getDayOfMonth()}">1</button>
+                    </li>
                     <th:block th:if="${shown < length}">
-                        <li class="heatmap-day is-future" th:each="future : ${#numbers.sequence(shown + 1, length)}"
-                            th:title="${future} + ' ' + ${#strings.capitalize(#strings.toLowerCase(#strings.substring(report.month().getMonth().name(), 0, 3)))} + ': still to come'"></li>
+                        <li th:each="future : ${#numbers.sequence(shown + 1, length)}">
+                            <span class="heatmap-day is-future" th:text="${future}" th:title="${future} + ': still to come'">16</span>
+                        </li>
                     </th:block>
                 </ol>
+                <p class="heatmap-detail is-hint" id="heatmap-detail" aria-live="polite">Choose a day to see what you spent.</p>
                 <div class="heatmap-legend" aria-hidden="true">
                     <span>Less</span>
                     <i style="background: #20242c"></i>
@@ -716,6 +738,29 @@
                 document.getElementById('card-drop-title').textContent = 'Importing…';
             }
             form.submit();
+        }
+
+        // Heat map: choosing a day writes its date and amount under the grid
+        const heatmapGrid = document.getElementById('heatmap-grid');            // only exists with data
+        const heatmapDetail = document.getElementById('heatmap-detail');
+        if (heatmapGrid) {
+            heatmapGrid.addEventListener('click', event => {
+                const day = event.target.closest('button.heatmap-day');
+                if (!day) return;
+                heatmapGrid.querySelectorAll('.is-selected').forEach(other => {
+                    other.classList.remove('is-selected');
+                    other.removeAttribute('aria-pressed');
+                });
+                day.classList.add('is-selected');
+                day.setAttribute('aria-pressed', 'true');
+
+                const label = document.createElement('span');
+                label.textContent = day.dataset.label + ' · ';
+                const amount = document.createElement('b');
+                amount.textContent = day.dataset.amount;
+                heatmapDetail.replaceChildren(label, amount);
+                heatmapDetail.classList.remove('is-hint');
+            });
         }
 
         // Dragging a file: the whole page accepts it.
