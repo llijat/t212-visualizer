@@ -125,6 +125,23 @@
         .story-symbol:hover { background: var(--accent-bg); color: var(--accent); }
         .story-symbol .logo { font-size: 1.15rem; }
 
+        /* The star: faint until it is pressed, then filled with the colour of what is selected */
+        .star-form { margin: 0 0 0 auto; }
+        .star {
+            width: 2rem;
+            height: 2rem;
+            margin: -0.45rem -0.45rem -0.45rem 0;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            background: none;
+            color: var(--faint);
+        }
+        .star .icon { width: 1.1rem; height: 1.1rem; }
+        .star:hover { background: var(--raised); color: var(--text); }
+        .star[aria-pressed="true"] { color: var(--accent); }
+        .star[aria-pressed="true"] .icon { fill: currentColor; }
+
         .empty { margin: 2rem 0; color: var(--muted); line-height: 1.6; }
 
         /* ===== Narrow screens: the sources become a row of buttons above the stories ===== */
@@ -150,6 +167,7 @@
 
     <svg class="sprite" aria-hidden="true">
         <symbol id="icon-stack" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+        <symbol id="icon-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></symbol>
     </svg>
 
     <main class="news-page"
@@ -191,6 +209,13 @@
                         <span class="source-count" th:text="${marketTotal}">100</span>
                     </button>
                 </li>
+                <li>
+                    <button type="button" class="source" data-show="starred" aria-pressed="false">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-star"/></svg></span>
+                        <span class="source-symbol">Starred</span>
+                        <span class="source-count" id="starred-count" th:text="${starredIds.size()}">3</span>
+                    </button>
+                </li>
             </ul>
 
             <p class="sources-note">The free news service only covers US companies, so holdings listed elsewhere have no news here.</p>
@@ -205,66 +230,28 @@
                 </div>
 
                 <!-- Your holdings, a day at a time -->
+                <!-- The days and their stories are drawn by fragments/news-story.html, the same in the three folders -->
                 <div id="portfolio" class="feed">
-                    <p class="empty" th:if="${portfolioDays.isEmpty()}">Loading the news of your holdings. Reload the page in a few seconds.</p>
-                    <section class="day" th:each="day : ${portfolioDays}">
-                        <div class="day-head">
-                            <h2 th:text="${day.date().equals(today)} ? 'Today'
-                                       : (${day.date().equals(today.minusDays(1))} ? 'Yesterday'
-                                       : ${#strings.capitalize(#strings.toLowerCase(day.date().getDayOfWeek().name())) + ' ' + day.date().getDayOfMonth() + ' ' + #strings.capitalize(#strings.toLowerCase(day.date().getMonth().name()))})">Today</h2>
-                            <span class="day-total" th:text="${day.news().size()} + (${day.news().size() == 1} ? ' story' : ' stories')">12 stories</span>
-                        </div>
-                        <ol class="day-list">
-                            <li class="story" th:each="n : ${day.news()}"
-                                th:data-symbol="${n.related()}"
-                                th:data-search="${#strings.toLowerCase(n.headline() + ' ' + n.summary() + ' ' + n.source() + ' ' + n.related())}">
-                                <time class="story-time" th:datetime="${n.publishedAt()}" th:text="${#temporals.format(n.publishedAt(), 'HH:mm')}">14:05</time>
-                                <div>
-                                    <!-- Opens the publisher's page in a new tab; it gets no hint of where the click came from -->
-                                    <a class="story-headline" th:href="${n.url()}" th:text="${n.headline()}" target="_blank" rel="noopener noreferrer">Headline</a>
-                                    <p class="story-summary" th:if="${!#strings.isEmpty(n.summary()) and n.summary() != n.headline()}" th:text="${n.summary()}">Summary</p>
-                                    <div class="story-meta">
-                                        <button type="button" class="story-symbol" th:if="${!#strings.isEmpty(n.related()) and !#strings.contains(n.related(), ',')}"
-                                                th:data-symbol="${n.related()}" th:aria-label="'Only ' + ${n.related()} + ' news'"
-                                                th:with="ticker=${tickers.get(n.related())}">
-                                            <span class="logo" aria-hidden="true">
-                                                <span class="logo-initial" th:text="${#strings.substring(n.related(), 0, 1)}">A</span>
-                                                <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
-                                            </span>
-                                            <th:block th:text="${n.related()}">AAPL</th:block>
-                                        </button>
-                                        <span th:unless="${#strings.isEmpty(n.source())}" th:text="${n.source()}">Reuters</span>
-                                    </div>
-                                </div>
-                            </li>
-                        </ol>
-                    </section>
+                    <p class="empty" th:if="${portfolioDays.isEmpty()}">No news from your holdings in the last 7 days. If the app has just started, reload the page in a few seconds.</p>
+                    <th:block th:each="day : ${portfolioDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
                 </div>
 
                 <!-- The market: the same, without holdings -->
                 <div id="market" class="feed hidden">
-                    <p class="empty" th:if="${marketDays.isEmpty()}">Loading the market news. Reload the page in a few seconds.</p>
-                    <section class="day" th:each="day : ${marketDays}">
-                        <div class="day-head">
-                            <h2 th:text="${day.date().equals(today)} ? 'Today'
-                                       : (${day.date().equals(today.minusDays(1))} ? 'Yesterday'
-                                       : ${#strings.capitalize(#strings.toLowerCase(day.date().getDayOfWeek().name())) + ' ' + day.date().getDayOfMonth() + ' ' + #strings.capitalize(#strings.toLowerCase(day.date().getMonth().name()))})">Today</h2>
-                            <span class="day-total" th:text="${day.news().size()} + (${day.news().size() == 1} ? ' story' : ' stories')">20 stories</span>
-                        </div>
-                        <ol class="day-list">
-                            <li class="story" th:each="n : ${day.news()}"
-                                th:data-search="${#strings.toLowerCase(n.headline() + ' ' + n.summary() + ' ' + n.source())}">
-                                <time class="story-time" th:datetime="${n.publishedAt()}" th:text="${#temporals.format(n.publishedAt(), 'HH:mm')}">14:05</time>
-                                <div>
-                                    <a class="story-headline" th:href="${n.url()}" th:text="${n.headline()}" target="_blank" rel="noopener noreferrer">Headline</a>
-                                    <p class="story-summary" th:if="${!#strings.isEmpty(n.summary()) and n.summary() != n.headline()}" th:text="${n.summary()}">Summary</p>
-                                    <div class="story-meta">
-                                        <span th:unless="${#strings.isEmpty(n.source())}" th:text="${n.source()}">CNBC</span>
-                                    </div>
-                                </div>
-                            </li>
-                        </ol>
-                    </section>
+                    <p class="empty" th:if="${marketDays.isEmpty()}">No market news in the last 7 days. If the app has just started, reload the page in a few seconds.</p>
+                    <th:block th:each="day : ${marketDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
+                </div>
+
+                <!-- Starred: from both, of any age, because they are never deleted -->
+                <div id="starred" class="feed hidden">
+                    <p class="empty" th:if="${starredDays.isEmpty()}">No starred stories yet. Press the star on a story to keep it here for good: the others are deleted after 30 days.</p>
+                    <th:block th:each="day : ${starredDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
                 </div>
 
                 <p class="empty hidden" id="nothing">No story matches. Try another word or choose another source.</p>
@@ -273,9 +260,15 @@
     </main>
 
     <script>
-        // Everything here only hides and shows what the page already has: nothing is asked to the server
+        // Almost everything here only hides and shows what the page already has; the star is the one thing sent to the server
         const sources = [...document.querySelectorAll('.source')];
-        const feeds = { portfolio: document.getElementById('portfolio'), market: document.getElementById('market') };
+        const feeds = {
+            portfolio: document.getElementById('portfolio'),
+            market: document.getElementById('market'),
+            starred: document.getElementById('starred')
+        };
+        const starredCount = document.getElementById('starred-count');
+        let starsChanged = false;
         const search = document.getElementById('search');
         const count = document.getElementById('count');
         const nothing = document.getElementById('nothing');
@@ -306,6 +299,14 @@
         }
 
         function choose(button) {
+            // The Starred folder was drawn when the page loaded: after starring something, draw it again
+            if (button.dataset.show === 'starred' && starsChanged) {
+                location.hash = 'starred';
+                location.reload();
+                return;
+            }
+            // Leaving Starred: a later reload should not bring it back
+            if (button.dataset.show !== 'starred' && location.hash) history.replaceState(null, '', location.pathname);
             sources.forEach(other => other.setAttribute('aria-pressed', String(other === button)));
             showing = button.dataset.show;
             symbol = button.dataset.symbol || null;
@@ -319,12 +320,44 @@
         search.addEventListener('input', filter);
 
         // The symbol on a story shows only that holding's stories
-        feeds.portfolio.addEventListener('click', event => {
+        storiesArea.addEventListener('click', event => {
             const chip = event.target.closest('.story-symbol');
             if (!chip) return;
             const source = sources.find(button => button.dataset.symbol === chip.dataset.symbol);
             if (source) choose(source);
         });
+
+        // The star: sent without reloading, so the folder and the search stay as they are.
+        // If that fails, the form is sent the normal way and the page reloads.
+        storiesArea.addEventListener('submit', async event => {
+            const form = event.target.closest('.star-form');
+            if (!form) return;
+            event.preventDefault();
+            const starred = form.elements.starred.value === 'true';
+            try {
+                // 'manual': the answer is a redirect to the whole page, which is not needed here
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: new URLSearchParams(new FormData(form)),
+                    redirect: 'manual'
+                });
+                if (!response.ok && response.type !== 'opaqueredirect') throw new Error('Status ' + response.status);
+            } catch (error) {
+                form.submit();
+                return;
+            }
+            // The same story can be in two folders (a holding and Starred): both stars change
+            document.querySelectorAll('.star-form[data-id="' + form.dataset.id + '"]').forEach(other => {
+                other.elements.starred.value = String(!starred);
+                other.querySelector('.star').setAttribute('aria-pressed', String(starred));
+            });
+            starredCount.textContent = Number(starredCount.textContent) + (starred ? 1 : -1);
+            starsChanged = true;
+        });
+
+        // Back on Starred after that reload (or with /news#starred)
+        const starredButton = sources.find(button => button.dataset.show === 'starred');
+        if (location.hash === '#starred') choose(starredButton);
 
         filter();
     </script>

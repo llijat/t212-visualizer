@@ -1,14 +1,20 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.NewsDay;
+import com.llijat.t212visualizer.model.NewsFeed;
+import com.llijat.t212visualizer.model.NewsItem;
 import com.llijat.t212visualizer.model.Position;
+import com.llijat.t212visualizer.repository.NewsItemRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.llijat.t212visualizer.dto.FinnhubNewsDto;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import javax.swing.text.html.Option;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -17,28 +23,30 @@ public class NewsService {
     private static final Logger log = LoggerFactory.getLogger(NewsService.class);
 
     private final FinnhubClient finnhubClient;
-    private List<FinnhubNewsDto> generalNews = List.of();
-    private List<FinnhubNewsDto> portfolioNews = List.of();
     private Map<String, String> tickerBySymbol = Map.of();
     private final PositionService positionService;
     private final CompanyProfileService companyProfileService;
+    private final NewsItemRepository newsItemRepository;
 
-    public NewsService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService) {
+    public NewsService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService, NewsItemRepository newsItemRepository) {
         this.finnhubClient = finnhubClient;
         this.positionService = positionService;
         this.companyProfileService = companyProfileService;
+        this.newsItemRepository = newsItemRepository;
     }
 
     public List<FinnhubNewsDto> getNews() {
-        return generalNews.stream().limit(20).toList();
+        return newsItemRepository.findTop20ByFeedOrderByPublishedAtDesc(NewsFeed.MARKET).stream()
+                .map(NewsItem::toDto)
+                .toList();
     }
 
     public List<FinnhubNewsDto> getPortfolioNews() {
-        return portfolioNews;
+        return lastWeek(NewsFeed.PORTFOLIO);
     }
 
     public List<String> getPortfolioTickers() {
-        return portfolioNews.stream()
+        return getPortfolioNews().stream()
                 .map(FinnhubNewsDto::related)
                 .filter(ticker -> ticker != null && !ticker.isBlank())
                 .distinct()
@@ -51,25 +59,72 @@ public class NewsService {
     }
 
     public List<NewsDay> getMarketNewsByDay() {
-        return NewsGrouper.byDay(generalNews);
+        return NewsGrouper.byDay(lastWeek(NewsFeed.MARKET));
     }
 
     public Map<String, Long> getNewsCountBySymbol() {
-        return portfolioNews.stream()
+        return getPortfolioNews().stream()
                 .filter(news -> news.related() != null && !news.related().isBlank())
                 .collect(Collectors.groupingBy(FinnhubNewsDto::related, TreeMap::new, Collectors.counting()));
     }
 
     public Map<String, String> getTickerBySymbol() {return tickerBySymbol;}
 
+    private void store(List<FinnhubNewsDto> fetched, NewsFeed feed) {
+        List<Long> ids = fetched.stream().map(FinnhubNewsDto::id).toList();
+        Set<Long> known = newsItemRepository.findAllById(ids).stream()
+                .map(NewsItem::getId)
+                .collect(Collectors.toSet());
+
+        List<NewsItem> fresh = fetched.stream()
+                .filter(news -> !known.contains(news.id()))
+                .map(news -> new NewsItem(news, feed))
+                .toList();
+
+        newsItemRepository.saveAll(fresh);
+        log.info("Stored {} new {} news", fresh.size(), feed);
+    }
+
+    private List<FinnhubNewsDto> lastWeek(NewsFeed feed) {
+        Instant weekAgo = Instant.now().minus(7, ChronoUnit.DAYS);
+        return newsItemRepository.findByFeedAndPublishedAtAfterOrderByPublishedAtDesc(feed, weekAgo).stream()
+                .map(NewsItem::toDto)
+                .toList();
+    }
+
+    private List<FinnhubNewsDto> starred() {
+        return newsItemRepository.findByStarredTrueOrderByPublishedAtDesc().stream()
+                .map(NewsItem::toDto)
+                .toList();
+    }
+
+    public List<NewsDay> getStarredNewsByDay() {
+        return NewsGrouper.byDay(starred());
+    }
+
+    public Set<Long> getStarredIds() {
+        return starred().stream()
+                .map(FinnhubNewsDto::id)
+                .collect(Collectors.toSet());
+    }
+
+    public void changeStarred(long id, boolean starred) {
+        Optional<NewsItem> item = newsItemRepository.findById(id);
+        if (item.isEmpty()) return;
+        item.get().changeStarred(starred);
+        newsItemRepository.save(item.get());
+    }
+
     @Scheduled(fixedRate = 15*60*1000, initialDelay = 0)
     public void refreshFromFinnhub() {
         log.info("Refreshing News...");
 
         try {
-            generalNews = finnhubClient.fetchGeneralNews();
-            log.info("Refreshed {} news.", generalNews.size());
+            List<FinnhubNewsDto> fetched = finnhubClient.fetchGeneralNews();
+            store(fetched, NewsFeed.MARKET);
+            log.info("Refreshed {} news.", fetched.size());
         }
+
         catch (Exception e) {
             log.warn("Could not refresh the news: {}", e.getMessage());
 
@@ -100,10 +155,20 @@ public class NewsService {
                 }
             }
         }
-        collected.sort(Comparator.comparingLong(FinnhubNewsDto::datetime).reversed());
-        portfolioNews = collected;
         tickerBySymbol = tickers;
-        log.info("Refreshed {} portfolio news.", portfolioNews.size());
+        store(collected, NewsFeed.PORTFOLIO);
+        log.info("Refreshed {} portfolio news.", collected.size());
+    }
+
+    @Scheduled(fixedRate = 24*60*60*1000, initialDelay = 60*1000)
+    public void cleanUpOldNews() {
+        Instant monthAgo = Instant.now().minus(30, ChronoUnit.DAYS);
+        try {
+            long deleted = newsItemRepository.deleteByStarredFalseAndPublishedAtBefore(monthAgo);
+            log.info("Deleted {} old news without a star.", deleted);
+        } catch (Exception e) {
+            log.warn("Could not clean up the old news: {}", e.getMessage());
+        }
     }
 }
 

@@ -5,16 +5,13 @@ import com.llijat.t212visualizer.dto.NewsDay;
 
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class NewsGrouper {
-    private NewsService newsService;
-
     private NewsGrouper() {}
 
     public static List<NewsDay> byDay(List<FinnhubNewsDto> news) {
         List<FinnhubNewsDto> sorted = news.stream().sorted(Comparator.comparingLong(FinnhubNewsDto::datetime).reversed()).toList();
-        Map<LocalDate, List<FinnhubNewsDto>> newsByDay= new LinkedHashMap<>();
+        Map<LocalDate, List<FinnhubNewsDto>> newsByDay = new LinkedHashMap<>();
 
         for (FinnhubNewsDto f : sorted) {
             newsByDay.computeIfAbsent(f.publishedAt().toLocalDate(), day -> new ArrayList<>()).add(f);
@@ -28,11 +25,4 @@ public class NewsGrouper {
 
         return list;
     }
-
-    public Map<String, Long> getNewsCountBySymbol() {
-        return newsService.getPortfolioNews().stream()
-                .filter(news -> news.related() != null && !news.related().isBlank())
-                .collect(Collectors.groupingBy(FinnhubNewsDto::related, TreeMap::new, Collectors.counting()));
-    }
-
 }
