@@ -3,21 +3,27 @@
 /* ===== App colours (change them here and the whole app follows) ===== */
 :root {
     color-scheme: dark;     /* tells the browser the page is dark, so its controls (scrollbars, search box...) match */
-    --bg: #0f1115;          /* page background */
-    --panel: #171a21;       /* card background */
-    --border: #2a2d35;      /* borders and separators */
-    --text: #e6e6e6;        /* main text */
-    --muted: #9aa0ab;       /* secondary text (grey) */
-    --accent: #60a5fa;      /* highlight blue */
-    --accent-bg: #1e3a5f;   /* dark blue for backgrounds (badges, chips) */
-    --green: #4ade80;
-    --red: #f87171;
-    --raised: #1f232c;      /* hover and open menus: one step above the cards */
-    --radius: 10px;         /* cards */
-    --radius-small: 6px;    /* buttons, fields, menus */
+    --bg: #0e1219;          /* page background: ink blue, not black */
+    --panel: #151b24;       /* card background */
+    --raised: #1c2431;      /* hover, tracks and open menus: one step above the cards */
+    --border: #252f3e;      /* the few lines left */
+    --text: #e7ebf1;        /* main text */
+    --muted: #8a94a6;       /* secondary text */
+    --faint: #5d6778;       /* hints and axis labels */
+    --accent: #8ab4ff;      /* only for what is selected or can be acted on */
+    --accent-bg: color-mix(in srgb, var(--accent) 16%, transparent);
+    --green: #6fd3a0;       /* up, beat, less spending */
+    --red: #f58b8b;         /* down, missed, more spending */
+    --radius: 14px;         /* cards */
+    --radius-small: 9px;    /* buttons, fields, menus */
+
+    /* Figures and titles in a DIN (Bahnschrift comes with Windows; DIN Alternate with macOS), text in the system face.
+       Nothing is downloaded: the app makes no requests to third parties. */
+    --figures: Bahnschrift, "DIN Alternate", "Segoe UI Variable Display", system-ui, sans-serif;
+    --text-font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
 
     /* Scrollbars: the thumb keeps a 3:1 contrast with the cards, so it is easy to see how far down a list is */
-    --scroll-thumb: #666d7c;
+    --scroll-thumb: #5f6879;
     --scroll-track: transparent;
 }
 
@@ -86,20 +92,20 @@
         margin-block: 4px;
         padding: 0.3rem;
         border: 1px solid var(--border);
-        border-radius: var(--radius-small);
+        border-radius: 10px;
         background: var(--raised);
         color: var(--text);
-        box-shadow: 0 12px 28px rgb(0 0 0 / 0.45);
+        box-shadow: 0 14px 32px rgb(0 0 0 / 0.5);
         max-block-size: min(22rem, 60vh);
     }
     option {
         padding: 0.4rem 0.6rem;
-        border-radius: 4px;
+        border-radius: 6px;
         font-size: 0.85rem;
         background: none;
         color: var(--text);
     }
-    option:hover, option:focus-visible { background: var(--accent-bg); color: #dbeafe; outline: none; }
+    option:hover, option:focus-visible { background: var(--accent-bg); outline: none; }
     option:checked { font-weight: 600; }
     option::checkmark { color: var(--accent); }
 }
@@ -109,13 +115,21 @@
 html, body { height: 100%; }
 body {
     margin: 0;
-    font-family: system-ui, sans-serif;
+    font: 15px/1.45 var(--text-font);
+    -webkit-font-smoothing: antialiased;
     background: var(--bg);
     color: var(--text);
     display: flex;
     flex-direction: column;     /* bar on top, content below */
     overflow: hidden;           /* the page does not scroll: each card scrolls on its own */
 }
+input, select, textarea { font: inherit; color: inherit; }
+
+/* Figures: the DIN face, every digit the same width so columns line up */
+.figures { font-family: var(--figures); font-variant-numeric: tabular-nums; }
+
+/* ===== Cards: no border, set apart by their tone ===== */
+.card-title { margin: 0; font: 500 1.05rem var(--figures); letter-spacing: 0.01em; }
 
 /* ===== Icons: drawn with lines that take the colour of the text around them ===== */
 .sprite { position: absolute; width: 0; height: 0; }
@@ -135,11 +149,11 @@ body {
     display: flex;
     align-items: center;
     gap: 2rem;
-    padding: 0.6rem 1.5rem;
+    padding: 0.65rem 2rem;
     border-bottom: 1px solid var(--border);
-    background: var(--panel);
+    background: var(--bg);
 }
-.brand { font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
+.brand { font: 600 1.15rem var(--figures); letter-spacing: 0.01em; white-space: nowrap; }
 .brand span { color: var(--accent); }
 
 .nav { display: flex; gap: 0.25rem; flex: 1; }   /* flex: 1 pushes the button to the right */
@@ -147,16 +161,17 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    padding: 0.4rem 0.7rem;
-    border-radius: 6px;
+    padding: 0.42rem 0.8rem;
+    border-radius: 8px;
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: 0.92rem;
     text-decoration: none;
     transition: color 0.15s, background-color 0.15s;
 }
 a.nav-item:hover { color: var(--text); background: var(--raised); }
-.nav-item.active { color: var(--accent); background: var(--accent-bg); }
-.nav-item.soon { opacity: 0.45; cursor: default; }   /* sections not built yet */
+/* The page you are on: lifted, with a line underneath */
+.nav-item.active { color: var(--text); background: var(--raised); box-shadow: inset 0 -2px 0 var(--accent); }
+.nav-item.soon { opacity: 0.4; cursor: default; }   /* sections not built yet */
 
 button { font: inherit; border: none; cursor: pointer; }
 /* No white outline on mouse click; with the keyboard (Tab) it shows in blue, for accessibility */
@@ -169,14 +184,16 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    background: #2563eb;
-    color: white;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text);
     padding: 0.45rem 1rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
     white-space: nowrap;
+    transition: background-color 0.15s;
 }
-.topbar-action:hover { background: #1d4ed8; }
+.topbar-action:hover { background: var(--raised); }
 .topbar-action:disabled { opacity: 0.6; cursor: wait; }
 
 /* ===== Demo mode notice ===== */
@@ -186,8 +203,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
     border-radius: 999px;
     background: var(--accent-bg);
     color: var(--accent);
-    font-size: 0.75rem;
-    font-weight: 500;
+    font: 400 0.75rem var(--text-font);
     white-space: nowrap;
 }
 
@@ -203,8 +219,9 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
     height: 1.35em;
     border-radius: 50%;
     overflow: hidden;
-    background: #2a3140;
+    background: var(--raised);
     color: var(--muted);
+    font-family: var(--figures);
     font-size: 1em;
     font-weight: 700;
     line-height: 1;
@@ -235,7 +252,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
 /* ===== Narrow screens: the page does scroll ===== */
 @media (max-width: 900px) {
     body { overflow: auto; height: auto; }
-    .topbar { gap: 1rem; padding: 0.6rem 1rem; }
+    .topbar { gap: 1rem; padding: 0.6rem 1rem; position: sticky; top: 0; z-index: 5; }
     .demo-badge { display: none; }
 }
 

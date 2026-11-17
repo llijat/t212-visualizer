@@ -13,16 +13,15 @@
             min-height: 0;              /* required for the inner scroll to work */
             display: grid;
             grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);   /* positions 60% · news 40% */
-            gap: 1rem;
-            padding: 1rem 1.5rem;
+            gap: 1.25rem;
+            padding: 1.25rem 2rem 1.5rem;
         }
 
-        /* Each card: title on top and content with its own scroll */
+        /* Each card: title on top and content with its own scroll. No border: the tone sets it apart */
         .card {
             background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 1rem 1.25rem;
+            border-radius: var(--radius);
+            padding: 1.25rem 1.35rem;
             display: flex;
             flex-direction: column;
             min-height: 0;
@@ -31,34 +30,35 @@
             display: flex;
             align-items: baseline;
             justify-content: space-between;
-            margin-bottom: 0.75rem;
+            margin-bottom: 1rem;
         }
-        .card-header h2 { margin: 0; font-size: 1rem; }
-        .card-header .count { color: var(--muted); font-size: 0.8rem; }
+        .card-header h2 { margin: 0; font: 500 1.05rem var(--figures); letter-spacing: 0.01em; }
+        .card-header .count { color: var(--muted); font-size: 0.85rem; }
         .scroll { flex: 1; min-height: 0; overflow-y: auto; }   /* the scrolling area; its scrollbar comes from common.css */
 
         /* ===== Compact positions table ===== */
-        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-        th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 0.6rem 0.6rem; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
         th {
-            color: var(--muted);
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.7rem;
+            color: var(--faint);
+            font-weight: 500;
+            font-size: 0.78rem;
             position: sticky;           /* the header stays in place while scrolling */
             top: 0;
             z-index: 1;                 /* above the rows, so the logos slide under it */
             background: var(--panel);
         }
-        tbody tr:hover { background: #1c2029; }
+        tbody tr:hover { background: var(--raised); }
+        tbody tr:last-child td { border-bottom: none; }
         .num {
             text-align: right;                  /* numbers aligned right, as in any finance app */
             font-variant-numeric: tabular-nums; /* all digits the same width, so columns line up */
             white-space: nowrap;
         }
+        td.num { font-family: var(--figures); font-size: 0.95rem; }
         .holding { display: flex; align-items: center; gap: 0.6rem; font-size: 1.45rem; }
         .holding > div { font-size: 0.875rem; min-width: 0; }
-        .symbol { font-weight: 600; }
+        .symbol { font: 600 0.95rem var(--figures); letter-spacing: 0.01em; }
         .company {
             display: block;
             color: var(--muted);
@@ -73,7 +73,7 @@
         .empty { color: var(--muted); font-size: 0.85rem; }
 
         /* ===== News ===== */
-        .tabs { display: flex; gap: 1rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+        .tabs { display: flex; gap: 1.25rem; margin-bottom: 0.9rem; border-bottom: 1px solid var(--border); }
         .tab {
             display: inline-flex;
             align-items: center;
@@ -90,16 +90,18 @@
 
         .search {
             width: 100%;
-            background: var(--bg);
+            height: 2.4rem;
+            background: var(--bg) no-repeat 0.75rem 50% / 1rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
             color: var(--text);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 0.45rem 0.7rem;
-            margin-bottom: 0.6rem;
-            font: inherit;
-            font-size: 0.85rem;
+            border-radius: 10px;
+            padding: 0 0.85rem 0 2.2rem;
+            margin-bottom: 0.7rem;
+            font-size: 0.9rem;
         }
-        .search:focus { outline: none; border-color: var(--accent); }
+        .search::placeholder { color: var(--faint); }
+        .search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
         .filters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
         .chip {
@@ -110,47 +112,45 @@
             padding: 0.15rem 0.65rem;
             font-size: 0.75rem;
         }
-        .chip:hover { color: var(--text); border-color: var(--accent); }
-        .chip.active { background: var(--accent-bg); color: #93c5fd; border-color: var(--accent-bg); }
+        .chip:hover { color: var(--text); border-color: var(--faint); }
+        .chip.active { background: var(--accent-bg); color: var(--accent); border-color: transparent; }
 
         .news-list { list-style: none; padding: 0; margin: 0; }
         .news-list li {
             display: flex;
             gap: 0.6rem;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid var(--border);
-            font-size: 0.875rem;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+            font-size: 0.9rem;
         }
         .news-list li:last-child { border-bottom: none; }
-        .news-time { color: var(--muted); font-size: 0.75rem; white-space: nowrap; padding-top: 0.1rem; }
+        .news-time { color: var(--faint); font: 0.78rem var(--figures); white-space: nowrap; padding-top: 0.15rem; }
         .news-list a { color: var(--text); text-decoration: none; }
-        .news-list a:hover { color: var(--accent); text-decoration: underline; }
+        .news-list a:hover { color: var(--accent); }
 
         .ticker-badge {
             background: var(--accent-bg);
-            color: #93c5fd;
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 0.1rem 0.45rem;
-            border-radius: 4px;
+            color: var(--accent);
+            font: 600 0.72rem var(--figures);
+            padding: 0.12rem 0.45rem;
+            border-radius: 5px;
             white-space: nowrap;
             align-self: flex-start;
             cursor: pointer;
         }
-        .ticker-badge:hover { background: #2563eb; color: white; }
+        .ticker-badge:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
         /* ===== Account summary: one main card (value and return) and two smaller ones ===== */
         .stats {
             display: grid;
             grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
-            gap: 1rem;
-            padding: 1rem 1.5rem 0;
+            gap: 1.25rem;
+            padding: 1.5rem 2rem 0;
         }
         .stat {
             background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0.8rem 1.1rem;
+            border-radius: var(--radius);
+            padding: 1rem 1.35rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -161,13 +161,14 @@
             align-items: center;
             gap: 0.4rem;
             color: var(--muted);
-            font-size: 0.78rem;
+            font-size: 0.85rem;
         }
-        .stat-value { font-size: 1.35rem; font-weight: 650; font-variant-numeric: tabular-nums; }
-        .stat-sub { color: var(--muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+        .stat-value { font: 400 1.6rem var(--figures); font-variant-numeric: tabular-nums; }
+        .stat-sub { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 
-        .stat-main { padding: 0.9rem 1.3rem; }
-        .stat-main .stat-value { font-size: 2.1rem; line-height: 1.15; letter-spacing: -0.01em; }
+        /* The value of the account is the one big figure of the page */
+        .stat-main { padding: 1.1rem 1.5rem; }
+        .stat-main .stat-value { font-size: 2.9rem; font-weight: 300; line-height: 1.1; letter-spacing: -0.02em; }
         .stat-return { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.6rem; }
 
         /* Coloured pills for gains and losses: colour + sign, so they do not depend on colour alone */
@@ -177,25 +178,23 @@
             gap: 0.3rem;
             padding: 0.12rem 0.55rem;
             border-radius: 999px;
-            font-size: 0.8rem;
-            font-weight: 600;
+            font: 500 0.82rem var(--figures);
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
         }
-        .pill.up { background: rgba(74, 222, 128, 0.12); color: var(--green); }
-        .pill.down { background: rgba(248, 113, 113, 0.12); color: var(--red); }
+        .pill.up { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
+        .pill.down { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); }
         .stat-main .pill { font-size: 0.9rem; padding: 0.2rem 0.7rem; }
 
         /* ===== Allocation: one bar split by weight, above the positions ===== */
         .allocation { margin-bottom: 0.9rem; }
         .allocation-bar {
             display: flex;
-            gap: 2px;                   /* thin gaps between the parts */
-            height: 10px;
-            border-radius: 5px;
-            overflow: hidden;
-            background: var(--border);
+            height: 12px;
+            gap: 3px;
+            background: none;
         }
+        .allocation-bar span { border-radius: 3px; }
         .allocation-bar span { min-width: 3px; }
         .allocation-legend {
             display: flex;
@@ -211,12 +210,13 @@
 
         /* ===== Weight of each position, with a small bar ===== */
         .weight { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.5rem; width: 100%; }
-        .weight-track { width: 3.2rem; height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
+        .weight-track { width: 3.2rem; height: 5px; border-radius: 3px; background: var(--raised); overflow: hidden; }
         .weight-fill { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
 
         /* ===== Narrow screens (phone, small window): a single column ===== */
         @media (max-width: 900px) {
-            .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 1rem 1rem 0; gap: 1rem; }
+            .layout { padding: 1rem; gap: 1rem; }
             .stat-main { grid-column: 1 / -1; }
             .layout { grid-template-columns: minmax(0, 1fr); }   /* minmax: a wide table scrolls inside its card */
             .card { max-height: 70vh; }
@@ -273,13 +273,12 @@
                 <span class="pill" th:classappend="${totalReturn >= 0} ? 'up' : 'down'">
                     <svg class="icon" aria-hidden="true"><use th:href="${totalReturn >= 0} ? '#icon-trend-up' : '#icon-trend-down'" href="#icon-trend-up"/></svg>
                     <span th:text="${totalReturn >= 0 ? '+' : '−'} + ${#numbers.formatDecimal(totalReturn.abs(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}
-                                   + ' · ' + ${returnPercent >= 0 ? '+' : '−'} + ${#numbers.formatDecimal(returnPercent.abs(), 1, 'COMMA', 2, 'POINT')} + '%'">+0.00 € · +0.00%</span>
+                                   + ' (' + ${returnPercent >= 0 ? '+' : '−'} + ${#numbers.formatDecimal(returnPercent.abs(), 1, 'COMMA', 2, 'POINT')} + ' %)'">+0.00 € (+0.00 %)</span>
                 </span>
                 <span class="stat-sub">
-                    total return ·
-                    open <span th:classappend="${inv.unrealizedProfitLoss() >= 0} ? 'positive' : 'negative'"
+                    total return, of which open <span th:classappend="${inv.unrealizedProfitLoss() >= 0} ? 'positive' : 'negative'"
                                th:text="${inv.unrealizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.unrealizedProfitLoss(), 1, 'COMMA', 2, 'POINT')}">+0.00</span>
-                    · closed <span th:classappend="${inv.realizedProfitLoss() >= 0} ? 'positive' : 'negative'"
+                    and closed <span th:classappend="${inv.realizedProfitLoss() >= 0} ? 'positive' : 'negative'"
                                    th:text="${inv.realizedProfitLoss() >= 0 ? '+' : ''} + ${#numbers.formatDecimal(inv.realizedProfitLoss(), 1, 'COMMA', 2, 'POINT')}">+0.00</span>
                 </span>
             </div>
@@ -296,7 +295,7 @@
             <span class="stat-label"><svg class="icon" aria-hidden="true"><use href="#icon-cash"/></svg>Cash</span>
             <span class="stat-value" th:text="${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">0.00 €</span>
             <span class="stat-sub" th:text="${summary.totalValue() > 0}
-                    ? ${#numbers.formatDecimal(cash * 100 / summary.totalValue(), 1, 0, 'POINT')} + '% of the total · available to invest'
+                    ? ${#numbers.formatDecimal(cash * 100 / summary.totalValue(), 1, 0, 'POINT')} + ' % of the total, ready to invest'
                     : 'Available to invest'">Available to invest</span>
         </div>
     </section>
@@ -494,14 +493,14 @@
             if (!(total > 0)) return;
 
             // Fixed colour order; colour follows the size rank of this moment, the legend names each one
-            const COLOURS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#2a9d8f'];
+            const COLOURS = ['#58b4e8', '#f2a65a', '#6fd3a0', '#d9c76c', '#ec8fab', '#c38cf0', '#5fd0c4'];
             const positions = rows
                 .map(row => ({ name: row.dataset.symbol, value: Number(row.dataset.value) || 0 }))
                 .sort((a, b) => b.value - a.value);
             const parts = positions.slice(0, COLOURS.length).map((part, i) => ({ ...part, colour: COLOURS[i] }));
             const rest = positions.slice(COLOURS.length).reduce((sum, part) => sum + part.value, 0);
-            if (rest > 0) parts.push({ name: 'Other ' + (positions.length - COLOURS.length), value: rest, colour: '#5b6170' });
-            if (cash > 0) parts.push({ name: 'Cash', value: cash, colour: '#3a3f4b' });
+            if (rest > 0) parts.push({ name: 'Other ' + (positions.length - COLOURS.length), value: rest, colour: '#5d6778' });
+            if (cash > 0) parts.push({ name: 'Cash', value: cash, colour: '#2f3a4b' });
 
             const bar = document.getElementById('allocation-bar');
             const legend = document.getElementById('allocation-legend');
