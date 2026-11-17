@@ -85,6 +85,8 @@
         }
         .tab:hover { color: var(--text); }
         .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+        .tabs-more { margin-left: auto; align-self: center; color: var(--accent); font-size: 0.85rem; text-decoration: none; }
+        .tabs-more:hover { text-decoration: underline; }
 
         #portfolio { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
@@ -379,6 +381,7 @@
                 <button class="tab" onclick="showTab('market', this)">
                     <svg class="icon" aria-hidden="true"><use href="#icon-globe"/></svg>Market
                 </button>
+                <a class="tabs-more" href="/news">All news</a>
             </div>
 
             <div id="portfolio">

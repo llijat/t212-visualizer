@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>News · T212 Visualizer</title>
+    <!-- @{...} adds a fingerprint of the file to its name, so a changed stylesheet is never taken from the cache -->
+    <link rel="stylesheet" th:href="@{/css/common.css}" href="/css/common.css">
+    <style>
+        /* ===== Page: the sources on the left, like the folders of a mail app; the stories on the right ===== */
+        .news-page {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: 270px minmax(0, 1fr);
+        }
+
+        /* ===== Left: where the stories come from ===== */
+        .sources {
+            min-height: 0;
+            overflow-y: auto;
+            padding: 1.75rem 1.25rem 2rem 2rem;
+            border-right: 1px solid var(--border);
+        }
+        .sources h1 { margin: 0 0 1.25rem; font: 500 1.6rem var(--figures); letter-spacing: 0.01em; }
+        .source-group { margin: 0 0 1.5rem; padding: 0; list-style: none; }
+        .source-group-name { margin: 0 0 0.4rem; padding-left: 0.6rem; color: var(--faint); font-size: 0.8rem; }
+        .source {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.45rem 0.6rem;
+            border-radius: 9px;
+            background: none;
+            color: var(--muted);
+            font-size: 0.92rem;
+            text-align: left;
+        }
+        .source:hover { background: var(--raised); color: var(--text); }
+        .source[aria-pressed="true"] { background: var(--raised); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+        .source .logo { font-size: 1.35rem; }
+        .source-symbol { flex: 1; min-width: 0; font: 500 0.92rem var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .source-count { color: var(--faint); font: 0.82rem var(--figures); font-variant-numeric: tabular-nums; }
+        .source[aria-pressed="true"] .source-count { color: var(--accent); }
+        .source-icon { width: 1.35rem; display: grid; place-items: center; color: var(--muted); }
+        .sources-note { margin: 0; padding-left: 0.6rem; color: var(--faint); font-size: 0.78rem; line-height: 1.5; max-width: 26ch; }
+
+        /* ===== Right: the stories, a day at a time ===== */
+        .stories { min-height: 0; overflow-y: auto; padding: 1.75rem 2rem 3rem; }
+        .stories-inner { max-width: 760px; }
+        .stories-tools { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+        .stories-search {
+            flex: 1;
+            min-width: 0;
+            height: 2.5rem;
+            padding: 0 0.9rem 0 2.3rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--panel) no-repeat 0.8rem 50% / 1rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+            font-size: 0.92rem;
+        }
+        .stories-search::placeholder { color: var(--faint); }
+        .stories-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .stories-count { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+
+        .day { margin-top: 0.5rem; }
+        .day-head {
+            position: sticky;
+            top: -1.75rem;              /* sticks at the top edge of the scrolling area, over its padding */
+            z-index: 1;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            padding: 1.25rem 0 0.6rem;
+            background: var(--bg);
+        }
+        .day-head h2 { margin: 0; font: 500 1.15rem var(--figures); letter-spacing: 0.01em; }
+        .day-head span { color: var(--faint); font-size: 0.82rem; }
+        .day-list { list-style: none; margin: 0; padding: 0; }
+
+        /* One story: the time, then the headline, two lines of summary and where it comes from */
+        .story {
+            display: grid;
+            grid-template-columns: 3.4rem minmax(0, 1fr);
+            gap: 0.9rem;
+            padding: 0.9rem 0.75rem;
+            margin: 0 -0.75rem;
+            border-radius: 12px;
+        }
+        .story:hover { background: var(--panel); }
+        .story-time { padding-top: 0.15rem; color: var(--faint); font: 0.85rem var(--figures); font-variant-numeric: tabular-nums; }
+        .story-headline {
+            color: var(--text);
+            font-size: 1.02rem;
+            font-weight: 500;
+            line-height: 1.4;
+            text-decoration: none;
+            text-wrap: pretty;
+        }
+        .story-headline:hover { color: var(--accent); }
+        .story-summary {
+            margin: 0.3rem 0 0;
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            overflow: hidden;
+        }
+        .story-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.8rem; margin-top: 0.5rem; color: var(--faint); font-size: 0.8rem; }
+        .story-symbol {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.15rem 0.55rem 0.15rem 0.2rem;
+            border-radius: 999px;
+            background: var(--raised);
+            color: var(--text);
+            font: 500 0.8rem var(--figures);
+        }
+        .story-symbol:hover { background: var(--accent-bg); color: var(--accent); }
+        .story-symbol .logo { font-size: 1.15rem; }
+
+        .empty { margin: 2rem 0; color: var(--muted); line-height: 1.6; }
+
+        /* ===== Narrow screens: the sources become a row of buttons above the stories ===== */
+        @media (max-width: 900px) {
+            .news-page { display: block; }
+            .sources { overflow: visible; padding: 1.25rem 1rem 0.5rem; border-right: none; }
+            .sources h1 { margin-bottom: 0.75rem; }
+            .source-group { display: flex; gap: 0.4rem; overflow-x: auto; margin-bottom: 0.75rem; padding-bottom: 0.25rem; }
+            .source-group li { flex: none; }
+            .source-group-name, .sources-note { display: none; }
+            .source { width: auto; height: 2.5rem; background: var(--panel); }
+            .stories { overflow: visible; padding: 0.5rem 1rem 2rem; }
+            .day-head { top: 0; }
+            .story { grid-template-columns: 1fr; gap: 0.2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="topbar">
+        <th:block th:replace="~{fragments/topbar :: bar('news')}"></th:block>
+    </header>
+
+    <svg class="sprite" aria-hidden="true">
+        <symbol id="icon-stack" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+    </svg>
+
+    <main class="news-page"
+          th:with="total=${portfolioDays.isEmpty() ? 0 : #aggregates.sum(portfolioDays.![news().size()])},
+                   marketTotal=${marketDays.isEmpty() ? 0 : #aggregates.sum(marketDays.![news().size()])}">
+
+        <!-- ===== Where the stories come from: every holding, or the market ===== -->
+        <nav class="sources" aria-label="Show news from">
+            <h1>News</h1>
+
+            <p class="source-group-name">Your holdings</p>
+            <ul class="source-group">
+                <li>
+                    <button type="button" class="source" data-show="portfolio" aria-pressed="true">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-briefcase"/></svg></span>
+                        <span class="source-symbol">All holdings</span>
+                        <span class="source-count" th:text="${total}">48</span>
+                    </button>
+                </li>
+                <!-- One button per holding with news: its logo (through its T212 ticker), its symbol and how many stories -->
+                <li th:each="entry : ${newsCount}" th:with="ticker=${tickers.get(entry.key)}">
+                    <button type="button" class="source" data-show="portfolio" th:data-symbol="${entry.key}" aria-pressed="false">
+                        <span class="logo" aria-hidden="true">
+                            <span class="logo-initial" th:text="${#strings.substring(entry.key, 0, 1)}">A</span>
+                            <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
+                        </span>
+                        <span class="source-symbol" th:text="${entry.key}">AAPL</span>
+                        <span class="source-count" th:text="${entry.value}">12</span>
+                    </button>
+                </li>
+            </ul>
+
+            <p class="source-group-name">Everything else</p>
+            <ul class="source-group">
+                <li>
+                    <button type="button" class="source" data-show="market" aria-pressed="false">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-globe"/></svg></span>
+                        <span class="source-symbol">Market</span>
+                        <span class="source-count" th:text="${marketTotal}">100</span>
+                    </button>
+                </li>
+            </ul>
+
+            <p class="sources-note">The free news service only covers US companies, so holdings listed elsewhere have no news here.</p>
+        </nav>
+
+        <!-- ===== The stories ===== -->
+        <section class="stories" id="stories" aria-label="Stories">
+            <div class="stories-inner">
+                <div class="stories-tools">
+                    <input type="search" class="stories-search" id="search" placeholder="Search the headlines" aria-label="Search the headlines" autocomplete="off">
+                    <span class="stories-count" id="count" aria-live="polite"></span>
+                </div>
+
+                <!-- Your holdings, a day at a time -->
+                <div id="portfolio" class="feed">
+                    <p class="empty" th:if="${portfolioDays.isEmpty()}">Loading the news of your holdings. Reload the page in a few seconds.</p>
+                    <section class="day" th:each="day : ${portfolioDays}">
+                        <div class="day-head">
+                            <h2 th:text="${day.date().equals(today)} ? 'Today'
+                                       : (${day.date().equals(today.minusDays(1))} ? 'Yesterday'
+                                       : ${#strings.capitalize(#strings.toLowerCase(day.date().getDayOfWeek().name())) + ' ' + day.date().getDayOfMonth() + ' ' + #strings.capitalize(#strings.toLowerCase(day.date().getMonth().name()))})">Today</h2>
+                            <span class="day-total" th:text="${day.news().size()} + (${day.news().size() == 1} ? ' story' : ' stories')">12 stories</span>
+                        </div>
+                        <ol class="day-list">
+                            <li class="story" th:each="n : ${day.news()}"
+                                th:data-symbol="${n.related()}"
+                                th:data-search="${#strings.toLowerCase(n.headline() + ' ' + n.summary() + ' ' + n.source() + ' ' + n.related())}">
+                                <time class="story-time" th:datetime="${n.publishedAt()}" th:text="${#temporals.format(n.publishedAt(), 'HH:mm')}">14:05</time>
+                                <div>
+                                    <!-- Opens the publisher's page in a new tab; it gets no hint of where the click came from -->
+                                    <a class="story-headline" th:href="${n.url()}" th:text="${n.headline()}" target="_blank" rel="noopener noreferrer">Headline</a>
+                                    <p class="story-summary" th:if="${!#strings.isEmpty(n.summary()) and n.summary() != n.headline()}" th:text="${n.summary()}">Summary</p>
+                                    <div class="story-meta">
+                                        <button type="button" class="story-symbol" th:if="${!#strings.isEmpty(n.related()) and !#strings.contains(n.related(), ',')}"
+                                                th:data-symbol="${n.related()}" th:aria-label="'Only ' + ${n.related()} + ' news'"
+                                                th:with="ticker=${tickers.get(n.related())}">
+                                            <span class="logo" aria-hidden="true">
+                                                <span class="logo-initial" th:text="${#strings.substring(n.related(), 0, 1)}">A</span>
+                                                <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
+                                            </span>
+                                            <th:block th:text="${n.related()}">AAPL</th:block>
+                                        </button>
+                                        <span th:unless="${#strings.isEmpty(n.source())}" th:text="${n.source()}">Reuters</span>
+                                    </div>
+                                </div>
+                            </li>
+                        </ol>
+                    </section>
+                </div>
+
+                <!-- The market: the same, without holdings -->
+                <div id="market" class="feed hidden">
+                    <p class="empty" th:if="${marketDays.isEmpty()}">Loading the market news. Reload the page in a few seconds.</p>
+                    <section class="day" th:each="day : ${marketDays}">
+                        <div class="day-head">
+                            <h2 th:text="${day.date().equals(today)} ? 'Today'
+                                       : (${day.date().equals(today.minusDays(1))} ? 'Yesterday'
+                                       : ${#strings.capitalize(#strings.toLowerCase(day.date().getDayOfWeek().name())) + ' ' + day.date().getDayOfMonth() + ' ' + #strings.capitalize(#strings.toLowerCase(day.date().getMonth().name()))})">Today</h2>
+                            <span class="day-total" th:text="${day.news().size()} + (${day.news().size() == 1} ? ' story' : ' stories')">20 stories</span>
+                        </div>
+                        <ol class="day-list">
+                            <li class="story" th:each="n : ${day.news()}"
+                                th:data-search="${#strings.toLowerCase(n.headline() + ' ' + n.summary() + ' ' + n.source())}">
+                                <time class="story-time" th:datetime="${n.publishedAt()}" th:text="${#temporals.format(n.publishedAt(), 'HH:mm')}">14:05</time>
+                                <div>
+                                    <a class="story-headline" th:href="${n.url()}" th:text="${n.headline()}" target="_blank" rel="noopener noreferrer">Headline</a>
+                                    <p class="story-summary" th:if="${!#strings.isEmpty(n.summary()) and n.summary() != n.headline()}" th:text="${n.summary()}">Summary</p>
+                                    <div class="story-meta">
+                                        <span th:unless="${#strings.isEmpty(n.source())}" th:text="${n.source()}">CNBC</span>
+                                    </div>
+                                </div>
+                            </li>
+                        </ol>
+                    </section>
+                </div>
+
+                <p class="empty hidden" id="nothing">No story matches. Try another word or choose another source.</p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Everything here only hides and shows what the page already has: nothing is asked to the server
+        const sources = [...document.querySelectorAll('.source')];
+        const feeds = { portfolio: document.getElementById('portfolio'), market: document.getElementById('market') };
+        const search = document.getElementById('search');
+        const count = document.getElementById('count');
+        const nothing = document.getElementById('nothing');
+        const storiesArea = document.getElementById('stories');
+        let showing = 'portfolio';
+        let symbol = null;
+
+        function filter() {
+            const words = search.value.trim().toLowerCase();
+            const feed = feeds[showing];
+            let shown = 0;
+            let total = 0;
+            feed.querySelectorAll('.day').forEach(day => {
+                let inDay = 0;
+                day.querySelectorAll('.story').forEach(story => {
+                    total++;
+                    const visible = (symbol === null || story.dataset.symbol === symbol) && story.dataset.search.includes(words);
+                    story.classList.toggle('hidden', !visible);
+                    if (visible) inDay++;
+                });
+                // A day stays only while one of its stories does
+                day.classList.toggle('hidden', inDay === 0);
+                day.querySelector('.day-total').textContent = inDay + (inDay === 1 ? ' story' : ' stories');
+                shown += inDay;
+            });
+            count.textContent = total === 0 ? '' : (shown === total ? total + ' stories' : shown + ' of ' + total);
+            nothing.classList.toggle('hidden', shown > 0 || total === 0);
+        }
+
+        function choose(button) {
+            sources.forEach(other => other.setAttribute('aria-pressed', String(other === button)));
+            showing = button.dataset.show;
+            symbol = button.dataset.symbol || null;
+            Object.entries(feeds).forEach(([name, feed]) => feed.classList.toggle('hidden', name !== showing));
+            storiesArea.scrollTop = 0;
+            window.scrollTo(0, 0);
+            filter();
+        }
+
+        sources.forEach(button => button.addEventListener('click', () => choose(button)));
+        search.addEventListener('input', filter);
+
+        // The symbol on a story shows only that holding's stories
+        feeds.portfolio.addEventListener('click', event => {
+            const chip = event.target.closest('.story-symbol');
+            if (!chip) return;
+            const source = sources.find(button => button.dataset.symbol === chip.dataset.symbol);
+            if (source) choose(source);
+        });
+
+        filter();
+    </script>
+</body>
+</html>

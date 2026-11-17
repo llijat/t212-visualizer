@@ -12,9 +12,11 @@ public record FinnhubNewsDto (
     long id,
     String related,
     String image,
-    String summary)
+    String summary,
+    String source)
 {
+    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
     public LocalDateTime publishedAt() {
-        return LocalDateTime.ofInstant(Instant.ofEpochSecond(datetime), ZoneId.systemDefault());
+        return LocalDateTime.ofInstant(Instant.ofEpochSecond(datetime), SPAIN);
     }
 }

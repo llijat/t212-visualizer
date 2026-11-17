@@ -9,7 +9,6 @@ import org.springframework.http.ResponseEntity;
 
 @Controller
 public class DashboardController {
-
     private final PositionService positionService;
     private final NewsService newsService;
     private final AccountService accountService;

@@ -1,4 +1,9 @@
 package com.llijat.t212visualizer.dto;
 
-public record NewsDay() {
-}
+import java.time.LocalDate;
+import java.util.List;
+
+public record NewsDay(
+        LocalDate date,
+        List<FinnhubNewsDto> news
+) {}
