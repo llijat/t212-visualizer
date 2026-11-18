@@ -12,7 +12,7 @@
             flex: 1;                    /* takes all the height the bar leaves */
             min-height: 0;              /* required for the inner scroll to work */
             display: grid;
-            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);   /* positions 60% · news 40% */
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);   /* positions 60 %, today 40 % */
             gap: 1.25rem;
             padding: 1.25rem 2rem 1.5rem;
         }
@@ -72,75 +72,48 @@
         .negative { color: var(--red); }
         .empty { color: var(--muted); font-size: 0.85rem; }
 
-        /* ===== News ===== */
-        .tabs { display: flex; gap: 1.25rem; margin-bottom: 0.9rem; border-bottom: 1px solid var(--border); }
-        .tab {
-            display: inline-flex;
+        /* ===== Right column: today in short. The whole news has its own page ===== */
+        .today-more { padding: 0.35rem 0.25rem; color: var(--accent); font-size: 0.85rem; text-decoration: none; }   /* padding: at least 24 px tall to tap */
+        .today-more:hover { text-decoration: underline; }
+        /* The rows stick out 0.55rem on each side (their hover background reaches the edge): the padding makes room for them inside the scroll */
+        .today-body { display: flex; flex-direction: column; gap: 1.5rem; margin: 0 -0.55rem; padding: 0 0.55rem; }
+        .today-title { margin: 0 0 0.35rem; color: var(--muted); font: 500 0.85rem var(--text-font); }
+        .today-list { list-style: none; margin: 0; padding: 0; }
+        .today-row {
+            display: grid;
             align-items: center;
-            gap: 0.4rem;
-            background: transparent;
-            color: var(--muted);
-            padding: 0.4rem 0.25rem;
-            border-bottom: 2px solid transparent;
-        }
-        .tab:hover { color: var(--text); }
-        .tab.active { color: var(--text); border-bottom-color: var(--accent); }
-        .tabs-more { margin-left: auto; align-self: center; color: var(--accent); font-size: 0.85rem; text-decoration: none; }
-        .tabs-more:hover { text-decoration: underline; }
-
-        #portfolio { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-
-        .search {
-            width: 100%;
-            height: 2.4rem;
-            background: var(--bg) no-repeat 0.75rem 50% / 1rem;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+            gap: 0.65rem;
+            padding: 0.45rem 0.55rem;
+            margin: 0 -0.55rem;
+            border-radius: 9px;
             color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0 0.85rem 0 2.2rem;
-            margin-bottom: 0.7rem;
+            text-decoration: none;
+        }
+        .today-row:hover { background: var(--raised); }
+        .today-row .logo { font-size: 1.3rem; }
+        .today-symbol { font: 600 0.92rem var(--figures); letter-spacing: 0.01em; }
+        .today-faint { color: var(--muted); font-size: 0.8rem; }
+        .today-figure { font: 500 0.92rem var(--figures); font-variant-numeric: tabular-nums; }
+
+        /* Moving today: logo, symbol over its weight, and the change */
+        .move-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+        .move-row .today-faint { display: block; }
+        /* Coming up: the day, logo and symbol, and when in the day */
+        .coming-row { grid-template-columns: 5.6rem auto minmax(0, 1fr) auto; }
+        .coming-row .today-figure { color: var(--muted); font-weight: 400; }
+        /* Latest: the time, then the headline in two lines at most, with its holding */
+        .story-row { grid-template-columns: 2.9rem minmax(0, 1fr); align-items: start; }
+        .story-row .today-figure { color: var(--muted); font-weight: 400; font-size: 0.82rem; padding-top: 0.1rem; }
+        .story-headline {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            overflow: hidden;
             font-size: 0.9rem;
+            line-height: 1.4;
         }
-        .search::placeholder { color: var(--faint); }
-        .search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-
-        .filters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
-        .chip {
-            background: transparent;
-            color: var(--muted);
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            padding: 0.15rem 0.65rem;
-            font-size: 0.75rem;
-        }
-        .chip:hover { color: var(--text); border-color: var(--faint); }
-        .chip.active { background: var(--accent-bg); color: var(--accent); border-color: transparent; }
-
-        .news-list { list-style: none; padding: 0; margin: 0; }
-        .news-list li {
-            display: flex;
-            gap: 0.6rem;
-            padding: 0.6rem 0;
-            border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
-            font-size: 0.9rem;
-        }
-        .news-list li:last-child { border-bottom: none; }
-        .news-time { color: var(--faint); font: 0.78rem var(--figures); white-space: nowrap; padding-top: 0.15rem; }
-        .news-list a { color: var(--text); text-decoration: none; }
-        .news-list a:hover { color: var(--accent); }
-
-        .ticker-badge {
-            background: var(--accent-bg);
-            color: var(--accent);
-            font: 600 0.72rem var(--figures);
-            padding: 0.12rem 0.45rem;
-            border-radius: 5px;
-            white-space: nowrap;
-            align-self: flex-start;
-            cursor: pointer;
-        }
-        .ticker-badge:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+        .story-row:hover .story-headline { color: var(--accent); }
 
         /* ===== Account summary: one main card (value and return) and two smaller ones ===== */
         .stats {
@@ -261,6 +234,9 @@
         first sync after startup finishes (or be empty): until then, the net deposits and return cards
         say "Syncing…" instead of showing a false return.
     -->
+    <!-- The page's main heading: on screen the top bar already says where you are; screen readers need it to start the outline -->
+    <h1 class="visually-hidden">Portfolio</h1>
+
     <section class="stats" th:if="${summary != null}"
              th:with="inv=${summary.investments()},
                       cur=${summary.currency() == 'EUR' ? '€' : summary.currency()},
@@ -372,41 +348,74 @@
             </div>
         </section>
 
-        <!-- ===== Right column: news ===== -->
-        <section class="card">
-            <div class="tabs">
-                <button class="tab active" onclick="showTab('portfolio', this)">
-                    <svg class="icon" aria-hidden="true"><use href="#icon-briefcase"/></svg>My portfolio
-                </button>
-                <button class="tab" onclick="showTab('market', this)">
-                    <svg class="icon" aria-hidden="true"><use href="#icon-globe"/></svg>Market
-                </button>
-                <a class="tabs-more" href="/news">All news</a>
+        <!-- ===== Right column: today in short. Moving today, the next results and the latest headlines; the rest is in News ===== -->
+        <section class="card" aria-labelledby="today-title">
+            <div class="card-header">
+                <h2 id="today-title">Today</h2>
+                <a class="today-more" href="/news">All news</a>
             </div>
 
-            <div id="portfolio">
-                <input type="search" id="news-search" class="search" placeholder="Search ticker or keyword…" oninput="searchNews(this.value)">
-                <div class="filters">
-                    <button class="chip active" data-ticker="ALL" onclick="filterNews(this.dataset.ticker)">All</button>
-                    <button class="chip" th:each="t : ${portfolioTickers}" th:data-ticker="${t}" th:text="${t}"
-                            onclick="filterNews(this.dataset.ticker)">AAPL</button>
-                </div>
-                <ul class="news-list scroll scroll-hints">
-                    <li class="empty" th:if="${portfolioNews.isEmpty()}">Loading your portfolio news… reload in a few seconds.</li>
-                    <li th:each="n : ${portfolioNews}" th:data-ticker="${n.related()}">
-                        <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
-                        <span class="ticker-badge" th:text="${n.related()}" th:data-ticker="${n.related()}" onclick="filterNews(this.dataset.ticker)">AAPL</span>
-                        <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Headline</a>
-                    </li>
-                </ul>
-            </div>
+            <div class="today-body scroll scroll-hints">
+                <!-- The holdings that move most, up or down; each one opens its news -->
+                <section th:if="${!moves.isEmpty()}" aria-labelledby="today-moves">
+                    <h3 class="today-title" id="today-moves">Moving today</h3>
+                    <ul class="today-list">
+                        <li th:each="m : ${moves}" th:if="${mStat.index < 4}">
+                            <a class="today-row move-row" th:href="'/news#holding=' + ${m.symbol()}" th:title="'The news of ' + ${m.symbol()}">
+                                <span class="logo" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(m.symbol(), 0, 1)}">A</span>
+                                    <img th:src="@{/logos/{ticker}(ticker=${m.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                </span>
+                                <span>
+                                    <span class="today-symbol" th:text="${m.symbol()}">AAPL</span>
+                                    <span class="today-faint" th:text="${#numbers.formatDecimal(m.weightPercent(), 1, 1, 'POINT')} + ' % of your portfolio'">15.0 % of your portfolio</span>
+                                </span>
+                                <span class="today-figure" th:classappend="${m.changePercent().signum() < 0} ? 'negative' : 'positive'"
+                                      th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">−4.19 %</span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
 
-            <ul class="news-list scroll scroll-hints hidden" id="market">
-                <li th:each="n : ${news}">
-                    <span class="news-time" th:text="${#temporals.format(n.publishedAt(), 'dd/MM HH:mm')}">00/00 00:00</span>
-                    <a th:href="${n.url()}" th:text="${n.headline()}" target="_blank">Headline</a>
-                </li>
-            </ul>
+                <!-- The next quarterly results of the holdings -->
+                <section th:if="${!comingUp.isEmpty()}" aria-labelledby="today-coming">
+                    <h3 class="today-title" id="today-coming">Coming up</h3>
+                    <ul class="today-list">
+                        <li th:each="e : ${comingUp}" th:if="${eStat.index < 3}">
+                            <a class="today-row coming-row" th:href="'/news#holding=' + ${e.symbol()}" th:title="'The news of ' + ${e.symbol()}">
+                                <time class="today-figure" th:datetime="${e.date()}"
+                                      th:text="${e.date().equals(today)} ? 'Today'
+                                             : (${e.date().equals(today.plusDays(1))} ? 'Tomorrow'
+                                             : ${#strings.capitalize(#strings.toLowerCase(#strings.substring(e.date().getDayOfWeek().name(), 0, 3))) + ' ' + e.date().getDayOfMonth() + ' '
+                                                 + #strings.capitalize(#strings.toLowerCase(#strings.substring(e.date().getMonth().name(), 0, 3)))})">Thu 20 Nov</time>
+                                <span class="logo" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(e.symbol(), 0, 1)}">N</span>
+                                    <img th:src="@{/logos/{ticker}(ticker=${e.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                </span>
+                                <span class="today-symbol" th:text="${e.symbol()}">NVDA</span>
+                                <span class="today-faint" th:text="${e.hourLabel()}">after the close</span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- The five latest headlines of the holdings; they open the publisher's page, which gets no hint of where the click came from -->
+                <section aria-labelledby="today-latest">
+                    <h3 class="today-title" id="today-latest">Latest from your holdings</h3>
+                    <p class="empty" th:if="${portfolioNews.isEmpty()}">No news from your holdings in the last 7 days. If the app has just started, reload the page in a few seconds.</p>
+                    <ul class="today-list">
+                        <li th:each="n : ${portfolioNews}" th:if="${nStat.index < 5}">
+                            <a class="today-row story-row" th:href="${n.url()}" target="_blank" rel="noopener noreferrer">
+                                <time class="today-figure" th:datetime="${n.publishedAt()}" th:text="${#temporals.format(n.publishedAt(), 'HH:mm')}">14:05</time>
+                                <span>
+                                    <span class="story-headline" th:text="${n.headline()}">Headline</span>
+                                    <span class="today-faint" th:text="${n.related()} + (${#strings.isEmpty(n.source())} ? '' : ', ' + ${n.source()})">NVDA, Reuters</span>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
+            </div>
         </section>
 
     </main>
@@ -428,53 +437,6 @@
                     label.textContent = 'Refresh';
                 }
             });
-        }
-
-        function showTab(tab, button) {
-            document.getElementById('portfolio').classList.add('hidden');
-            document.getElementById('market').classList.add('hidden');
-
-            document.getElementById(tab).classList.remove('hidden');
-
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            button.classList.add('active');
-        }
-
-        function filterNews(ticker) {
-            // Using a chip or badge clears the search box
-            document.getElementById('news-search').value = '';
-
-            // Pressing the active filter again turns it off (back to "All")
-            const current = document.querySelector('.chip.active');
-            if (current && current.dataset.ticker === ticker) {
-                ticker = 'ALL';
-            }
-
-            document.querySelectorAll('#portfolio li[data-ticker]').forEach(li => {
-                if (ticker === 'ALL' || li.dataset.ticker === ticker) {
-                    li.classList.remove('hidden');
-                } else {
-                    li.classList.add('hidden');
-                }
-            });
-
-            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-            document.querySelector('.chip[data-ticker="' + ticker + '"]').classList.add('active');
-        }
-
-        function searchNews(text) {
-            const query = text.trim().toLowerCase();
-
-            document.querySelectorAll('#portfolio li[data-ticker]').forEach(li => {
-                if (query === '' || li.textContent.toLowerCase().includes(query)) {
-                    li.classList.remove('hidden');
-                } else {
-                    li.classList.add('hidden');
-                }
-            });
-
-            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-            document.querySelector('.chip[data-ticker="ALL"]').classList.add('active');
         }
     </script>
 
@@ -502,7 +464,7 @@
                 .sort((a, b) => b.value - a.value);
             const parts = positions.slice(0, COLOURS.length).map((part, i) => ({ ...part, colour: COLOURS[i] }));
             const rest = positions.slice(COLOURS.length).reduce((sum, part) => sum + part.value, 0);
-            if (rest > 0) parts.push({ name: 'Other ' + (positions.length - COLOURS.length), value: rest, colour: '#5d6778' });
+            if (rest > 0) parts.push({ name: 'Other ' + (positions.length - COLOURS.length), value: rest, colour: '#7e889a' });
             if (cash > 0) parts.push({ name: 'Cash', value: cash, colour: '#2f3a4b' });
 
             const bar = document.getElementById('allocation-bar');

@@ -2,6 +2,7 @@ package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.CalendarDay;
 import com.llijat.t212visualizer.dto.CalendarMonth;
+import com.llijat.t212visualizer.dto.UpcomingEarnings;
 import com.llijat.t212visualizer.model.EarningsEvent;
 import com.llijat.t212visualizer.model.Position;
 import com.llijat.t212visualizer.repository.EarningsEventRepository;
@@ -18,12 +19,16 @@ import java.util.stream.Collectors;
 @Service
 public class CalendarService {
     private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private static final int COMING_UP_DAYS = 14;
+
     private final EarningsEventRepository earningsEventRepository;
     private final PositionService positionService;
+    private final CompanyProfileService companyProfileService;
 
-    public CalendarService(EarningsEventRepository earningsEventRepository, PositionService positionService) {
+    public CalendarService(EarningsEventRepository earningsEventRepository, PositionService positionService, CompanyProfileService companyProfileService) {
         this.earningsEventRepository = earningsEventRepository;
         this.positionService = positionService;
+        this.companyProfileService = companyProfileService;
     }
 
     public CalendarMonth getMonth(YearMonth month) {
@@ -44,7 +49,21 @@ public class CalendarService {
         for (LocalDate date = gridStart; !date.isAfter(gridEnd); date = date.plusDays(1)) {
             dayList.add(new CalendarDay(date, YearMonth.from(date).equals(month),date.equals(today),byDate.getOrDefault(date,List.of())));
         }
-
         return new CalendarMonth(month,dayList);
+    }
+
+    public List<UpcomingEarnings> getComingUp() {
+        LocalDate today = LocalDate.now(SPAIN);
+        Map<String, String> symbols = companyProfileService.currentSymbols();
+
+        Map<String, String> symbolByTicker = new HashMap<>();
+        for (Position position : positionService.getAllPositions()) {
+            symbolByTicker.put(position.getTicker(), symbols.getOrDefault(position.getTicker(), position.getSymbol()));
+        }
+
+        return earningsEventRepository.findByReportDateBetweenOrderByReportDateAsc(today, today.plusDays(COMING_UP_DAYS - 1)).stream()
+                .filter(event -> symbolByTicker.containsKey(event.getTicker()))
+                .map(event -> new UpcomingEarnings(symbolByTicker.get(event.getTicker()), event.getTicker(), event.getReportDate(), event.getReportHour()))
+                .toList();
     }
 }

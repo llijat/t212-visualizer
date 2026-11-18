@@ -118,6 +118,7 @@ The tests use JUnit 5 and Mockito, and need neither a database nor network acces
 - **Expenses:** payments appear once they settle, and the automatic import only runs while the app is on. A reverted payment never appears in the export, so it does not count. How the refund of a settled payment appears has not been checked yet: the import reports the rows it skips, by type.
 - **Percentage:** the return percentage is a simple division over net deposits, not time-weighted like the one in the Trading 212 app.
 - **News:** company news only covers US stocks, because of the Finnhub free plan.
+- **Moving today:** the daily change also comes from the Finnhub free plan, so it only covers US stocks and is refreshed every 15 minutes. It does not include pre-market or after-hours trading: outside the New York session (15:30 to 22:00 in Spain) it shows the last session, and the title says which day. The change is in the stock's own currency, so it can differ from a change in euros, which also includes the exchange rate.
 - **Single user:** one account per installation, with no login.
 
 ## Roadmap

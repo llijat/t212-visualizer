@@ -2,6 +2,7 @@ package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.CalendarDay;
 import com.llijat.t212visualizer.dto.CalendarMonth;
+import com.llijat.t212visualizer.dto.UpcomingEarnings;
 import com.llijat.t212visualizer.model.EarningsEvent;
 import com.llijat.t212visualizer.model.Position;
 import com.llijat.t212visualizer.repository.EarningsEventRepository;
@@ -17,11 +18,13 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,11 +38,14 @@ class CalendarServiceTest {
     @Mock
     private PositionService positionService;
 
+    @Mock
+    private CompanyProfileService companyProfileService;
+
     private CalendarService service;
 
     @BeforeEach
     void setUp() {
-        service = new CalendarService(repository, positionService);
+        service = new CalendarService(repository, positionService, companyProfileService);
     }
 
     private static Position position(String ticker) {
@@ -162,5 +168,57 @@ class CalendarServiceTest {
             assertNotNull(day.earnings(), day.date() + " has null earnings");
             assertTrue(day.earnings().isEmpty());
         }
+    }
+
+    // ===== Coming up: the next two weeks, for the news page =====
+
+    private static final LocalDate TODAY = LocalDate.now(ZoneId.of("Europe/Madrid"));
+
+    @Test
+    void comingUp_asksForTodayAndTheNext13Days_inDateOrder() {
+        when(positionService.getAllPositions()).thenReturn(List.of());
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of());
+
+        service.getComingUp();
+
+        // Between includes both ends: today + 13 makes 14 days
+        verify(repository).findByReportDateBetweenOrderByReportDateAsc(TODAY, TODAY.plusDays(13));
+    }
+
+    @Test
+    void comingUp_onlyShowsWhatIsHeldToday() {
+        when(positionService.getAllPositions()).thenReturn(List.of(position("NVDA_US_EQ")));
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of());
+        when(repository.findByReportDateBetweenOrderByReportDateAsc(any(), any())).thenReturn(List.of(
+                earnings("NVDA_US_EQ", TODAY.plusDays(1)), earnings("SOLD_US_EQ", TODAY.plusDays(2))));
+
+        List<UpcomingEarnings> comingUp = service.getComingUp();
+
+        assertEquals(List.of("NVDA"), comingUp.stream().map(UpcomingEarnings::symbol).toList());
+    }
+
+    @Test
+    void comingUp_usesTheCurrentSymbol_soTheNewsOfThatCompanyCanBeShown() {
+        when(positionService.getAllPositions()).thenReturn(List.of(position("FB_US_EQ")));
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of("FB_US_EQ", "META"));
+        when(repository.findByReportDateBetweenOrderByReportDateAsc(any(), any())).thenReturn(List.of(
+                earnings("FB_US_EQ", TODAY.plusDays(3))));
+
+        UpcomingEarnings meta = service.getComingUp().get(0);
+
+        assertEquals("META", meta.symbol());
+        assertEquals("FB_US_EQ", meta.ticker());
+        assertEquals(TODAY.plusDays(3), meta.date());
+        assertEquals("after the close", meta.hourLabel());
+    }
+
+    @Test
+    void comingUp_keepsTheOrderOfTheQuery() {
+        when(positionService.getAllPositions()).thenReturn(List.of(position("AAPL_US_EQ"), position("NVDA_US_EQ")));
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of());
+        when(repository.findByReportDateBetweenOrderByReportDateAsc(any(), any())).thenReturn(List.of(
+                earnings("NVDA_US_EQ", TODAY), earnings("AAPL_US_EQ", TODAY.plusDays(9))));
+
+        assertEquals(List.of("NVDA", "AAPL"), service.getComingUp().stream().map(UpcomingEarnings::symbol).toList());
     }
 }

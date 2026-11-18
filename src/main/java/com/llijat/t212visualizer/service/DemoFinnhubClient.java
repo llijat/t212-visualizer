@@ -3,10 +3,12 @@ package com.llijat.t212visualizer.service;
 import com.llijat.t212visualizer.dto.FinnhubCompanyProfileDto;
 import com.llijat.t212visualizer.dto.FinnhubEarningsDto;
 import com.llijat.t212visualizer.dto.FinnhubNewsDto;
+import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.LogoImage;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -47,12 +49,27 @@ public class DemoFinnhubClient implements FinnhubClient {
 
     @Override
     public List<FinnhubEarningsDto> fetchEarnings(String symbol, LocalDate from, LocalDate to) {
-        return List.of();
+        // One made-up report per company, always on the same day relative to today: with the demo companies,
+        // one was 4 days ago (with its figures) and three come in the next two weeks (only the estimates)
+        LocalDate today = LocalDate.now();
+        LocalDate date = today.plusDays(Math.floorMod(symbol.hashCode(), 24) - 6);
+        String hour = Math.floorMod(symbol.hashCode(), 2) == 0 ? "bmo" : "amc";
+        boolean published = date.isBefore(today);
+        return List.of(new FinnhubEarningsDto(symbol, date, hour, 4, 2026,
+                new BigDecimal("1.20"), published ? new BigDecimal("1.31") : null,
+                new BigDecimal("2500000000"), published ? new BigDecimal("2610000000") : null));
     }
 
     @Override
     public FinnhubCompanyProfileDto fetchCompanyProfile(String symbol) {
         return new FinnhubCompanyProfileDto(null, null);
+    }
+
+    @Override
+    public FinnhubQuoteDto fetchQuote(String symbol) {
+        // A made-up move for each symbol, always the same one, between -5 % and +5 %, from a session that is happening now
+        BigDecimal changePercent = BigDecimal.valueOf(Math.floorMod(symbol.hashCode(), 1001) - 500, 2);
+        return new FinnhubQuoteDto(new BigDecimal("100.00"), changePercent, Instant.now().getEpochSecond());
     }
 
     @Override

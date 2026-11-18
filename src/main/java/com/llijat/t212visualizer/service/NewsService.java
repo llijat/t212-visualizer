@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 @Service
 public class NewsService {
     private static final Logger log = LoggerFactory.getLogger(NewsService.class);
+    private static final int PER_HOLDING_PER_DAY = 7;
 
     private final FinnhubClient finnhubClient;
     private Map<String, String> tickerBySymbol = Map.of();
@@ -35,27 +36,12 @@ public class NewsService {
         this.newsItemRepository = newsItemRepository;
     }
 
-    public List<FinnhubNewsDto> getNews() {
-        return newsItemRepository.findTop20ByFeedOrderByPublishedAtDesc(NewsFeed.MARKET).stream()
-                .map(NewsItem::toDto)
-                .toList();
-    }
-
     public List<FinnhubNewsDto> getPortfolioNews() {
         return lastWeek(NewsFeed.PORTFOLIO);
     }
 
-    public List<String> getPortfolioTickers() {
-        return getPortfolioNews().stream()
-                .map(FinnhubNewsDto::related)
-                .filter(ticker -> ticker != null && !ticker.isBlank())
-                .distinct()
-                .sorted()
-                .toList();
-    }
-
     public List<NewsDay> getPortfolioNewsByDay() {
-        return NewsGrouper.byDay(getPortfolioNews());
+        return NewsGrouper.byDay(shownPortfolioNews());
     }
 
     public List<NewsDay> getMarketNewsByDay() {
@@ -63,7 +49,7 @@ public class NewsService {
     }
 
     public Map<String, Long> getNewsCountBySymbol() {
-        return getPortfolioNews().stream()
+        return shownPortfolioNews().stream()
                 .filter(news -> news.related() != null && !news.related().isBlank())
                 .collect(Collectors.groupingBy(FinnhubNewsDto::related, TreeMap::new, Collectors.counting()));
     }
@@ -90,6 +76,17 @@ public class NewsService {
         return newsItemRepository.findByFeedAndPublishedAtAfterOrderByPublishedAtDesc(feed, weekAgo).stream()
                 .map(NewsItem::toDto)
                 .toList();
+    }
+
+    private List<FinnhubNewsDto> shownPortfolioNews() {
+        Map<String, Integer> shownByHoldingAndDay = new HashMap<>();
+        List<FinnhubNewsDto> shown = new ArrayList<>();
+        for (FinnhubNewsDto news : getPortfolioNews()) {
+            String key = news.related() + " " + news.publishedAt().toLocalDate();
+            int count = shownByHoldingAndDay.merge(key, 1, Integer::sum);
+            if (count <= PER_HOLDING_PER_DAY) shown.add(news);
+        }
+        return shown;
     }
 
     private List<FinnhubNewsDto> starred() {

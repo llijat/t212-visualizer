@@ -82,4 +82,11 @@ public class LiveFinnhubClient implements FinnhubClient {
         return Optional.of(new LogoImage(bytes, contentType));
     }
 
+    @Override
+    public FinnhubQuoteDto fetchQuote(String symbol) {
+        return finnhubRestClient.get()
+                .uri("/quote?symbol={symbol}", symbol)
+                .retrieve()
+                .body(FinnhubQuoteDto.class);
+    }
 }

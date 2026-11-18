@@ -1,6 +1,9 @@
 package com.llijat.t212visualizer.controller;
 
+import com.llijat.t212visualizer.service.CalendarService;
 import com.llijat.t212visualizer.service.NewsService;
+import com.llijat.t212visualizer.service.QuoteService;
+import org.hibernate.boot.jaxb.hbm.internal.CacheAccessTypeConverter;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,9 +19,13 @@ public class NewsController {
     private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
 
     private final NewsService newsService;
+    private final QuoteService quoteService;
+    private final CalendarService calendarService;
 
-    public NewsController(NewsService newsService) {
+    public NewsController(NewsService newsService, QuoteService quoteService, CalendarService calendarService) {
         this.newsService = newsService;
+        this.quoteService = quoteService;
+        this.calendarService = calendarService;
     }
 
     @GetMapping("/news")
@@ -30,6 +37,9 @@ public class NewsController {
         model.addAttribute("today", LocalDate.now(SPAIN));
         model.addAttribute("starredDays", newsService.getStarredNewsByDay());
         model.addAttribute("starredIds", newsService.getStarredIds());
+        model.addAttribute("moves", quoteService.getMoves());
+        model.addAttribute("lastSession", quoteService.getLastSession());
+        model.addAttribute("comingUp", calendarService.getComingUp());
         return "news";
     }
 

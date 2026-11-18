@@ -10,7 +10,6 @@ import java.util.List;
 
 public interface NewsItemRepository extends JpaRepository<NewsItem, Long> {
     List<NewsItem> findByFeedAndPublishedAtAfterOrderByPublishedAtDesc(NewsFeed feed, Instant after);
-    List<NewsItem> findTop20ByFeedOrderByPublishedAtDesc(NewsFeed feed);
     List<NewsItem> findByStarredTrueOrderByPublishedAtDesc();
 
     @Transactional

@@ -1,7 +1,11 @@
 package com.llijat.t212visualizer.controller;
 
+import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.NewsDay;
+import com.llijat.t212visualizer.dto.UpcomingEarnings;
+import com.llijat.t212visualizer.service.CalendarService;
 import com.llijat.t212visualizer.service.NewsService;
+import com.llijat.t212visualizer.service.QuoteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,10 +15,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.mockito.Mockito.verify;
@@ -34,13 +40,19 @@ class NewsControllerTest {
     @Mock
     private NewsService newsService;
 
+    @Mock
+    private QuoteService quoteService;
+
+    @Mock
+    private CalendarService calendarService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         // Without Thymeleaf, the view "news" would be looked for at the URL /news, which is this same page.
         // This resolver turns it into a file name instead, as Thymeleaf does in the real app.
-        mockMvc = MockMvcBuilders.standaloneSetup(new NewsController(newsService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new NewsController(newsService, quoteService, calendarService))
                 .setViewResolvers(new InternalResourceViewResolver("/templates/", ".html"))
                 .build();
     }
@@ -132,5 +144,29 @@ class NewsControllerTest {
                 .andExpect(status().isMethodNotAllowed());
 
         verifyNoInteractions(newsService);
+    }
+
+    // ===== Moving today =====
+
+    @Test
+    void thePage_getsTheMoves_andTheDayTheyAreFrom() throws Exception {
+        List<HoldingMove> moves = List.of(new HoldingMove("AAPL", "AAPL_US_EQ", new BigDecimal("-4.19"), new BigDecimal("15.0")));
+        when(quoteService.getMoves()).thenReturn(moves);
+        when(quoteService.getLastSession()).thenReturn(Optional.of(LocalDate.of(2026, 11, 16)));
+
+        mockMvc.perform(get("/news"))
+                .andExpect(model().attribute("moves", moves))
+                .andExpect(model().attribute("lastSession", Optional.of(LocalDate.of(2026, 11, 16))));
+    }
+
+    // ===== Coming up =====
+
+    @Test
+    void thePage_getsTheNextResultsOfTheHoldings() throws Exception {
+        List<UpcomingEarnings> comingUp = List.of(new UpcomingEarnings("NVDA", "NVDA_US_EQ", LocalDate.of(2026, 11, 19), "amc"));
+        when(calendarService.getComingUp()).thenReturn(comingUp);
+
+        mockMvc.perform(get("/news"))
+                .andExpect(model().attribute("comingUp", comingUp));
     }
 }

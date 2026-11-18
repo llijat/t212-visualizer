@@ -1,9 +1,6 @@
 package com.llijat.t212visualizer.service;
 
-import com.llijat.t212visualizer.dto.FinnhubCompanyProfileDto;
-import com.llijat.t212visualizer.dto.FinnhubEarningsDto;
-import com.llijat.t212visualizer.dto.FinnhubNewsDto;
-import com.llijat.t212visualizer.dto.LogoImage;
+import com.llijat.t212visualizer.dto.*;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -15,4 +12,5 @@ public interface FinnhubClient {
     List<FinnhubEarningsDto> fetchEarnings(String symbol, LocalDate from, LocalDate to);
     FinnhubCompanyProfileDto fetchCompanyProfile(String symbol);
     Optional<LogoImage> downloadLogo(String url);
+    FinnhubQuoteDto fetchQuote(String symbol);
 }

@@ -17,11 +17,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -106,7 +108,6 @@ class NewsServiceTest {
         assertTrue(newsService.getTickerBySymbol().isEmpty());
         assertTrue(newsService.getPortfolioNewsByDay().isEmpty());
         assertTrue(newsService.getMarketNewsByDay().isEmpty());
-        assertTrue(newsService.getNews().isEmpty());
     }
 
     // ===== The T212 ticker of each symbol, for the logos =====
@@ -169,14 +170,6 @@ class NewsServiceTest {
         verify(newsItemRepository).findByFeedAndPublishedAtAfterOrderByPublishedAtDesc(eq(NewsFeed.PORTFOLIO), since.capture());
         assertFalse(since.getValue().isBefore(before));
         assertFalse(since.getValue().isAfter(after));
-    }
-
-    @Test
-    void theDashboard_getsTheTwentyNewestMarketNews_fromTheTable() {
-        when(newsItemRepository.findTop20ByFeedOrderByPublishedAtDesc(NewsFeed.MARKET)).thenReturn(List.of(
-                new NewsItem(news(9, "", "2026-11-16T10:00:00Z"), NewsFeed.MARKET)));
-
-        assertEquals(List.of(9L), newsService.getNews().stream().map(FinnhubNewsDto::id).toList());
     }
 
     @Test
@@ -317,5 +310,69 @@ class NewsServiceTest {
         when(newsItemRepository.deleteByStarredFalseAndPublishedAtBefore(any())).thenThrow(new RuntimeException("Database is down"));
 
         assertDoesNotThrow(() -> newsService.cleanUpOldNews());
+    }
+
+    // ===== At most 7 news per holding and day =====
+
+    // n news of that holding on that day, one hour apart, the newest first (as the table gives them)
+    private static List<FinnhubNewsDto> many(String related, String day, int n, long firstId) {
+        return IntStream.range(0, n)
+                .mapToObj(i -> news(firstId + i, related, day + "T" + String.format("%02d", 20 - i) + ":00:00Z"))
+                .toList();
+    }
+
+    private void theTableHoldsPortfolio(List<FinnhubNewsDto> news) {
+        theTableHolds(NewsFeed.PORTFOLIO, news.toArray(FinnhubNewsDto[]::new));
+    }
+
+    @Test
+    void aBusyHolding_showsOnlyItsSevenNewestNewsOfTheDay() {
+        // On its results day, NVIDIA had 210 news: only the 7 newest are shown
+        theTableHoldsPortfolio(many("NVDA", "2026-11-17", 10, 1));
+
+        List<NewsDay> days = newsService.getPortfolioNewsByDay();
+
+        assertEquals(List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L), days.get(0).news().stream().map(FinnhubNewsDto::id).toList());
+    }
+
+    @Test
+    void theOtherHoldings_keepTheirNews_onABusyDay() {
+        List<FinnhubNewsDto> news = new ArrayList<>(many("NVDA", "2026-11-17", 10, 1));
+        news.addAll(many("AAPL", "2026-11-17", 2, 100));
+        theTableHoldsPortfolio(news);
+
+        assertEquals(Map.of("AAPL", 2L, "NVDA", 7L), newsService.getNewsCountBySymbol());
+    }
+
+    @Test
+    void eachDay_hasItsOwnSeven() {
+        List<FinnhubNewsDto> news = new ArrayList<>(many("NVDA", "2026-11-17", 9, 1));
+        news.addAll(many("NVDA", "2026-11-16", 9, 100));
+        theTableHoldsPortfolio(news);
+
+        List<NewsDay> days = newsService.getPortfolioNewsByDay();
+
+        assertEquals(2, days.size());
+        assertEquals(7, days.get(0).news().size());
+        assertEquals(7, days.get(1).news().size());
+    }
+
+    @Test
+    void theCounts_matchWhatIsShown() {
+        // If the count said 10 and the page showed 7, choosing that holding would look broken
+        theTableHoldsPortfolio(many("NVDA", "2026-11-17", 10, 1));
+
+        int shown = newsService.getPortfolioNewsByDay().stream().mapToInt(day -> day.news().size()).sum();
+
+        assertEquals(7L, newsService.getNewsCountBySymbol().get("NVDA"));
+        assertEquals(7, shown);
+    }
+
+    @Test
+    void theDashboard_stillGetsEveryNews_newestFirst() {
+        // The limit is for the news page; the dashboard shows the 5 newest, whoever they are from
+        theTableHoldsPortfolio(many("NVDA", "2026-11-17", 10, 1));
+
+        assertEquals(10, newsService.getPortfolioNews().size());
     }
 }

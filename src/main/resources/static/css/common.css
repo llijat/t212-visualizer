@@ -8,8 +8,8 @@
     --raised: #1c2431;      /* hover, tracks and open menus: one step above the cards */
     --border: #252f3e;      /* the few lines left */
     --text: #e7ebf1;        /* main text */
-    --muted: #8a94a6;       /* secondary text */
-    --faint: #5d6778;       /* hints and axis labels */
+    --muted: #9aa3b4;       /* secondary text (6.8:1 on the cards) */
+    --faint: #7e889a;       /* hints and axis labels: the dimmest text that still reads at 4.5:1 on the cards (WCAG AA) */
     --accent: #8ab4ff;      /* only for what is selected or can be acted on */
     --accent-bg: color-mix(in srgb, var(--accent) 16%, transparent);
     --green: #6fd3a0;       /* up, beat, less spending */
@@ -238,6 +238,22 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
 
 /* Hide: !important so it always wins, even over a rule that says display:flex */
 .hidden { display: none !important; }
+
+/* "Skip to ...": hidden until the keyboard reaches it, so keyboard users can jump over a long list of buttons */
+.skip-link {
+    position: absolute;
+    left: 1rem;
+    top: 0.5rem;
+    z-index: 10;
+    padding: 0.5rem 0.9rem;
+    border-radius: var(--radius-small);
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+    text-decoration: none;
+    transform: translateY(-200%);
+}
+.skip-link:focus-visible { transform: none; outline: 2px solid var(--text); outline-offset: 2px; }
 
 /* Hidden on screen, but screen readers still read it */
 .visually-hidden {

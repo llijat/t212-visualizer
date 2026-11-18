@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface EarningsEventRepository extends JpaRepository<EarningsEvent, Long> {
     Optional<EarningsEvent> findByTickerAndFiscalYearAndFiscalQuarter(String ticker, int fiscalYear, int fiscalQuarter);
     List<EarningsEvent> findByReportDateBetween(LocalDate from, LocalDate to);
+    List<EarningsEvent> findByReportDateBetweenOrderByReportDateAsc(LocalDate from, LocalDate to);
 }

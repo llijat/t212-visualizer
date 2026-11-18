@@ -44,7 +44,7 @@
             <!-- A real form, so the star also works without JavaScript; it sends the state wanted, never "flip it" -->
             <form class="star-form" method="post" th:action="@{/news/{id}/starred(id=${n.id()})}" th:data-id="${n.id()}">
                 <input type="hidden" name="starred" th:value="${!isStarred}">
-                <button type="submit" class="star" th:aria-pressed="${isStarred}" aria-label="Star" title="Starred stories are kept for good">
+                <button type="submit" class="star" th:aria-pressed="${isStarred}" th:aria-label="'Star: ' + ${n.headline()}" title="Starred stories are kept for good">
                     <svg class="icon" aria-hidden="true"><use href="#icon-star"/></svg>
                 </button>
             </form>

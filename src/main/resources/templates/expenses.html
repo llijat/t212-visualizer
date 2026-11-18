@@ -166,7 +166,7 @@
         .month-notes { margin-top: 1.1rem; display: flex; flex-wrap: wrap; gap: 0.35rem 1.6rem; color: var(--muted); font-size: 0.85rem; }
         .month-notes b { color: var(--text); font-family: var(--figures); font-weight: 500; }
 
-        /* Heat map: one square per day, Monday first. Each colour is the day (--v) over the month's biggest day */
+        /* Heat map: one square per day, Monday first. Its colour is a step (data-level) of the day over the month's biggest day */
         .heatmap { align-self: stretch; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.5rem; }
         .heatmap-head, .heatmap-grid { display: grid; grid-template-columns: repeat(7, 30px); gap: 5px; }
         .heatmap-head { color: var(--faint); font-size: 0.7rem; text-align: center; }
@@ -178,13 +178,19 @@
             display: grid;
             place-items: center;
             border-radius: 7px;
-            background: color-mix(in srgb, var(--accent) calc(var(--v) * 85%), #1a212c);
-            color: color-mix(in srgb, var(--text) 80%, transparent);
+            background: color-mix(in srgb, var(--accent) var(--mix, 0%), #1a212c);
+            color: var(--text);
             font: 500 0.72rem var(--figures);
             font-variant-numeric: tabular-nums;
             transition: transform 0.12s;
         }
         button.heatmap-day:hover { transform: scale(1.08); }
+        /* Four steps instead of a smooth scale: in the middle of a smooth one, neither a light nor a dark number
+           reaches the 4.5:1 contrast. Light numbers on steps 1-2 (8.6:1, 5.2:1), dark ones on steps 3-4 (5.5:1, 9.0:1); a day with nothing, 4.5:1 */
+        .heatmap-day[data-level="1"] { --mix: 22%; }
+        .heatmap-day[data-level="2"] { --mix: 44%; }
+        .heatmap-day[data-level="3"] { --mix: 72%; }
+        .heatmap-day[data-level="4"] { --mix: 100%; }
         .heatmap-day.is-strong { color: var(--bg); }        /* dark number on the brightest days */
         .heatmap-day.is-zero { color: var(--faint); }
         .heatmap-day.is-future { background: none; border: 1px dashed var(--border); color: var(--faint); }
@@ -345,6 +351,8 @@
             font-size: 0.82rem;
         }
         .day-head .figures { color: var(--muted); }
+        /* What scrolls under the day's head fades out instead of being cut in half (the amount looked crossed out) */
+        .day-head::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 0.75rem; background: linear-gradient(var(--panel), transparent); pointer-events: none; }
         .pay-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.5rem; margin: 0 -0.5rem; border-radius: 10px; }
         .pay-row:hover { background: var(--raised); }
         .pay-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -383,7 +391,7 @@
         .budget-delete button { width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: 6px; background: none; color: var(--faint); }
         .budget-delete button:hover, .budget-delete button:focus-visible { background: var(--raised); color: var(--red); }
         .add { margin-top: 0.75rem; }
-        .add summary { color: var(--accent); font-size: 0.88rem; cursor: pointer; list-style: none; width: fit-content; }
+        .add summary { padding: 0.3rem 0; color: var(--accent); font-size: 0.88rem; cursor: pointer; list-style: none; width: fit-content; }   /* padding: at least 24 px tall to tap */
         .add summary::-webkit-details-marker { display: none; }
         .add summary:hover { text-decoration: underline; }
         .add[open] summary { color: var(--muted); }
@@ -603,11 +611,12 @@
                     th:style="'--start:' + ${report.month().atDay(1).getDayOfWeek().getValue()}">
                     <li th:each="d, stat : ${report.days()}"
                         th:with="share=${max.signum() == 0 ? 0 : d.total() / max},
+                                 level=${d.total().signum() == 0 ? 0 : (share <= 0.25 ? 1 : (share <= 0.5 ? 2 : (share <= 0.75 ? 3 : 4)))},
                                  label=${#strings.capitalize(#strings.toLowerCase(#strings.substring(d.date().getDayOfWeek().name(), 0, 3)))} + ' ' + ${d.date().getDayOfMonth()} + ' ' + ${#strings.capitalize(#strings.toLowerCase(#strings.substring(d.date().getMonth().name(), 0, 3)))},
                                  amount=${#numbers.formatDecimal(d.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">
                         <button type="button" class="heatmap-day"
-                                th:classappend="${(d.total().signum() == 0 ? 'is-zero ' : '') + (share > 0.6 ? 'is-strong ' : '') + (stat.last and report.current() ? 'is-today' : '')}"
-                                th:style="'--v:' + ${share}"
+                                th:classappend="${(d.total().signum() == 0 ? 'is-zero ' : '') + (level >= 3 ? 'is-strong ' : '') + (stat.last and report.current() ? 'is-today' : '')}"
+                                th:data-level="${level}"
                                 th:data-label="${label}" th:data-amount="${amount}" th:data-date="${d.date()}"
                                 th:aria-label="${label} + ': ' + ${amount}"
                                 th:text="${d.date().getDayOfMonth()}">1</button>

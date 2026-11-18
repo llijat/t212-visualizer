@@ -7,33 +7,43 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping; 
 import org.springframework.http.ResponseEntity;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+
 @Controller
 public class DashboardController {
+    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+
     private final PositionService positionService;
     private final NewsService newsService;
     private final AccountService accountService;
     private final TransactionService transactionService;
     private final CompanyProfileService companyProfileService;
+    private final QuoteService quoteService;
+    private final CalendarService calendarService;
 
 
-    public DashboardController(PositionService positionService, NewsService newsService, AccountService accountService, TransactionService transactionService, CompanyProfileService companyProfileService) {
+    public DashboardController(PositionService positionService, NewsService newsService, AccountService accountService, TransactionService transactionService, CompanyProfileService companyProfileService, QuoteService quoteService, CalendarService calendarService) {
         this.positionService = positionService;
         this.newsService = newsService;
         this.accountService = accountService;
         this.transactionService = transactionService;
         this.companyProfileService = companyProfileService;
+        this.quoteService = quoteService;
+        this.calendarService = calendarService;
     }
 
     @GetMapping("/")
     public String dashboard(Model model) {
         model.addAttribute("positions", positionService.getAllPositions());
-        model.addAttribute("news", newsService.getNews());
         model.addAttribute("portfolioNews", newsService.getPortfolioNews());
-        model.addAttribute("portfolioTickers", newsService.getPortfolioTickers());
         model.addAttribute("summary", accountService.getSummary());
         model.addAttribute("netDeposits", transactionService.getNetDeposits());
         model.addAttribute("firstSyncDone", transactionService.isFirstSyncDone());
         model.addAttribute("symbols", companyProfileService.currentSymbols());
+        model.addAttribute("moves", quoteService.getMoves());
+        model.addAttribute("comingUp", calendarService.getComingUp());
+        model.addAttribute("today", LocalDate.now(SPAIN));
         return "dashboard"; // resolves to templates/dashboard.html
     }
 

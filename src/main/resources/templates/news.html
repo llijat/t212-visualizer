@@ -48,6 +48,7 @@
 
         /* ===== Right: the stories, a day at a time ===== */
         .stories { min-height: 0; overflow-y: auto; padding: 1.75rem 2rem 3rem; }
+        .stories:focus { outline: none; }   /* it gets the focus only to start from there after "Skip to the stories" */
         .stories-inner { max-width: 760px; }
         .stories-tools { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
         .stories-search {
@@ -76,6 +77,8 @@
             padding: 1.25rem 0 0.6rem;
             background: var(--bg);
         }
+        /* What scrolls under the day's head fades out instead of being cut in half */
+        .day-head::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 0.75rem; background: linear-gradient(var(--bg), transparent); pointer-events: none; }
         .day-head h2 { margin: 0; font: 500 1.15rem var(--figures); letter-spacing: 0.01em; }
         .day-head span { color: var(--faint); font-size: 0.82rem; }
         .day-list { list-style: none; margin: 0; padding: 0; }
@@ -142,6 +145,57 @@
         .star[aria-pressed="true"] { color: var(--accent); }
         .star[aria-pressed="true"] .icon { fill: currentColor; }
 
+        /* ===== Moving today: the holdings that move most, before their news ===== */
+        .moves { margin: 0.75rem 0 0.25rem; }
+        .moves-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.6rem; }
+        .moves-head h2 { margin: 0; font: 500 1.15rem var(--figures); letter-spacing: 0.01em; }
+        .moves-head span { color: var(--faint); font-size: 0.82rem; }
+        .moves-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; }
+        .move {
+            width: 100%;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            align-items: center;
+            column-gap: 0.65rem;
+            row-gap: 0.1rem;
+            padding: 0.7rem 0.85rem;
+            border-radius: 12px;
+            background: var(--panel);
+            color: var(--text);
+            text-align: left;
+        }
+        .move:hover:not(:disabled) { background: var(--raised); }
+        .move:disabled { cursor: default; }
+        .move .logo { grid-row: span 2; font-size: 1.6rem; }
+        .move-symbol { font: 500 0.95rem var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .move-change { font: 500 0.95rem var(--figures); font-variant-numeric: tabular-nums; }
+        .move-change.up { color: var(--green); }
+        .move-change.down { color: var(--red); }
+        .move-weight { grid-column: 2 / 4; color: var(--faint); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+
+        /* ===== Coming up: the next results of the holdings, one line each ===== */
+        .coming { margin: 1.25rem 0 0.25rem; }
+        .coming-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+        .coming-item {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 6.5rem auto minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 10px;
+            background: none;
+            color: var(--text);
+            text-align: left;
+        }
+        .coming-item:hover:not(:disabled) { background: var(--panel); }
+        .coming-item:disabled { cursor: default; }
+        .coming-date { color: var(--muted); font: 0.88rem var(--figures); font-variant-numeric: tabular-nums; }
+        .coming-date.is-soon { color: var(--accent); }
+        .coming-item .logo { font-size: 1.35rem; }
+        .coming-symbol { font: 500 0.95rem var(--figures); letter-spacing: 0.01em; }
+        .coming-hour { color: var(--faint); font-size: 0.82rem; }
+
         .empty { margin: 2rem 0; color: var(--muted); line-height: 1.6; }
 
         /* ===== Narrow screens: the sources become a row of buttons above the stories ===== */
@@ -160,6 +214,9 @@
     </style>
 </head>
 <body>
+
+    <!-- With 30+ holdings there are many buttons before the first story: this lets the keyboard jump over them -->
+    <a class="skip-link" href="#stories">Skip to the stories</a>
 
     <header class="topbar">
         <th:block th:replace="~{fragments/topbar :: bar('news')}"></th:block>
@@ -222,7 +279,7 @@
         </nav>
 
         <!-- ===== The stories ===== -->
-        <section class="stories" id="stories" aria-label="Stories">
+        <section class="stories" id="stories" aria-label="Stories" tabindex="-1">
             <div class="stories-inner">
                 <div class="stories-tools">
                     <input type="search" class="stories-search" id="search" placeholder="Search the headlines" aria-label="Search the headlines" autocomplete="off">
@@ -232,6 +289,63 @@
                 <!-- Your holdings, a day at a time -->
                 <!-- The days and their stories are drawn by fragments/news-story.html, the same in the three folders -->
                 <div id="portfolio" class="feed">
+                    <!-- Moving today: the six US holdings that move most, up or down; pressing one shows its news -->
+                    <section class="moves overview" id="moves" th:if="${!moves.isEmpty()}" aria-labelledby="moves-title">
+                        <div class="moves-head">
+                            <h2 id="moves-title"
+                                th:text="${lastSession.isPresent() and lastSession.get().equals(today)} ? 'Moving today'
+                                       : 'Moving on ' + ${lastSession.isPresent()
+                                           ? #strings.capitalize(#strings.toLowerCase(lastSession.get().getDayOfWeek().name())) + ' ' + lastSession.get().getDayOfMonth() + ' '
+                                             + #strings.capitalize(#strings.toLowerCase(lastSession.get().getMonth().name()))
+                                           : 'the last session'}">Moving today</h2>
+                            <span>Against the previous close</span>
+                        </div>
+                        <ul class="moves-list">
+                            <li th:each="m : ${moves}" th:if="${mStat.index < 6}"
+                                th:with="hasNews=${newsCount.containsKey(m.symbol())}">
+                                <button type="button" class="move" th:data-symbol="${m.symbol()}" th:disabled="${!hasNews}"
+                                        th:title="${hasNews} ? 'Show the news of ' + ${m.symbol()} : 'No news of ' + ${m.symbol()} + ' in the last 7 days'">
+                                    <span class="logo" aria-hidden="true">
+                                        <span class="logo-initial" th:text="${#strings.substring(m.symbol(), 0, 1)}">A</span>
+                                        <img th:src="@{/logos/{ticker}(ticker=${m.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                    </span>
+                                    <span class="move-symbol" th:text="${m.symbol()}">AAPL</span>
+                                    <span class="move-change" th:classappend="${m.changePercent().signum() < 0} ? 'down' : 'up'"
+                                          th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">−4.19 %</span>
+                                    <span class="move-weight" th:text="${#numbers.formatDecimal(m.weightPercent(), 1, 1, 'POINT')} + ' % of your portfolio'">15.0 % of your portfolio</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </section>
+
+                    <!-- Coming up: the quarterly results of the holdings in the next two weeks, the closest first -->
+                    <section class="coming overview" id="coming" th:if="${!comingUp.isEmpty()}" aria-labelledby="coming-title">
+                        <div class="moves-head">
+                            <h2 id="coming-title">Coming up</h2>
+                            <span>Quarterly results in the next two weeks</span>
+                        </div>
+                        <ul class="coming-list">
+                            <li th:each="e : ${comingUp}" th:if="${eStat.index < 6}"
+                                th:with="hasNews=${newsCount.containsKey(e.symbol())},
+                                         soon=${!e.date().isAfter(today.plusDays(1))}">
+                                <button type="button" class="coming-item" th:data-symbol="${e.symbol()}" th:disabled="${!hasNews}"
+                                        th:title="${hasNews} ? 'Show the news of ' + ${e.symbol()} : 'No news of ' + ${e.symbol()} + ' in the last 7 days'">
+                                    <time class="coming-date" th:classappend="${soon} ? 'is-soon'" th:datetime="${e.date()}"
+                                          th:text="${e.date().equals(today)} ? 'Today'
+                                                 : (${e.date().equals(today.plusDays(1))} ? 'Tomorrow'
+                                                 : ${#strings.capitalize(#strings.toLowerCase(#strings.substring(e.date().getDayOfWeek().name(), 0, 3))) + ' ' + e.date().getDayOfMonth() + ' '
+                                                     + #strings.capitalize(#strings.toLowerCase(#strings.substring(e.date().getMonth().name(), 0, 3)))})">Thu 20 Nov</time>
+                                    <span class="logo" aria-hidden="true">
+                                        <span class="logo-initial" th:text="${#strings.substring(e.symbol(), 0, 1)}">N</span>
+                                        <img th:src="@{/logos/{ticker}(ticker=${e.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                    </span>
+                                    <span class="coming-symbol" th:text="${e.symbol()}">NVDA</span>
+                                    <span class="coming-hour" th:text="${e.hourLabel()}">after the close</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </section>
+
                     <p class="empty" th:if="${portfolioDays.isEmpty()}">No news from your holdings in the last 7 days. If the app has just started, reload the page in a few seconds.</p>
                     <th:block th:each="day : ${portfolioDays}">
                         <section th:replace="~{fragments/news-story :: day(${day})}"></section>
@@ -268,6 +382,7 @@
             starred: document.getElementById('starred')
         };
         const starredCount = document.getElementById('starred-count');
+        const overviews = [...document.querySelectorAll('.overview')];   // Moving today and Coming up, when they have something
         let starsChanged = false;
         const search = document.getElementById('search');
         const count = document.getElementById('count');
@@ -294,6 +409,8 @@
                 day.querySelector('.day-total').textContent = inDay + (inDay === 1 ? ' story' : ' stories');
                 shown += inDay;
             });
+            // Moving today and Coming up belong to all the holdings: they step aside for one holding or a search
+            overviews.forEach(overview => overview.classList.toggle('hidden', symbol !== null || words !== ''));
             count.textContent = total === 0 ? '' : (shown === total ? total + ' stories' : shown + ' of ' + total);
             nothing.classList.toggle('hidden', shown > 0 || total === 0);
         }
@@ -319,9 +436,9 @@
         sources.forEach(button => button.addEventListener('click', () => choose(button)));
         search.addEventListener('input', filter);
 
-        // The symbol on a story shows only that holding's stories
+        // The symbol on a story, or a holding in Moving today or Coming up, shows only that holding's stories
         storiesArea.addEventListener('click', event => {
-            const chip = event.target.closest('.story-symbol');
+            const chip = event.target.closest('.story-symbol, .move, .coming-item');
             if (!chip) return;
             const source = sources.find(button => button.dataset.symbol === chip.dataset.symbol);
             if (source) choose(source);
@@ -358,6 +475,11 @@
         // Back on Starred after that reload (or with /news#starred)
         const starredButton = sources.find(button => button.dataset.show === 'starred');
         if (location.hash === '#starred') choose(starredButton);
+
+        // From the dashboard: /news#holding=NVDA opens that holding's news (if it has any this week)
+        const wantedHolding = new URLSearchParams(location.hash.slice(1)).get('holding');
+        const holdingButton = sources.find(button => button.dataset.symbol === wantedHolding);
+        if (holdingButton) choose(holdingButton);
 
         filter();
     </script>

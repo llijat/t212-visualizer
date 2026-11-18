@@ -2,6 +2,7 @@ package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.FinnhubCompanyProfileDto;
 import com.llijat.t212visualizer.dto.FinnhubEarningsDto;
+import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.LogoImage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -197,5 +199,22 @@ class LiveFinnhubClientTest {
                 .andRespond(withSuccess(new byte[0], MediaType.IMAGE_PNG));
 
         assertTrue(client.downloadLogo(LOGO_URL).isEmpty());
+    }
+
+    @Test
+    void fetchQuote_asksForOneSymbol_withTheKey_andReadsTheMove() {
+        server.expect(requestTo(BASE_URL + "/quote?symbol=MU"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Finnhub-Token", "test-key"))
+                .andRespond(withSuccess("""
+                        {"c": 182.5, "d": -7.98, "dp": -4.19, "h": 190.1, "l": 181.9, "o": 189.7, "pc": 190.48, "t": 1794862800}
+                        """, MediaType.APPLICATION_JSON));
+
+        FinnhubQuoteDto quote = client.fetchQuote("MU");
+
+        server.verify();
+        assertEquals(new BigDecimal("-4.19"), quote.changePercent());
+        assertEquals(1794862800L, quote.time());
+        assertTrue(quote.isKnown());
     }
 }
