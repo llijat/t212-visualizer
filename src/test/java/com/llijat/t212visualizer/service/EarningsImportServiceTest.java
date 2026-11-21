@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -196,5 +197,100 @@ class EarningsImportServiceTest {
         service.importEarnings();
 
         verify(companyProfileService, times(1)).currentSymbols();
+    }
+
+    // ----- Hourly refresh of today's and yesterday's reports -----
+
+    // A report already in the table, dated today, still waiting for its real EPS
+    private static EarningsEvent pending(String ticker, int year, int quarter) {
+        EarningsEvent event = new EarningsEvent(ticker, year, quarter);
+        event.updateReport(LocalDate.now(), "amc", new BigDecimal("1.65"), null, new BigDecimal("8700000000"), null);
+        return event;
+    }
+
+    private void pendingRows(EarningsEvent... rows) {
+        LocalDate today = LocalDate.now();
+        when(repository.findByReportDateBetweenAndEpsActualIsNull(today.minusDays(1), today)).thenReturn(List.of(rows));
+    }
+
+    @Test
+    void refresh_withNothingPending_makesNoRequestAtAll() {
+        pendingRows();
+
+        service.refreshRecentReports();
+
+        // Not even the positions or the resolved tickers: this is what happens almost every hour
+        verifyNoInteractions(finnhubClient, positionService, companyProfileService);
+    }
+
+    @Test
+    void refresh_asksOnlyForThePendingStocks_fromYesterdayToToday() {
+        pendingRows(pending("NVDA_US_EQ", 2027, 3));
+        when(positionService.getAllPositions()).thenReturn(List.of(position("MU_US_EQ"), position("NVDA_US_EQ")));
+        LocalDate today = LocalDate.now();
+
+        service.refreshRecentReports();
+
+        verify(finnhubClient).fetchEarnings("NVDA", today.minusDays(1), today);
+        verify(finnhubClient, times(1)).fetchEarnings(anyString(), any(), any());
+    }
+
+    @Test
+    void refresh_aStockWithTwoPendingRows_isAskedOnce() {
+        pendingRows(pending("NVDA_US_EQ", 2027, 3), pending("NVDA_US_EQ", 2027, 4));
+        when(positionService.getAllPositions()).thenReturn(List.of(position("NVDA_US_EQ")));
+
+        service.refreshRecentReports();
+
+        verify(finnhubClient, times(1)).fetchEarnings(eq("NVDA"), any(), any());
+    }
+
+    @Test
+    void refresh_aPendingRowOfASoldStock_isSkipped() {
+        pendingRows(pending("ORCL_US_EQ", 2027, 2));
+        when(positionService.getAllPositions()).thenReturn(List.of(position("MU_US_EQ")));
+
+        service.refreshRecentReports();
+
+        verify(finnhubClient, never()).fetchEarnings(anyString(), any(), any());
+    }
+
+    @Test
+    void refresh_fillsTheRealFiguresIntoTheExistingRow() {
+        EarningsEvent row = pending("NVDA_US_EQ", 2027, 3);
+        pendingRows(row);
+        when(positionService.getAllPositions()).thenReturn(List.of(position("NVDA_US_EQ")));
+        when(finnhubClient.fetchEarnings(eq("NVDA"), any(), any())).thenReturn(List.of(published("NVDA", 2027, 3)));
+        when(repository.findByTickerAndFiscalYearAndFiscalQuarter("NVDA_US_EQ", 2027, 3)).thenReturn(Optional.of(row));
+
+        service.refreshRecentReports();
+
+        verify(repository).save(savedCaptor.capture());
+        assertSame(row, savedCaptor.getValue());
+        assertEquals(new BigDecimal("1.79"), row.getEpsActual());
+        assertEquals(new BigDecimal("8900000000"), row.getRevenueActual());
+    }
+
+    @Test
+    void refresh_usesTheCurrentTicker_likeTheFullImport() {
+        pendingRows(pending("FB_US_EQ", 2026, 4));
+        when(positionService.getAllPositions()).thenReturn(List.of(position("FB_US_EQ")));
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of("FB_US_EQ", "META"));
+
+        service.refreshRecentReports();
+
+        verify(finnhubClient).fetchEarnings(eq("META"), any(), any());
+        verify(finnhubClient, never()).fetchEarnings(eq("FB"), any(), any());
+    }
+
+    @Test
+    void refresh_aFailingStock_doesNotStopTheOthers() {
+        pendingRows(pending("ORCL_US_EQ", 2027, 2), pending("NVDA_US_EQ", 2027, 3));
+        when(positionService.getAllPositions()).thenReturn(List.of(position("ORCL_US_EQ"), position("NVDA_US_EQ")));
+        when(finnhubClient.fetchEarnings(eq("ORCL"), any(), any())).thenThrow(new RuntimeException("429 Too Many Requests"));
+
+        service.refreshRecentReports();
+
+        verify(finnhubClient).fetchEarnings(eq("NVDA"), any(), any());
     }
 }

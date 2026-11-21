@@ -6,6 +6,8 @@ target/
 src/main/resources/application-local.yml
 .env
 NOTAS_DEL_PROYECTO.md
+# Notes (Obsidian vault): real figures and personal details, never published
+notas/
 
 .DS_Store
 Thumbs.db

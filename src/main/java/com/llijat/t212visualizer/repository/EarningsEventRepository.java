@@ -12,4 +12,5 @@ public interface EarningsEventRepository extends JpaRepository<EarningsEvent, Lo
     Optional<EarningsEvent> findByTickerAndFiscalYearAndFiscalQuarter(String ticker, int fiscalYear, int fiscalQuarter);
     List<EarningsEvent> findByReportDateBetween(LocalDate from, LocalDate to);
     List<EarningsEvent> findByReportDateBetweenOrderByReportDateAsc(LocalDate from, LocalDate to);
+    List<EarningsEvent> findByReportDateBetweenAndEpsActualIsNull(LocalDate from, LocalDate to);
 }
