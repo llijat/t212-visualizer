@@ -44,6 +44,7 @@ public class DashboardController {
         model.addAttribute("moves", quoteService.getMoves());
         model.addAttribute("comingUp", calendarService.getComingUp());
         model.addAttribute("today", LocalDate.now(SPAIN));
+        model.addAttribute("metals", quoteService.getMetals());
         return "dashboard"; // resolves to templates/dashboard.html
     }
 

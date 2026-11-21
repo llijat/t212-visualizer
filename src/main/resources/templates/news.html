@@ -520,6 +520,9 @@
         const starredButton = sources.find(button => button.dataset.show === 'starred');
         if (location.hash === '#starred') choose(starredButton);
 
+        // From the dashboard: /news#metals opens the Metals folder
+        if (location.hash === '#metals') choose(sources.find(button => button.dataset.show === 'metals'));
+
         // From the dashboard: /news#holding=NVDA opens that holding's news (if it has any this week)
         const wantedHolding = new URLSearchParams(location.hash.slice(1)).get('holding');
         const holdingButton = sources.find(button => button.dataset.symbol === wantedHolding);

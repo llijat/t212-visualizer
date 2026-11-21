@@ -98,6 +98,14 @@
         /* Moving today: logo, symbol over its weight, and the change */
         .move-row { grid-template-columns: auto minmax(0, 1fr) auto; }
         .move-row .today-faint { display: block; }
+        /* Moving today and Metals side by side, 2:1; each has a minimum width, so Metals wraps below when they do not fit */
+        .today-moves { display: flex; flex-wrap: wrap; gap: 1.5rem 1.75rem; }
+        .today-stocks { flex: 2 1 14rem; min-width: 0; }
+        .today-metals { flex: 1 1 8rem; min-width: 0; }
+        /* Metals: a coin of the metal's colour, the name and the change */
+        .metal-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+        .metal-logo { background: #c9a227; color: #1a1406; }
+        .metal-logo.is-silver { background: #b9c0cb; color: #14171c; }
         /* Coming up: the day, logo and symbol, and when in the day */
         .coming-row { grid-template-columns: 5.6rem auto minmax(0, 1fr) auto; }
         .coming-row .today-figure { color: var(--muted); font-weight: 400; }
@@ -356,8 +364,10 @@
             </div>
 
             <div class="today-body scroll scroll-hints">
-                <!-- The holdings that move most, up or down; each one opens its news -->
-                <section th:if="${!moves.isEmpty()}" aria-labelledby="today-moves">
+                <!-- Two columns, 2:1: the holdings that move most (each opens its news) and gold and silver.
+                     When there is no room for both, Metals wraps below on its own. -->
+                <div class="today-moves" th:if="${!moves.isEmpty() or !metals.isEmpty()}">
+                <section class="today-stocks" th:if="${!moves.isEmpty()}" aria-labelledby="today-moves">
                     <h3 class="today-title" id="today-moves">Moving today</h3>
                     <ul class="today-list">
                         <li th:each="m : ${moves}" th:if="${mStat.index < 4}">
@@ -376,6 +386,24 @@
                         </li>
                     </ul>
                 </section>
+
+                <!-- Gold and silver through the GLD and SLV funds: only the change, because a fund share is not an ounce -->
+                <section class="today-metals" th:if="${!metals.isEmpty()}" aria-labelledby="today-metals">
+                    <h3 class="today-title" id="today-metals">Metals</h3>
+                    <ul class="today-list">
+                        <li th:each="m : ${metals}">
+                            <a class="today-row metal-row" href="/news#metals" th:title="'The news about ' + ${#strings.toLowerCase(m.name())} + ' (through the ' + ${m.etf()} + ' fund)'">
+                                <span class="logo metal-logo" th:classappend="${m.etf() == 'SLV'} ? 'is-silver'" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(m.name(), 0, 1)}">G</span>
+                                </span>
+                                <span class="today-symbol" th:text="${m.name()}">Gold</span>
+                                <span class="today-figure" th:classappend="${m.changePercent().signum() < 0} ? 'negative' : 'positive'"
+                                      th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">+0.85 %</span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
+                </div>
 
                 <!-- The next quarterly results of the holdings -->
                 <section th:if="${!comingUp.isEmpty()}" aria-labelledby="today-coming">
