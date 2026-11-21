@@ -69,7 +69,7 @@ The services depend on interfaces, and a Spring profile chooses the implementati
 
 ## Running it with your own account
 
-You need a Trading 212 API key and secret, and a [Finnhub](https://finnhub.io) API key.
+You need a Trading 212 API key and secret, a [Finnhub](https://finnhub.io) API key and an [Alpha Vantage](https://www.alphavantage.co) API key. All three services have a free plan.
 
 > **Security:** use a Trading 212 key **without order permissions**. The app has **no login**, so anyone who can reach it sees your portfolio. The compose file only publishes it on `127.0.0.1`. Do not expose it to the internet.
 
@@ -98,6 +98,7 @@ Your browser only talks to your own installation of the app. The app's server is
 | [Trading 212](https://www.trading212.com) | Your API key and secret | Positions, account summary, account movements and card payment reports |
 | [Finnhub](https://finnhub.io) | Your API key and the tickers of your US holdings | Market and company news, earnings, company names and logos |
 | [OpenFIGI](https://www.openfigi.com) | The ISINs of all your holdings | The current ticker and exchange of each one, because Trading 212 keeps some old tickers |
+| [Alpha Vantage](https://www.alphavantage.co) | Your API key and the tickers of your US holdings, up to 20 a day | Announced dividends: the payment date, the ex-dividend date and the amount per share |
 
 None of them receives quantities, prices or amounts. A list of tickers or ISINs does reveal **which** companies you hold, so do not use the app if that is a problem for you.
 

@@ -58,3 +58,11 @@ t212:
 finnhub:
   base-url: https://finnhub.io/api/v1
   api-key: ${FINNHUB_API_KEY:}
+
+# Announced dividends. The free plan allows 25 requests a day and 5 a minute:
+# each day the import asks for at most 20 stocks, 13 seconds apart, the ones checked longest ago first.
+alpha-vantage:
+  base-url: https://www.alphavantage.co
+  api-key: ${ALPHA_VANTAGE_API_KEY:}
+  stocks-per-day: 20
+  request-delay-ms: 13000

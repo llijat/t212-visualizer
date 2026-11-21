@@ -10,3 +10,6 @@ t212:
 
 finnhub:
   api-key: your_finnhub_api_key
+
+alpha-vantage:
+  api-key: your_alpha_vantage_api_key
