@@ -173,6 +173,11 @@
         .move-change.down { color: var(--red); }
         .move-weight { grid-column: 2 / 4; color: var(--faint); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 
+        /* Gold and silver: the same cards, but not buttons, with a coin of the metal's colour instead of a logo */
+        .move.is-static:hover { background: var(--panel); }
+        .metal-logo { background: #c9a227; color: #1a1406; }
+        .metal-logo.is-silver { background: #b9c0cb; color: #14171c; }
+
         /* ===== Coming up: the next results of the holdings, one line each ===== */
         .coming { margin: 1.25rem 0 0.25rem; }
         .coming-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
@@ -224,12 +229,14 @@
 
     <svg class="sprite" aria-hidden="true">
         <symbol id="icon-stack" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+        <symbol id="icon-ingot" viewBox="0 0 24 24"><path d="M7.5 8h9l3.5 9H4z"/><path d="M9 11.5h6"/></symbol>
         <symbol id="icon-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></symbol>
     </svg>
 
     <main class="news-page"
           th:with="total=${portfolioDays.isEmpty() ? 0 : #aggregates.sum(portfolioDays.![news().size()])},
-                   marketTotal=${marketDays.isEmpty() ? 0 : #aggregates.sum(marketDays.![news().size()])}">
+                   marketTotal=${marketDays.isEmpty() ? 0 : #aggregates.sum(marketDays.![news().size()])},
+                   metalTotal=${metalDays.isEmpty() ? 0 : #aggregates.sum(metalDays.![news().size()])}">
 
         <!-- ===== Where the stories come from: every holding, or the market ===== -->
         <nav class="sources" aria-label="Show news from">
@@ -264,6 +271,13 @@
                         <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-globe"/></svg></span>
                         <span class="source-symbol">Market</span>
                         <span class="source-count" th:text="${marketTotal}">100</span>
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="source" data-show="metals" aria-pressed="false">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-ingot"/></svg></span>
+                        <span class="source-symbol">Metals</span>
+                        <span class="source-count" th:text="${metalTotal}">6</span>
                     </button>
                 </li>
                 <li>
@@ -360,6 +374,35 @@
                     </th:block>
                 </div>
 
+                <!-- Metals: how gold and silver moved, then the market news about them -->
+                <div id="metals" class="feed hidden">
+                    <section class="moves overview" th:if="${!metals.isEmpty()}" aria-labelledby="metals-title">
+                        <div class="moves-head">
+                            <h2 id="metals-title">Gold and silver</h2>
+                            <span>Through the GLD and SLV funds, against the previous close</span>
+                        </div>
+                        <ul class="moves-list">
+                            <li th:each="m : ${metals}">
+                                <!-- Only the change: a fund share holds a fraction of an ounce, so its price is not the metal's -->
+                                <div class="move is-static">
+                                    <span class="logo metal-logo" th:classappend="${m.etf() == 'SLV'} ? 'is-silver'" aria-hidden="true">
+                                        <span class="logo-initial" th:text="${#strings.substring(m.name(), 0, 1)}">G</span>
+                                    </span>
+                                    <span class="move-symbol" th:text="${m.name()}">Gold</span>
+                                    <span class="move-change" th:classappend="${m.changePercent().signum() < 0} ? 'down' : 'up'"
+                                          th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">+1.20 %</span>
+                                    <span class="move-weight" th:text="${m.etf()} + ' fund'">GLD fund</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </section>
+
+                    <p class="empty" th:if="${metalDays.isEmpty()}">No market news about gold or silver in the last 7 days.</p>
+                    <th:block th:each="day : ${metalDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
+                </div>
+
                 <!-- Starred: from both, of any age, because they are never deleted -->
                 <div id="starred" class="feed hidden">
                     <p class="empty" th:if="${starredDays.isEmpty()}">No starred stories yet. Press the star on a story to keep it here for good: the others are deleted after 30 days.</p>
@@ -379,6 +422,7 @@
         const feeds = {
             portfolio: document.getElementById('portfolio'),
             market: document.getElementById('market'),
+            metals: document.getElementById('metals'),
             starred: document.getElementById('starred')
         };
         const starredCount = document.getElementById('starred-count');

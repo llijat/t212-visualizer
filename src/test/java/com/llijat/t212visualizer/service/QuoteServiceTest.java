@@ -2,6 +2,7 @@ package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.HoldingMove;
+import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.model.Position;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -201,5 +202,72 @@ class QuoteServiceTest {
     @Test
     void withoutQuotes_thereIsNoSession() {
         assertEquals(Optional.empty(), quoteService.getLastSession());
+    }
+
+    // ===== Metals (through the GLD and SLV ETFs) =====
+
+    @Test
+    void metals_areAskedForInEveryRefresh_evenWithoutUsPositions() {
+        thePortfolioIs(position("VUSAl_EQ", "1000"));
+
+        quoteService.refreshQuotes();
+
+        verify(finnhubClient).fetchQuote("GLD");
+        verify(finnhubClient).fetchQuote("SLV");
+    }
+
+    @Test
+    void metals_comeGoldFirst_withTheirChange() {
+        thePortfolioIs();
+        when(finnhubClient.fetchQuote("GLD")).thenReturn(moved("1.2"));
+        when(finnhubClient.fetchQuote("SLV")).thenReturn(moved("-0.8"));
+
+        quoteService.refreshQuotes();
+
+        List<MetalMove> metals = quoteService.getMetals();
+        assertEquals(2, metals.size());
+        assertEquals("Gold", metals.get(0).name());
+        assertEquals(new BigDecimal("1.2"), metals.get(0).changePercent());
+        assertEquals("Silver", metals.get(1).name());
+        assertEquals(new BigDecimal("-0.8"), metals.get(1).changePercent());
+    }
+
+    @Test
+    void metals_areNotHoldings_soTheyNeverShowInMovingToday() {
+        thePortfolioIs(position("AAPL_US_EQ", "1500"));
+        when(finnhubClient.fetchQuote("AAPL")).thenReturn(moved("-4"));
+        when(finnhubClient.fetchQuote("GLD")).thenReturn(moved("1.2"));
+
+        quoteService.refreshQuotes();
+
+        assertEquals(List.of("AAPL"), quoteService.getMoves().stream().map(HoldingMove::symbol).toList());
+    }
+
+    @Test
+    void ifSilverFails_goldStillArrives() {
+        thePortfolioIs();
+        when(finnhubClient.fetchQuote("GLD")).thenReturn(moved("1.2"));
+        when(finnhubClient.fetchQuote("SLV")).thenThrow(new RuntimeException("Too many requests"));
+
+        quoteService.refreshQuotes();
+
+        assertEquals(List.of("Gold"), quoteService.getMetals().stream().map(MetalMove::name).toList());
+    }
+
+    @Test
+    void aMetalWithoutData_isLeftOut() {
+        // What the free plan would answer if it did not cover the ETF: zeros and no change
+        thePortfolioIs();
+        when(finnhubClient.fetchQuote("GLD")).thenReturn(new FinnhubQuoteDto(BigDecimal.ZERO, null, 0L));
+        when(finnhubClient.fetchQuote("SLV")).thenReturn(moved("-0.8"));
+
+        quoteService.refreshQuotes();
+
+        assertEquals(List.of("Silver"), quoteService.getMetals().stream().map(MetalMove::name).toList());
+    }
+
+    @Test
+    void beforeTheFirstRefresh_thereAreNoMetals() {
+        assertTrue(quoteService.getMetals().isEmpty());
     }
 }

@@ -3,7 +3,6 @@ package com.llijat.t212visualizer.controller;
 import com.llijat.t212visualizer.service.CalendarService;
 import com.llijat.t212visualizer.service.NewsService;
 import com.llijat.t212visualizer.service.QuoteService;
-import org.hibernate.boot.jaxb.hbm.internal.CacheAccessTypeConverter;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,6 +39,8 @@ public class NewsController {
         model.addAttribute("moves", quoteService.getMoves());
         model.addAttribute("lastSession", quoteService.getLastSession());
         model.addAttribute("comingUp", calendarService.getComingUp());
+        model.addAttribute("metals", quoteService.getMetals());
+        model.addAttribute("metalDays", newsService.getMetalNewsByDay());
         return "news";
     }
 

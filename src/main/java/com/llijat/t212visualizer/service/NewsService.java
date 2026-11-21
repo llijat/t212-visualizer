@@ -11,17 +11,18 @@ import com.llijat.t212visualizer.dto.FinnhubNewsDto;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import javax.swing.text.html.Option;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 public class NewsService {
     private static final Logger log = LoggerFactory.getLogger(NewsService.class);
     private static final int PER_HOLDING_PER_DAY = 7;
+    private static final Pattern METALS = Pattern.compile("\\b(gold|silver|bullion|precious metals?)\\b", Pattern.CASE_INSENSITIVE);
 
     private final FinnhubClient finnhubClient;
     private Map<String, String> tickerBySymbol = Map.of();
@@ -46,6 +47,13 @@ public class NewsService {
 
     public List<NewsDay> getMarketNewsByDay() {
         return NewsGrouper.byDay(lastWeek(NewsFeed.MARKET));
+    }
+
+    public List<NewsDay> getMetalNewsByDay() {
+        List<FinnhubNewsDto> metalNews = lastWeek(NewsFeed.MARKET).stream()
+                .filter(news -> METALS.matcher(news.headline()).find())
+                .toList();
+        return NewsGrouper.byDay(metalNews);
     }
 
     public Map<String, Long> getNewsCountBySymbol() {

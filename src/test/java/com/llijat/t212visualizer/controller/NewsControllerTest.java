@@ -1,6 +1,7 @@
 package com.llijat.t212visualizer.controller;
 
 import com.llijat.t212visualizer.dto.HoldingMove;
+import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.dto.NewsDay;
 import com.llijat.t212visualizer.dto.UpcomingEarnings;
 import com.llijat.t212visualizer.service.CalendarService;
@@ -102,6 +103,18 @@ class NewsControllerTest {
         mockMvc.perform(get("/news"))
                 .andExpect(model().attribute("starredDays", starred))
                 .andExpect(model().attribute("starredIds", Set.of(7L)));
+    }
+
+    @Test
+    void thePage_getsTheMetals_andTheirNews() throws Exception {
+        List<MetalMove> metals = List.of(new MetalMove("GLD", new BigDecimal("1.2")));
+        List<NewsDay> metalDays = List.of(new NewsDay(LocalDate.of(2026, 11, 20), List.of()));
+        when(quoteService.getMetals()).thenReturn(metals);
+        when(newsService.getMetalNewsByDay()).thenReturn(metalDays);
+
+        mockMvc.perform(get("/news"))
+                .andExpect(model().attribute("metals", metals))
+                .andExpect(model().attribute("metalDays", metalDays));
     }
 
     @Test

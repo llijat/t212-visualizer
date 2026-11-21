@@ -375,4 +375,58 @@ class NewsServiceTest {
 
         assertEquals(10, newsService.getPortfolioNews().size());
     }
+    // ===== Metals: the market news whose headline is about gold or silver =====
+
+    private static FinnhubNewsDto headlined(long id, String headline) {
+        return new FinnhubNewsDto("general", Instant.parse("2026-11-20T10:00:00Z").getEpochSecond() - id, headline,
+                "https://example.com/" + id, id, "", "", "Summary " + id, "Sample Wire");
+    }
+
+    private List<String> metalHeadlines() {
+        return newsService.getMetalNewsByDay().stream()
+                .flatMap(day -> day.news().stream())
+                .map(FinnhubNewsDto::headline)
+                .toList();
+    }
+
+    @Test
+    void metals_keepOnlyTheMarketNewsAboutGoldOrSilver() {
+        theTableHolds(NewsFeed.MARKET,
+                headlined(1, "Gold hits a record as the dollar weakens"),
+                headlined(2, "Fed holds rates steady"),
+                headlined(3, "Silver jumps 4% on industrial demand"));
+
+        assertEquals(List.of("Gold hits a record as the dollar weakens", "Silver jumps 4% on industrial demand"), metalHeadlines());
+    }
+
+    @Test
+    void metals_findTheWord_anywhereAndInAnyCase() {
+        theTableHolds(NewsFeed.MARKET,
+                headlined(1, "Why investors are buying GOLD again"),
+                headlined(2, "Central banks add to bullion reserves"),
+                headlined(3, "Precious metals rally for a third day"),
+                headlined(4, "A precious metal miner beats estimates"));
+
+        assertEquals(4, metalHeadlines().size());
+    }
+
+    @Test
+    void metals_needTheWholeWord_soGoldmanAndGoldenAreLeftOut() {
+        theTableHolds(NewsFeed.MARKET,
+                headlined(1, "Goldman Sachs raises its S&P 500 target"),
+                headlined(2, "Golden State utility files for a rate rise"),
+                headlined(3, "Silverline Corp. names a new CEO"));
+
+        assertTrue(metalHeadlines().isEmpty());
+    }
+
+    @Test
+    void metals_comeFromTheMarketFeed_notFromTheHoldings() {
+        theTableHolds(NewsFeed.MARKET);
+
+        newsService.getMetalNewsByDay();
+
+        verify(newsItemRepository).findByFeedAndPublishedAtAfterOrderByPublishedAtDesc(eq(NewsFeed.MARKET), any());
+        verify(newsItemRepository, never()).findByFeedAndPublishedAtAfterOrderByPublishedAtDesc(eq(NewsFeed.PORTFOLIO), any());
+    }
 }

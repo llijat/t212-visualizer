@@ -119,6 +119,7 @@ The tests use JUnit 5 and Mockito, and need neither a database nor network acces
 - **Percentage:** the return percentage is a simple division over net deposits, not time-weighted like the one in the Trading 212 app.
 - **News:** company news only covers US stocks, because of the Finnhub free plan.
 - **Moving today:** the daily change also comes from the Finnhub free plan, so it only covers US stocks and is refreshed every 15 minutes. It does not include pre-market or after-hours trading: outside the New York session (15:30 to 22:00 in Spain) it shows the last session, and the title says which day. The change is in the stock's own currency, so it can differ from a change in euros, which also includes the exchange rate.
+- **Metals:** gold and silver come through the GLD and SLV funds, also from the Finnhub free plan, with the same hours as Moving today. Only their daily change is shown, because a fund share holds a fraction of an ounce, so its price is not the price of the metal. Their news are the market stories whose headline mentions gold, silver, bullion or precious metals.
 - **Single user:** one account per installation, with no login.
 
 ## Roadmap

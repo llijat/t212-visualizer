@@ -2,6 +2,7 @@ package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.HoldingMove;
+import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.model.Position;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,11 +21,13 @@ public class QuoteService {
     private static final Logger log = LoggerFactory.getLogger(QuoteService.class);
     private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private static final List<String> METAL_ETFS = List.of("GLD","SLV");
 
     private final FinnhubClient finnhubClient;
     private final PositionService positionService;
     private final CompanyProfileService companyProfileService;
     private volatile Map<String, FinnhubQuoteDto> quoteByTicker = Map.of();
+    private volatile Map<String, FinnhubQuoteDto> quoteByMetalEtf = Map.of();
 
 
     public QuoteService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService) {
@@ -62,6 +65,16 @@ public class QuoteService {
                 .map(time -> LocalDate.ofInstant(Instant.ofEpochSecond(time), SPAIN));
     }
 
+    public List<MetalMove> getMetals() {
+        List<MetalMove> metals = new ArrayList<>();
+        for (String etf : METAL_ETFS) {
+            FinnhubQuoteDto quote = quoteByMetalEtf.get(etf);
+            if (quote == null) continue;
+            metals.add(new MetalMove(etf, quote.changePercent()));
+        }
+        return metals;
+    }
+
     @Scheduled(fixedRate = 15*60*1000, initialDelay = 3*60*1000)
     public void refreshQuotes() {
         Map<String, FinnhubQuoteDto> quotes = new HashMap<>();
@@ -79,6 +92,21 @@ public class QuoteService {
         }
 
         quoteByTicker = quotes;
+        quoteByMetalEtf = fetchMetals();
         log.info("Refreshed {} quotes.", quotes.size());
+    }
+
+    private Map<String, FinnhubQuoteDto> fetchMetals() {
+        Map<String, FinnhubQuoteDto> quotes = new HashMap<>();
+        for (String etf: METAL_ETFS) {
+            try {
+                FinnhubQuoteDto quote = finnhubClient.fetchQuote(etf);
+                if (quote != null && quote.isKnown()) quotes.put(etf, quote);
+            }
+            catch (Exception e) {
+                log.warn("Could not load the quote of {}: {}", etf, e.getMessage());
+            }
+        }
+        return quotes;
     }
 }
