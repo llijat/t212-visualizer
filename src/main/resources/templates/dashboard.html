@@ -125,12 +125,12 @@
         .story-row:hover .story-headline { color: var(--accent); }
 
         /* ===== Account summary: no cards, the same voice as the expenses page =====
-           Three parts side by side, bottoms aligned: the value and a sentence that reads it, the dividends of the year,
-           and one bar of what the account is made of. It sits on the page itself, apart from the cards below. */
+           Three parts side by side, bottoms aligned: the value and a sentence that reads it, then the same money as a sum
+           with a bar (next to it, because it reads the same thing), and the dividends of the year at the end. It sits on the page itself, apart from the cards below. */
         .summary {
             display: grid;
-            grid-template-columns: auto minmax(0, 13rem) minmax(0, 1fr);
-            grid-template-areas: "value dividends split";
+            grid-template-columns: auto minmax(0, 44rem) minmax(16rem, 1fr);   /* the chart never below 16rem */
+            grid-template-areas: "value split dividends";
             align-items: end;
             gap: 1.25rem 3.5rem;
             padding: 1.35rem 2rem 0.4rem;
@@ -152,13 +152,13 @@
         .summary b.is-down { color: var(--red); }
 
         /* Dividends: a bar per month, with its initial; each one opens that month in the calendar */
-        .summary-dividends { grid-area: dividends; }
+        .summary-dividends { grid-area: dividends; justify-self: end; width: 100%; max-width: 34rem; }
         .dividends-total { margin: 0 0 0.5rem; color: var(--muted); font-size: 0.82rem; }
         .dividends-total b { font-size: 1.15rem; margin-right: 0.35rem; }
-        .dividend-chart { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; max-width: 13rem; }
+        .dividend-chart { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; }
         .dividend-month { display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; border-radius: 3px; color: var(--faint); text-decoration: none; }
         .dividend-month:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-        .dividend-track { height: 2.6rem; display: flex; align-items: flex-end; }
+        .dividend-track { height: 3.4rem; display: flex; align-items: flex-end; }
         .dividend-fill { width: 100%; height: var(--height); min-height: 2px; border-radius: 2px 2px 1px 1px; background: var(--dividend); }
         .dividend-month.no-payment .dividend-fill { background: var(--raised); }
         .dividend-initial { text-align: center; font: 0.68rem var(--figures); }
@@ -167,29 +167,38 @@
         .dividend-month.no-payment:hover .dividend-fill { background: var(--faint); }
         .dividend-month:hover .dividend-initial { color: var(--text); }
 
-        /* What the account is made of: invested and cash, against a mark where what you put in reaches.
-           Above it, the gain is a green line from that mark to the end; below it, the loss is a red stretch up to the mark. */
-        .split { grid-area: split; padding-bottom: 0.15rem; }
-        .split-edge { margin: 0 calc(100% - var(--at)) 0.55rem 0; text-align: right; white-space: nowrap; color: var(--muted); font-size: 0.82rem; }
-        .split-edge.from-left { margin: 0 0 0.55rem var(--at); text-align: left; }
-        .split-track { position: relative; }
+        /* Where the money is, read as a sum: what you put in, plus what you earned (or minus what you lost), is what
+           the account is worth now. Under it, one short bar of what "now" is made of: invested and cash. */
+        .split { grid-area: split; width: 100%; max-width: 44rem; justify-self: start; padding-bottom: 0.15rem; }
+        .ledger { display: flex; align-items: last baseline; justify-content: space-between; gap: 0.75rem; margin: 0; }
+        .ledger-item { display: flex; flex-direction: column; gap: 0.1rem; margin: 0; white-space: nowrap; }   /* margin: they are paragraphs */
+        .ledger-item .summary-label { margin: 0; font-size: 0.78rem; }
+        .ledger-item b { font-size: 1.3rem; }
+        .ledger-now { text-align: right; }
+        .ledger-op { color: var(--muted); font: 300 1.3rem var(--figures); }
+        .split-track { position: relative; margin-top: 0.7rem; }
         .split-bar { display: flex; height: 10px; border-radius: 3px; overflow: hidden; }
+        .split-lost { background: color-mix(in srgb, var(--red) 70%, var(--raised)); }
+        /* The gain is part of "now", so it goes under the bar instead of inside it: inside, it would hide part of the cash */
+        .split-gain { position: absolute; left: var(--at); right: 0; bottom: -7px; height: 4px; border-radius: 2px; background: var(--green); }
         .split-bar span { min-width: 2px; }
         .split-bar span + span { box-shadow: inset 2px 0 0 var(--bg); }   /* a thin gap between the parts, without moving them */
-        .split-invested { background: color-mix(in srgb, var(--muted) 55%, var(--raised)); }
-        .split-cash { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 55%, var(--raised)) 0 2px, var(--raised) 2px 5px); }
-        .split-lost { background: color-mix(in srgb, var(--red) 55%, var(--raised)); }
-        .split-tick { position: absolute; top: -6px; bottom: -6px; left: var(--at); width: 2px; margin-left: -1px; border-radius: 1px; background: var(--text); }
-        .split-gain { position: absolute; left: var(--at); right: 0; bottom: -6px; height: 3px; border-radius: 2px; background: var(--green); }
-        .split-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.3rem 1.25rem; margin-top: 0.75rem; color: var(--muted); font-size: 0.82rem; }
+        .split-invested { background: color-mix(in srgb, var(--muted) 70%, var(--raised)); }
+        .split-cash { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 70%, var(--raised)) 0 2px, var(--raised) 2px 5px); }
+        .split-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.3rem 1rem; margin-top: 0.75rem; color: var(--muted); font-size: 0.82rem; }
         .split-key { display: inline-flex; align-items: baseline; gap: 0.4rem; }
         .split-key i { align-self: center; width: 0.7rem; height: 0.7rem; border-radius: 2px; }
-        .split-end { margin-left: auto; text-align: right; }
+        .split-key + .split-key { margin-left: auto; }
 
-        @media (max-width: 1250px) {
-            .summary { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "value dividends" "split split"; }
-            .summary.no-dividends { grid-template-areas: "value value" "split split"; }
-            .summary-dividends { justify-self: end; }
+        /* Less room: the three stay in one row, with a narrower chart */
+        @media (max-width: 1300px) {
+            .summary { column-gap: 2.5rem; }
+            .summary-dividends { max-width: 16rem; }
+        }
+        /* Not enough room for three: the money (value and the sum) stays together on top, the dividends go under */
+        @media (max-width: 1100px) {
+            .summary { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "value split" "dividends dividends"; }
+            .summary-dividends { justify-self: start; }
         }
 
         /* Coloured pills for gains and losses: colour + sign, so they do not depend on colour alone */
@@ -235,8 +244,9 @@
 
         /* ===== Narrow screens (phone, small window): a single column ===== */
         @media (max-width: 900px) {
-            .summary, .summary.no-dividends { grid-template-columns: minmax(0, 1fr); grid-template-areas: "value" "dividends" "split"; padding: 1rem 1rem 0; gap: 1.25rem; }
+            .summary, .summary.no-dividends { grid-template-columns: minmax(0, 1fr); grid-template-areas: "value" "split" "dividends"; padding: 1rem 1rem 0; gap: 1.25rem; }
             .summary-dividends { justify-self: start; }
+            .split { max-width: none; justify-self: stretch; }
             .layout { padding: 1rem; gap: 1rem; }
             .layout { grid-template-columns: minmax(0, 1fr); }   /* minmax: a wide table scrolls inside its card */
             .card { max-height: 70vh; }
@@ -329,42 +339,45 @@
             </div>
         </div>
 
-        <!-- What the account is made of: invested and cash, measured against what you put in.
-             whole: the longer of the two (the value when it is above what you put in, what you put in when it is below);
-             at: where the mark goes (what you put in, above zero; what the account is worth now, below zero). -->
-        <div class="split" th:if="${hasDeposits}"
-             th:with="whole=${gained ? value : netDeposits},
-                      at=${(gained ? netDeposits : value) * 100 / whole}"
-             th:style="'--at:' + ${at} + '%'">
-            <p class="split-edge" th:classappend="${at < 35} ? 'from-left'">
-                <th:block th:if="${gained}"><b th:text="${#numbers.formatDecimal(netDeposits, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">11,239.65 €</b> put in</th:block>
-                <th:block th:unless="${gained}"><b th:text="${#numbers.formatDecimal(value, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">9,030.86 €</b> now</th:block>
-            </p>
+        <!-- Where the money is, as a sum: put in, plus earned or minus lost, equals now.
+             Then what "now" is made of: invested and cash, in one short bar with each figure under its part. -->
+        <div class="split" th:if="${hasDeposits}" th:with="invested=${value - cash}">
+            <div class="ledger">
+                <p class="ledger-item">
+                    <span class="summary-label">Put in</span>
+                    <b th:text="${#numbers.formatDecimal(netDeposits, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">10,112.00 €</b>
+                </p>
+                <span class="ledger-op" aria-hidden="true" th:text="${gained} ? '+' : '−'">−</span>
+                <p class="ledger-item"
+                   th:title="${'Of which ' + (inv.unrealizedProfitLoss() >= 0 ? '+' : '−') + #numbers.formatDecimal(inv.unrealizedProfitLoss().abs(), 1, 'COMMA', 2, 'POINT') + ' in open positions and '
+                              + (inv.realizedProfitLoss() >= 0 ? '+' : '−') + #numbers.formatDecimal(inv.realizedProfitLoss().abs(), 1, 'COMMA', 2, 'POINT') + ' in closed ones'}">
+                    <span class="summary-label" th:text="${gained} ? 'Earned' : 'Lost'">Lost</span>
+                    <b th:class="${gained} ? 'is-up' : 'is-down'"
+                       th:text="${#numbers.formatDecimal(totalReturn.abs(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">1,081.14 €</b>
+                </p>
+                <span class="ledger-op" aria-hidden="true">=</span>
+                <p class="ledger-item ledger-now">
+                    <span class="summary-label">Now</span>
+                    <b th:text="${#numbers.formatDecimal(value, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">9,030.86 €</b>
+                </p>
+            </div>
+            <!-- The bar measures the longer of the two: what you put in when you lost (the red part is the loss, in proportion),
+                 what it is worth now when you earned (the green line under it is the gain, from where what you put in reaches) -->
             <div class="split-track" role="img"
-                 th:attr="aria-label=${#numbers.formatDecimal(value - cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' invested and '
-                          + ${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' in cash, against '
-                          + ${#numbers.formatDecimal(netDeposits, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' put in'">
+                 th:style="${gained} ? '--at:' + ${netDeposits * 100 / value} + '%'"
+                 th:attr="aria-label=${#numbers.formatDecimal(invested, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' invested and '
+                          + ${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' in cash'
+                          + (${gained} ? '' : ', next to the part that was lost')">
                 <div class="split-bar">
-                    <span class="split-invested" th:style="'flex:' + ${value - cash}"></span>
+                    <span class="split-invested" th:style="'flex:' + ${invested}"></span>
                     <span class="split-cash" th:if="${cash.signum() > 0}" th:style="'flex:' + ${cash}"></span>
                     <span class="split-lost" th:unless="${gained}" th:style="'flex:' + ${totalReturn.abs()}"></span>
                 </div>
-                <span class="split-tick"></span>
                 <span class="split-gain" th:if="${gained}"></span>
             </div>
             <div class="split-foot">
-                <span class="split-key"><i class="split-cash"></i><span><b th:text="${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">312.40 €</b> in cash<th:block th:if="${value > 0}" th:text="', ' + ${#numbers.formatDecimal(cash * 100 / value, 1, 0, 'POINT')} + ' % of the account'">, 3 % of the account</th:block></span></span>
-                <span class="split-end" th:title="${'Of which ' + (inv.unrealizedProfitLoss() >= 0 ? '+' : '−') + #numbers.formatDecimal(inv.unrealizedProfitLoss().abs(), 1, 'COMMA', 2, 'POINT') + ' in open positions and '
-                                                   + (inv.realizedProfitLoss() >= 0 ? '+' : '−') + #numbers.formatDecimal(inv.realizedProfitLoss().abs(), 1, 'COMMA', 2, 'POINT') + ' in closed ones'}">
-                    <th:block th:if="${gained}">
-                        <b th:text="${#numbers.formatDecimal(value, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">12,480.20 €</b> now,
-                        <b class="is-up" th:text="'+' + ${#numbers.formatDecimal(totalReturn, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">+1,240.55 €</b> earned
-                    </th:block>
-                    <th:block th:unless="${gained}">
-                        <b th:text="${#numbers.formatDecimal(netDeposits, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">10,112.00 €</b> put in,
-                        <b class="is-down" th:text="'−' + ${#numbers.formatDecimal(totalReturn.abs(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">−1,081.14 €</b> lost
-                    </th:block>
-                </span>
+                <span class="split-key"><i class="split-invested"></i><span><b th:text="${#numbers.formatDecimal(invested, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">8,718.46 €</b> invested</span></span>
+                <span class="split-key"><i class="split-cash"></i><span><b th:text="${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">312.40 €</b> cash<th:block th:if="${value > 0}" th:text="', ' + ${#numbers.formatDecimal(cash * 100 / value, 1, 0, 'POINT')} + ' %'">, 3 %</th:block></span></span>
             </div>
         </div>
     </section>

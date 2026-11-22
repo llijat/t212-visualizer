@@ -86,8 +86,9 @@
    Browsers that cannot (Firefox today) keep their own menu, which works the same. */
 @supports (appearance: base-select) {
     select, ::picker(select) { appearance: base-select; }
-    select { cursor: pointer; }
-    select::picker-icon { color: var(--muted); transition: rotate 0.15s; }
+    /* align-items: the drawn menu is a flex box that stretches its parts, which left the text and the arrow at the top */
+    select { cursor: pointer; align-items: center; gap: 0.35em; }
+    select::picker-icon { color: var(--muted); line-height: 1; transition: rotate 0.15s; }
     select:open::picker-icon { rotate: 180deg; }
     ::picker(select) {
         margin-block: 4px;

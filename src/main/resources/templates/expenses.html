@@ -378,7 +378,7 @@
         .pay-reset:hover { color: var(--text); }
 
         /* Budgets: measured against the limit (--p, in %), with a button to remove */
-        .budget { position: relative; padding: 0.55rem 2rem 0.55rem 0; }
+        .budget { position: relative; padding: 0.55rem 3.8rem 0.55rem 0; }
         .budget-line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font-size: 0.92rem; }
         .budget-line .figures { color: var(--muted); font-size: 0.9rem; }
         .budget-line .figures b { color: var(--text); font-weight: 500; }
@@ -390,6 +390,13 @@
         .budget-delete { position: absolute; top: 0.45rem; right: 0; margin: 0; }
         .budget-delete button { width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: 6px; background: none; color: var(--faint); }
         .budget-delete button:hover, .budget-delete button:focus-visible { background: var(--raised); color: var(--red); }
+        /* Changing the limit: a pencil next to the cross; the form opens under the budget */
+        .budget-edit summary { position: absolute; top: 0.45rem; right: 1.8rem; width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: 6px; color: var(--faint); cursor: pointer; list-style: none; }
+        .budget-edit summary::-webkit-details-marker { display: none; }
+        .budget-edit summary:hover, .budget-edit summary:focus-visible, .budget-edit[open] summary { background: var(--raised); color: var(--text); }
+        .budget-edit .budget-form { margin: 0.55rem -3.8rem 0 0; }   /* the whole width, under the two buttons too */
+        .budget-edit .budget-cancel { background: none; color: var(--muted); padding: 0 0.6rem; font-weight: 500; }
+        .budget-edit .budget-cancel:hover { color: var(--text); }
         .add { margin-top: 0.75rem; }
         .add summary { padding: 0.3rem 0; color: var(--accent); font-size: 0.88rem; cursor: pointer; list-style: none; width: fit-content; }   /* padding: at least 24 px tall to tap */
         .add summary::-webkit-details-marker { display: none; }
@@ -484,6 +491,7 @@
         <symbol id="cat-GOVERNMENT_SERVICES" viewBox="0 0 24 24"><path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M3 10l9-6 9 6"/></symbol>
         <symbol id="cat-OTHER" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
         <symbol id="icon-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+        <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></symbol>
     </svg>
 
     <!-- The form has no visible parts: the button, the card and dragging a file all fill it in -->
@@ -797,6 +805,21 @@
                                 <svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg>
                             </button>
                         </form>
+                        <!-- Changing the limit: the same form as "Add a budget", with this category fixed.
+                             Saving a category that already has a budget changes its limit, so nothing new is needed on the server -->
+                        <details class="budget-edit">
+                            <summary th:aria-label="'Change the limit for ' + ${name}" th:title="'Change the limit for ' + ${name}">
+                                <svg class="icon" aria-hidden="true"><use href="#icon-edit"/></svg>
+                            </summary>
+                            <form class="budget-form" method="post" th:action="@{/expenses/budgets}">
+                                <input type="hidden" name="category" th:value="${b.category()}">
+                                <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                                <input type="number" name="monthlyLimit" min="0.01" step="0.01" required th:value="${b.limit()}"
+                                       th:aria-label="'New monthly limit for ' + ${name} + ', in euros'">
+                                <button type="submit">Save</button>
+                                <button type="button" class="budget-cancel">Cancel</button>
+                            </form>
+                        </details>
                     </div>
 
                     <!-- Saving a category that already has a budget changes its limit -->
@@ -1048,6 +1071,20 @@
             document.body.classList.remove('is-dragging');
             fileInput.files = event.dataTransfer.files;
             sendFile();
+        });
+
+        // ===== Changing a budget's limit: one open at a time, the figure ready to type over, Esc or Cancel to close =====
+        document.querySelectorAll('.budget-edit').forEach(edit => {
+            const input = edit.querySelector('input[name="monthlyLimit"]');
+            const close = () => { edit.open = false; input.value = input.defaultValue; edit.querySelector('summary').focus(); };
+            edit.addEventListener('toggle', () => {
+                if (!edit.open) return;
+                document.querySelectorAll('.budget-edit[open]').forEach(other => { if (other !== edit) other.open = false; });
+                input.focus();
+                input.select();
+            });
+            edit.querySelector('.budget-cancel').addEventListener('click', close);
+            edit.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
         });
     </script>
 </body>
