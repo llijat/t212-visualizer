@@ -6,6 +6,9 @@ server:
     session:
       tracking-modes: cookie
 
+app:
+  zone: Europe/Madrid
+
 spring:
   profiles:
     active: local

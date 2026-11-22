@@ -1,5 +1,8 @@
 package com.llijat.t212visualizer.service;
 
+import java.time.Clock;
+import java.time.Instant;
+
 import com.llijat.t212visualizer.dto.CalendarDay;
 import com.llijat.t212visualizer.dto.CalendarDividend;
 import com.llijat.t212visualizer.dto.CalendarMonth;
@@ -37,6 +40,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class CalendarServiceTest {
 
+    // "Now" for the code under test: fixed, so a test run at midnight does not see two different days
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-15T11:00:00Z"), ZoneId.of("Europe/Madrid"));
+
     @Mock
     private EarningsEventRepository repository;
 
@@ -54,7 +60,7 @@ class CalendarServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CalendarService(repository, positionService, companyProfileService, dividendRepository);
+        service = new CalendarService(repository, positionService, companyProfileService, dividendRepository, CLOCK);
     }
 
     private static Position position(String ticker) {
@@ -123,7 +129,7 @@ class CalendarServiceTest {
 
     @Test
     void today_isMarkedOnce_inSpanishTime() {
-        LocalDate today = LocalDate.now(ZoneId.of("Europe/Madrid"));
+        LocalDate today = LocalDate.now(CLOCK);
 
         List<CalendarDay> days = service.getMonth(YearMonth.from(today)).days();
 
@@ -181,7 +187,7 @@ class CalendarServiceTest {
 
     // ===== Coming up: the next two weeks, for the news page =====
 
-    private static final LocalDate TODAY = LocalDate.now(ZoneId.of("Europe/Madrid"));
+    private static final LocalDate TODAY = LocalDate.now(CLOCK);
 
     @Test
     void comingUp_asksForTodayAndTheNext13Days_inDateOrder() {
@@ -365,7 +371,7 @@ class CalendarServiceTest {
     // ===== Coming up: dividends of the next two weeks =====
 
     private void comingUpHolds(DividendEvent... dividends) {
-        LocalDate today = LocalDate.now(ZoneId.of("Europe/Madrid"));
+        LocalDate today = LocalDate.now(CLOCK);
         when(dividendRepository.findByPaymentDateBetweenOrderByPaymentDateAsc(today, today.plusDays(13))).thenReturn(List.of(dividends));
     }
 
@@ -378,7 +384,7 @@ class CalendarServiceTest {
 
     @Test
     void comingUpDividends_carryTheCurrentSymbol_andTheEstimate() {
-        LocalDate soon = LocalDate.now(ZoneId.of("Europe/Madrid")).plusDays(4);
+        LocalDate soon = LocalDate.now(CLOCK).plusDays(4);
         when(positionService.getAllPositions()).thenReturn(List.of(holding("FB_US_EQ", "10")));
         when(companyProfileService.currentSymbols()).thenReturn(Map.of("FB_US_EQ", "META"));
         comingUpHolds(announced("FB_US_EQ", soon, "0.525"));
@@ -396,7 +402,7 @@ class CalendarServiceTest {
 
     @Test
     void comingUpDividends_leaveOutStocksYouNoLongerHold_becauseThoseWillNotPayYou() {
-        LocalDate soon = LocalDate.now(ZoneId.of("Europe/Madrid")).plusDays(4);
+        LocalDate soon = LocalDate.now(CLOCK).plusDays(4);
         when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "8.5")));
         comingUpHolds(announced("ORCL_US_EQ", soon, "0.50"), announced("MU_US_EQ", soon.plusDays(1), "0.115"));
 
@@ -405,7 +411,7 @@ class CalendarServiceTest {
 
     @Test
     void comingUpDividends_keepTheOrderOfTheQuery() {
-        LocalDate today = LocalDate.now(ZoneId.of("Europe/Madrid"));
+        LocalDate today = LocalDate.now(CLOCK);
         when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "1"), holding("ORCL_US_EQ", "1")));
         comingUpHolds(announced("ORCL_US_EQ", today.plusDays(2), "0.50"), announced("MU_US_EQ", today.plusDays(9), "0.115"));
 

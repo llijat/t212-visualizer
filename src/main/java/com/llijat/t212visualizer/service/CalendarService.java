@@ -10,17 +10,17 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class CalendarService {
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final Clock clock;
     private static final int COMING_UP_DAYS = 14;
 
     private final EarningsEventRepository earningsEventRepository;
@@ -28,11 +28,12 @@ public class CalendarService {
     private final CompanyProfileService companyProfileService;
     private final DividendEventRepository dividendEventRepository;
 
-    public CalendarService(EarningsEventRepository earningsEventRepository, PositionService positionService, CompanyProfileService companyProfileService, DividendEventRepository dividendEventRepository) {
+    public CalendarService(EarningsEventRepository earningsEventRepository, PositionService positionService, CompanyProfileService companyProfileService, DividendEventRepository dividendEventRepository, Clock clock) {
         this.earningsEventRepository = earningsEventRepository;
         this.positionService = positionService;
         this.companyProfileService = companyProfileService;
         this.dividendEventRepository = dividendEventRepository;
+        this.clock = clock;
     }
 
     public CalendarMonth getMonth(YearMonth month) {
@@ -40,7 +41,7 @@ public class CalendarService {
         LocalDate lastDay = month.atEndOfMonth();
         LocalDate gridStart = firstDay.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate gridEnd = lastDay.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
-        LocalDate today = LocalDate.now(SPAIN);
+        LocalDate today = LocalDate.now(clock);
 
         List<CalendarDay> dayList = new ArrayList<>();
         List<EarningsEvent> events = earningsEventRepository.findByReportDateBetween(gridStart, gridEnd);
@@ -72,7 +73,7 @@ public class CalendarService {
     }
 
     public List<UpcomingEarnings> getComingUp() {
-        LocalDate today = LocalDate.now(SPAIN);
+        LocalDate today = LocalDate.now(clock);
         Map<String, String> symbols = companyProfileService.currentSymbols();
 
         Map<String, String> symbolByTicker = new HashMap<>();
@@ -87,7 +88,7 @@ public class CalendarService {
     }
 
     public List<UpcomingDividend> getComingUpDividends() {
-        LocalDate today = LocalDate.now(SPAIN);
+        LocalDate today = LocalDate.now(clock);
         Map<String, String> symbols = companyProfileService.currentSymbols();
         Map<String, DividendEvent> lastReceived = lastReceivedByTicker();
 

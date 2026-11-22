@@ -1,5 +1,7 @@
 package com.llijat.t212visualizer.model;
 
+import java.time.ZoneId;
+
 import com.llijat.t212visualizer.dto.FinnhubNewsDto;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +33,7 @@ class NewsItemTest {
         FinnhubNewsDto back = new NewsItem(FROM_FINNHUB, NewsFeed.PORTFOLIO).toDto();
 
         assertEquals(FROM_FINNHUB.datetime(), back.datetime());
-        assertEquals(LocalDateTime.of(2026, 11, 17, 0, 20), back.publishedAt());
+        assertEquals(LocalDateTime.of(2026, 11, 17, 0, 20), back.publishedAt(ZoneId.of("Europe/Madrid")));
     }
 
     @Test

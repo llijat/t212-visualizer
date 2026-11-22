@@ -4,17 +4,18 @@ import com.llijat.t212visualizer.dto.FinnhubNewsDto;
 import com.llijat.t212visualizer.dto.NewsDay;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 
 public class NewsGrouper {
     private NewsGrouper() {}
 
-    public static List<NewsDay> byDay(List<FinnhubNewsDto> news) {
+    public static List<NewsDay> byDay(List<FinnhubNewsDto> news, ZoneId zone) {
         List<FinnhubNewsDto> sorted = news.stream().sorted(Comparator.comparingLong(FinnhubNewsDto::datetime).reversed()).toList();
         Map<LocalDate, List<FinnhubNewsDto>> newsByDay = new LinkedHashMap<>();
 
         for (FinnhubNewsDto f : sorted) {
-            newsByDay.computeIfAbsent(f.publishedAt().toLocalDate(), day -> new ArrayList<>()).add(f);
+            newsByDay.computeIfAbsent(f.publishedAt(zone).toLocalDate(), day -> new ArrayList<>()).add(f);
         }
 
         List<NewsDay> list = new ArrayList<>();

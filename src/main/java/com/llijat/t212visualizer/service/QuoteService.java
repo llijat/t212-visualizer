@@ -11,16 +11,16 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.*;
 
 @Service
 public class QuoteService {
     private static final Logger log = LoggerFactory.getLogger(QuoteService.class);
     private static final BigDecimal HUNDRED = new BigDecimal("100");
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final Clock clock;
     private static final List<String> METAL_ETFS = List.of("GLD","SLV");
 
     private final FinnhubClient finnhubClient;
@@ -30,10 +30,11 @@ public class QuoteService {
     private volatile Map<String, FinnhubQuoteDto> quoteByMetalEtf = Map.of();
 
 
-    public QuoteService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService) {
+    public QuoteService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService, Clock clock) {
         this.finnhubClient = finnhubClient;
         this.positionService = positionService;
         this.companyProfileService = companyProfileService;
+        this.clock = clock;
     }
 
     public List<HoldingMove> getMoves() {
@@ -62,7 +63,7 @@ public class QuoteService {
         return quoteByTicker.values().stream()
                 .map(FinnhubQuoteDto::time)
                 .max(Comparator.naturalOrder())
-                .map(time -> LocalDate.ofInstant(Instant.ofEpochSecond(time), SPAIN));
+                .map(time -> LocalDate.ofInstant(Instant.ofEpochSecond(time), clock.getZone()));
     }
 
     public List<MetalMove> getMetals() {

@@ -11,6 +11,7 @@ import com.llijat.t212visualizer.dto.FinnhubNewsDto;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -29,12 +30,14 @@ public class NewsService {
     private final PositionService positionService;
     private final CompanyProfileService companyProfileService;
     private final NewsItemRepository newsItemRepository;
+    private final Clock clock;
 
-    public NewsService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService, NewsItemRepository newsItemRepository) {
+    public NewsService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService, NewsItemRepository newsItemRepository, Clock clock) {
         this.finnhubClient = finnhubClient;
         this.positionService = positionService;
         this.companyProfileService = companyProfileService;
         this.newsItemRepository = newsItemRepository;
+        this.clock = clock;
     }
 
     public List<FinnhubNewsDto> getPortfolioNews() {
@@ -42,18 +45,18 @@ public class NewsService {
     }
 
     public List<NewsDay> getPortfolioNewsByDay() {
-        return NewsGrouper.byDay(shownPortfolioNews());
+        return NewsGrouper.byDay(shownPortfolioNews(), clock.getZone());
     }
 
     public List<NewsDay> getMarketNewsByDay() {
-        return NewsGrouper.byDay(lastWeek(NewsFeed.MARKET));
+        return NewsGrouper.byDay(lastWeek(NewsFeed.MARKET), clock.getZone());
     }
 
     public List<NewsDay> getMetalNewsByDay() {
         List<FinnhubNewsDto> metalNews = lastWeek(NewsFeed.MARKET).stream()
                 .filter(news -> METALS.matcher(news.headline()).find())
                 .toList();
-        return NewsGrouper.byDay(metalNews);
+        return NewsGrouper.byDay(metalNews, clock.getZone());
     }
 
     public Map<String, Long> getNewsCountBySymbol() {
@@ -90,7 +93,7 @@ public class NewsService {
         Map<String, Integer> shownByHoldingAndDay = new HashMap<>();
         List<FinnhubNewsDto> shown = new ArrayList<>();
         for (FinnhubNewsDto news : getPortfolioNews()) {
-            String key = news.related() + " " + news.publishedAt().toLocalDate();
+            String key = news.related() + " " + news.publishedAt(clock.getZone()).toLocalDate();
             int count = shownByHoldingAndDay.merge(key, 1, Integer::sum);
             if (count <= PER_HOLDING_PER_DAY) shown.add(news);
         }
@@ -104,7 +107,7 @@ public class NewsService {
     }
 
     public List<NewsDay> getStarredNewsByDay() {
-        return NewsGrouper.byDay(starred());
+        return NewsGrouper.byDay(starred(), clock.getZone());
     }
 
     public Set<Long> getStarredIds() {
@@ -139,7 +142,7 @@ public class NewsService {
 
     @Scheduled(fixedRate = 15*60*1000, initialDelay = 15*1000)
     public void refreshPortfolioNews() {
-        LocalDate to = LocalDate.now();
+        LocalDate to = LocalDate.now(clock);
         LocalDate from = to.minusDays(7);
 
         List<FinnhubNewsDto> collected = new ArrayList<>();

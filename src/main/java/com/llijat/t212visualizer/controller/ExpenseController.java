@@ -15,9 +15,9 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 
 @Controller
@@ -26,21 +26,22 @@ public class ExpenseController {
     private final CardExpenseSummaryService cardExpenseSummaryService;
     private final BudgetService budgetService;
     private final MerchantCategoryService merchantCategoryService;
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final Clock clock;
     private final CustomCategoryService customCategoryService;
 
 
-    public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService, BudgetService budgetService, MerchantCategoryService merchantCategoryService, CustomCategoryService customCategoryService) {
+    public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService, BudgetService budgetService, MerchantCategoryService merchantCategoryService, CustomCategoryService customCategoryService, Clock clock) {
         this.cardExpenseImportService = cardExpenseImportService;
         this.cardExpenseSummaryService = cardExpenseSummaryService;
         this.budgetService = budgetService;
         this.merchantCategoryService = merchantCategoryService;
         this.customCategoryService = customCategoryService;
+        this.clock = clock;
     }
 
     @GetMapping("/expenses")
     public String expenses(@RequestParam(required = false) YearMonth month, Model model) {
-        LocalDate today = LocalDate.now(SPAIN);
+        LocalDate today = LocalDate.now(clock);
         if (month == null) {
             month = YearMonth.from(today);
         }

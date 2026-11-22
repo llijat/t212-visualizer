@@ -1,5 +1,9 @@
 package com.llijat.t212visualizer.controller;
 
+import java.time.Clock;
+import java.time.ZoneId;
+import java.time.Instant;
+
 import com.llijat.t212visualizer.dto.DailyChange;
 import com.llijat.t212visualizer.dto.DividendHistory;
 import com.llijat.t212visualizer.dto.HoldingMove;
@@ -36,6 +40,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class DashboardControllerTest {
 
+    // "Now" for the code under test: fixed, so a test run at midnight does not see two different days
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-15T11:00:00Z"), ZoneId.of("Europe/Madrid"));
+
     @Mock private PositionService positionService;
     @Mock private NewsService newsService;
     @Mock private AccountService accountService;
@@ -52,7 +59,7 @@ class DashboardControllerTest {
     void setUp() {
         // The same trick as in NewsControllerTest: the view name becomes a file name, so "/" is not looked up again
         DashboardController controller = new DashboardController(positionService, newsService, accountService,
-                transactionService, companyProfileService, quoteService, calendarService, dividendHistoryService, accountSnapshotService);
+                transactionService, companyProfileService, quoteService, calendarService, dividendHistoryService, accountSnapshotService, CLOCK);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setViewResolvers(new InternalResourceViewResolver("/templates/", ".html"))
                 .build();

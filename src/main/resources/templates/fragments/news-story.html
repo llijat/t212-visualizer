@@ -25,7 +25,7 @@
     th:with="isStarred=${starredIds.contains(n.id())}"
     th:data-symbol="${n.related()}"
     th:data-search="${#strings.toLowerCase(n.headline() + ' ' + n.summary() + ' ' + n.source() + ' ' + n.related())}">
-    <time class="story-time" th:datetime="${n.publishedAt()}" th:text="${#temporals.format(n.publishedAt(), 'HH:mm')}">14:05</time>
+    <time class="story-time" th:datetime="${n.publishedAt(zone)}" th:text="${#temporals.format(n.publishedAt(zone), 'HH:mm')}">14:05</time>
     <div>
         <!-- Opens the publisher's page in a new tab; it gets no hint of where the click came from -->
         <a class="story-headline" th:href="${n.url()}" th:text="${n.headline()}" target="_blank" rel="noopener noreferrer">Headline</a>

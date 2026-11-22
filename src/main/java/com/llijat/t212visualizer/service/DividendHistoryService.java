@@ -8,23 +8,24 @@ import com.llijat.t212visualizer.repository.DividendEventRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.util.*;
 
 @Service
 public class DividendHistoryService {
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final Clock clock;
     private static final int MONTHS = 12;
 
     private final DividendEventRepository dividendEventRepository;
 
-    public DividendHistoryService(DividendEventRepository dividendEventRepository) {
+    public DividendHistoryService(DividendEventRepository dividendEventRepository, Clock clock) {
         this.dividendEventRepository = dividendEventRepository;
+        this.clock = clock;
     }
 
     public DividendHistory getLast12Months() {
-        YearMonth current = YearMonth.now(SPAIN);
+        YearMonth current = YearMonth.now(clock);
         YearMonth first = current.minusMonths(MONTHS - 1);
 
         Map<YearMonth, Map<String, BigDecimal>> receivedByMonthAndTicker = new HashMap<>();

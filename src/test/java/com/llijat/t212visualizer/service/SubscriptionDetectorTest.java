@@ -1,5 +1,7 @@
 package com.llijat.t212visualizer.service;
 
+import java.time.ZoneId;
+
 import com.llijat.t212visualizer.dto.Subscription;
 import com.llijat.t212visualizer.model.CardExpense;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * their amounts at most 10 % away from the last one; and the last one at most 40 days before today.
  */
 class SubscriptionDetectorTest {
+
+    private static final ZoneId MADRID = ZoneId.of("Europe/Madrid");
 
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 15);
 
@@ -47,7 +51,7 @@ class SubscriptionDetectorTest {
                 payment("Music Streaming", "10.99", "2026-10-03"),
                 payment("Music Streaming", "10.99", "2026-11-03"));
 
-        Subscription subscription = only(SubscriptionDetector.detect(expenses, TODAY));
+        Subscription subscription = only(SubscriptionDetector.detect(expenses, TODAY, MADRID));
 
         assertEquals("Music Streaming", subscription.merchant());
         assertEquals(new BigDecimal("10.99"), subscription.amount());
@@ -63,7 +67,7 @@ class SubscriptionDetectorTest {
                 payment("Cloud Storage", "2.99", "2026-10-08"),
                 payment("Cloud Storage", "2.99", "2026-11-08"));
 
-        assertEquals(1, SubscriptionDetector.detect(expenses, TODAY).size());
+        assertEquals(1, SubscriptionDetector.detect(expenses, TODAY, MADRID).size());
     }
 
     @Test
@@ -74,7 +78,7 @@ class SubscriptionDetectorTest {
                 payment("Cloud Storage", "2.99", "2026-09-08"),
                 payment("Cloud Storage", "2.99", "2026-10-08"));
 
-        assertEquals(LocalDate.of(2026, 11, 8), only(SubscriptionDetector.detect(expenses, TODAY)).lastPayment());
+        assertEquals(LocalDate.of(2026, 11, 8), only(SubscriptionDetector.detect(expenses, TODAY, MADRID)).lastPayment());
     }
 
     @Test
@@ -85,7 +89,7 @@ class SubscriptionDetectorTest {
                 payment("Gym", "29.90", "2026-09-30"),
                 payment("Gym", "29.90", "2026-10-31"));
 
-        assertEquals(LocalDate.of(2026, 11, 30), only(SubscriptionDetector.detect(expenses, TODAY)).nextPayment());
+        assertEquals(LocalDate.of(2026, 11, 30), only(SubscriptionDetector.detect(expenses, TODAY, MADRID)).nextPayment());
     }
 
     // ===== What is not =====
@@ -97,7 +101,7 @@ class SubscriptionDetectorTest {
                 payment("Barber", "15.00", "2026-10-02"),
                 payment("Barber", "15.00", "2026-11-01"));
 
-        assertTrue(SubscriptionDetector.detect(expenses, TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(expenses, TODAY, MADRID).isEmpty());
     }
 
     @Test
@@ -108,7 +112,7 @@ class SubscriptionDetectorTest {
                 payment("Supermarket", "40.00", "2026-11-01"),
                 payment("Supermarket", "40.00", "2026-11-08"));
 
-        assertTrue(SubscriptionDetector.detect(expenses, TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(expenses, TODAY, MADRID).isEmpty());
     }
 
     @Test
@@ -119,7 +123,7 @@ class SubscriptionDetectorTest {
                 payment("Gym", "29.90", "2026-06-30"),
                 payment("Gym", "29.90", "2026-07-31"));
 
-        assertTrue(SubscriptionDetector.detect(expenses, TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(expenses, TODAY, MADRID).isEmpty());
     }
 
     @Test
@@ -130,7 +134,7 @@ class SubscriptionDetectorTest {
                 payment("Online Shop", "15.00", "2026-10-05"),
                 payment("Online Shop", "15.00", "2026-11-05"));
 
-        assertTrue(SubscriptionDetector.detect(expenses, TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(expenses, TODAY, MADRID).isEmpty());
     }
 
     @Test
@@ -142,7 +146,7 @@ class SubscriptionDetectorTest {
                 payment("Big Online Store", "23.50", "2026-10-21"),
                 payment("Big Online Store", "4.99", "2026-11-10"));
 
-        assertTrue(SubscriptionDetector.detect(expenses, TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(expenses, TODAY, MADRID).isEmpty());
     }
 
     @Test
@@ -153,7 +157,7 @@ class SubscriptionDetectorTest {
                 payment("Shop B", "9.99", "2026-10-01"),
                 payment("Shop C", "9.99", "2026-11-01"));
 
-        assertTrue(SubscriptionDetector.detect(expenses, TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(expenses, TODAY, MADRID).isEmpty());
     }
 
     @Test
@@ -163,12 +167,12 @@ class SubscriptionDetectorTest {
                 payment(null, "5.00", "2026-10-01"),
                 payment(null, "5.00", "2026-11-01"));
 
-        assertTrue(SubscriptionDetector.detect(expenses, TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(expenses, TODAY, MADRID).isEmpty());
     }
 
     @Test
     void noPayments_noSubscriptions() {
-        assertTrue(SubscriptionDetector.detect(List.of(), TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(List.of(), TODAY, MADRID).isEmpty());
     }
 
     // ===== The limits of each rule =====
@@ -180,7 +184,7 @@ class SubscriptionDetectorTest {
                 payment("Video Streaming", "7.99", "2026-10-01"),    // 25 days later
                 payment("Video Streaming", "7.99", "2026-11-05"));   // 35 days later
 
-        assertEquals(1, SubscriptionDetector.detect(expenses, TODAY).size());
+        assertEquals(1, SubscriptionDetector.detect(expenses, TODAY, MADRID).size());
     }
 
     @Test
@@ -190,7 +194,7 @@ class SubscriptionDetectorTest {
                 payment("Video Streaming", "7.99", "2026-10-13"),
                 payment("Video Streaming", "7.99", "2026-11-06"));   // 24 days later
 
-        assertTrue(SubscriptionDetector.detect(expenses, TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(expenses, TODAY, MADRID).isEmpty());
     }
 
     @Test
@@ -200,7 +204,7 @@ class SubscriptionDetectorTest {
                 payment("Video Streaming", "7.99", "2026-10-05"),    // 36 days later
                 payment("Video Streaming", "7.99", "2026-11-04"));
 
-        assertTrue(SubscriptionDetector.detect(expenses, TODAY).isEmpty());
+        assertTrue(SubscriptionDetector.detect(expenses, TODAY, MADRID).isEmpty());
     }
 
     @Test
@@ -215,8 +219,8 @@ class SubscriptionDetectorTest {
                 payment("Newspaper", "6.00", "2026-09-05"),
                 payment("Newspaper", "6.00", "2026-10-05"));
 
-        assertEquals(1, SubscriptionDetector.detect(active, TODAY).size());
-        assertTrue(SubscriptionDetector.detect(stopped, TODAY).isEmpty());
+        assertEquals(1, SubscriptionDetector.detect(active, TODAY, MADRID).size());
+        assertTrue(SubscriptionDetector.detect(stopped, TODAY, MADRID).isEmpty());
     }
 
     @Test
@@ -227,7 +231,7 @@ class SubscriptionDetectorTest {
                 payment("Mobile Plan", "11.00", "2026-10-02"),
                 payment("Mobile Plan", "10.00", "2026-11-02"));
 
-        assertEquals(1, SubscriptionDetector.detect(expenses, TODAY).size());
+        assertEquals(1, SubscriptionDetector.detect(expenses, TODAY, MADRID).size());
     }
 
     // ===== Price changes =====
@@ -239,7 +243,7 @@ class SubscriptionDetectorTest {
                 payment("Video Streaming", "12.99", "2026-10-12"),
                 payment("Video Streaming", "13.99", "2026-11-12"));   // 7.7 % more
 
-        Subscription subscription = only(SubscriptionDetector.detect(expenses, TODAY));
+        Subscription subscription = only(SubscriptionDetector.detect(expenses, TODAY, MADRID));
 
         assertEquals(new BigDecimal("13.99"), subscription.amount());
         assertEquals(new BigDecimal("12.99"), subscription.previousAmount());
@@ -259,7 +263,7 @@ class SubscriptionDetectorTest {
                 payment("Language App", "8.99", "2026-10-04"),
                 payment("Language App", "8.99", "2026-11-04"));
 
-        assertEquals(LocalDate.of(2026, 11, 4), only(SubscriptionDetector.detect(expenses, TODAY)).lastPayment());
+        assertEquals(LocalDate.of(2026, 11, 4), only(SubscriptionDetector.detect(expenses, TODAY, MADRID)).lastPayment());
     }
 
     // ===== Several at once =====
@@ -276,7 +280,7 @@ class SubscriptionDetectorTest {
                 payment("Gym", "29.90", "2026-10-20")));
         expenses.add(payment("Supermarket", "40.00", "2026-11-08"));
 
-        List<Subscription> found = SubscriptionDetector.detect(expenses, TODAY);
+        List<Subscription> found = SubscriptionDetector.detect(expenses, TODAY, MADRID);
 
         assertEquals(2, found.size());
         assertEquals("Gym", found.get(0).merchant());               // next on 20 November

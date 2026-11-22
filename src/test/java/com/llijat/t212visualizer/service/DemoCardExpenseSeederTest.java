@@ -1,5 +1,7 @@
 package com.llijat.t212visualizer.service;
 
+import java.time.ZoneId;
+
 import com.llijat.t212visualizer.model.CardExpense;
 import com.llijat.t212visualizer.model.CardCashback;
 import com.llijat.t212visualizer.model.MerchantCategory;
@@ -33,6 +35,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DemoCardExpenseSeederTest {
+
+    private static final ZoneId MADRID = ZoneId.of("Europe/Madrid");
 
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 15);
 
@@ -116,7 +120,7 @@ class DemoCardExpenseSeederTest {
     void theDemo_hasSubscriptionsToShow_oneOfThemWithAPriceRise() {
         // Whatever day the demo starts, its fixed-price payments must pass the detector's rules
         for (LocalDate today = LocalDate.of(2026, 1, 1); today.isBefore(LocalDate.of(2027, 1, 1)); today = today.plusDays(1)) {
-            List<com.llijat.t212visualizer.dto.Subscription> found = SubscriptionDetector.detect(seeder.buildExpenses(today), today);
+            List<com.llijat.t212visualizer.dto.Subscription> found = SubscriptionDetector.detect(seeder.buildExpenses(today), today, MADRID);
 
             assertEquals(4, found.size(), "on " + today + " found " + found);
             assertEquals(1, found.stream().filter(com.llijat.t212visualizer.dto.Subscription::priceChanged).count(), "on " + today);

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -29,6 +30,6 @@ class FinnhubNewsDtoTest {
         // 1794871200 is 2026-11-16 at 23:20 UTC: in Spain (UTC+1 in November) it is already the 17th
         FinnhubNewsDto news = new ObjectMapper().readValue(JSON, FinnhubNewsDto.class);
 
-        assertEquals(LocalDateTime.of(2026, 11, 17, 0, 20), news.publishedAt());
+        assertEquals(LocalDateTime.of(2026, 11, 17, 0, 20), news.publishedAt(ZoneId.of("Europe/Madrid")));
     }
 }

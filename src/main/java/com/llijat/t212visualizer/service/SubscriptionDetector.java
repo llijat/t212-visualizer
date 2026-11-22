@@ -10,7 +10,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 public class SubscriptionDetector {
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
     private static final int MIN_PAYMENTS = 3;
     private static final int MIN_GAP_DAYS = 25;
     private static final int MAX_GAP_DAYS = 35;
@@ -19,7 +18,8 @@ public class SubscriptionDetector {
 
     private SubscriptionDetector() {}
 
-    public static List<Subscription> detect(List<CardExpense> expenses, LocalDate today) {
+    /** zone: where the app is used, so a payment at 00:30 counts on the day it was made there */
+    public static List<Subscription> detect(List<CardExpense> expenses, LocalDate today, ZoneId zone) {
         Map<String, List<CardExpense>> byMerchant = new HashMap<>();
         for (CardExpense expense : expenses) {
             if (expense.getMerchantName() == null) continue;
@@ -35,23 +35,23 @@ public class SubscriptionDetector {
             CardExpense second = payments.get(payments.size() - 2);
             CardExpense last = payments.get(payments.size() - 1);
 
-            if (!isMonthlyGap(dateOf(first), dateOf(second)) || !isMonthlyGap(dateOf(second), dateOf(last))) continue;
+            if (!isMonthlyGap(dateOf(first, zone), dateOf(second, zone)) || !isMonthlyGap(dateOf(second, zone), dateOf(last, zone))) continue;
             if (!isSimilar(amountOf(first), amountOf(last)) || !isSimilar(amountOf(second), amountOf(last))) continue;
-            if (ChronoUnit.DAYS.between(dateOf(last), today) > MAX_DAYS_SINCE_LAST) continue;
+            if (ChronoUnit.DAYS.between(dateOf(last, zone), today) > MAX_DAYS_SINCE_LAST) continue;
 
             subscriptions.add(new Subscription(
                     last.getMerchantName(),
                     amountOf(last),
                     amountOf(second),
-                    dateOf(last),
-                    dateOf(last).plusMonths(1)));
+                    dateOf(last, zone),
+                    dateOf(last, zone).plusMonths(1)));
         }
         subscriptions.sort(Comparator.comparing(Subscription::nextPayment));
         return subscriptions;
     }
 
-    private static LocalDate dateOf(CardExpense expense) {
-        return expense.getDateTime().atZone(SPAIN).toLocalDate();
+    private static LocalDate dateOf(CardExpense expense, ZoneId zone) {
+        return expense.getDateTime().atZone(zone).toLocalDate();
     }
 
     private static BigDecimal amountOf(CardExpense expense) {

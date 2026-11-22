@@ -10,21 +10,22 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 
 @Controller
 public class NewsController {
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final Clock clock;
 
     private final NewsService newsService;
     private final QuoteService quoteService;
     private final CalendarService calendarService;
 
-    public NewsController(NewsService newsService, QuoteService quoteService, CalendarService calendarService) {
+    public NewsController(NewsService newsService, QuoteService quoteService, CalendarService calendarService, Clock clock) {
         this.newsService = newsService;
         this.quoteService = quoteService;
         this.calendarService = calendarService;
+        this.clock = clock;
     }
 
     @GetMapping("/news")
@@ -33,7 +34,7 @@ public class NewsController {
         model.addAttribute("marketDays", newsService.getMarketNewsByDay());
         model.addAttribute("newsCount", newsService.getNewsCountBySymbol());
         model.addAttribute("tickers", newsService.getTickerBySymbol());
-        model.addAttribute("today", LocalDate.now(SPAIN));
+        model.addAttribute("today", LocalDate.now(clock));
         model.addAttribute("starredDays", newsService.getStarredNewsByDay());
         model.addAttribute("starredIds", newsService.getStarredIds());
         model.addAttribute("moves", quoteService.getMoves());

@@ -15,8 +15,8 @@ public record FinnhubNewsDto (
     String summary,
     String source)
 {
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
-    public LocalDateTime publishedAt() {
-        return LocalDateTime.ofInstant(Instant.ofEpochSecond(datetime), SPAIN);
+    /** The time it came out where the app is used. The zone is passed in: a record cannot receive the app's Clock */
+    public LocalDateTime publishedAt(ZoneId zone) {
+        return LocalDateTime.ofInstant(Instant.ofEpochSecond(datetime), zone);
     }
 }

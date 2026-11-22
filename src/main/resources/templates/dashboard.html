@@ -128,13 +128,13 @@
 
         /* ===== Account summary: no cards, on the page itself =====
            On the left, the account: what it is worth, what it made all-time, and the same money as a short sum over a bar
-           of what it is made of. On the right, the dividends of the year. The chart of the value will go between the two. */
+           of what it is made of. In the middle, how the value moved; on the right, the dividends of the year. */
         .summary {
             display: grid;
-            grid-template-columns: minmax(0, 46rem) minmax(16rem, 1fr);   /* the account takes its room first */
-            grid-template-areas: "account dividends";
+            grid-template-columns: minmax(22rem, 30rem) minmax(0, 1fr) minmax(16rem, 24rem);
+            grid-template-areas: "account chart dividends";
             align-items: end;
-            gap: 1.25rem 4.5rem;
+            gap: 1.25rem 3.5rem;
             padding: 1.35rem 2rem 0.4rem;
         }
         .summary-account { grid-area: account; min-width: 0; }
@@ -178,7 +178,7 @@
 
         /* Dividends: a bar per month, with its initial; each one opens that month in the calendar.
            Pointing at a month (or reaching it with Tab) shows it in the line above the bars */
-        .summary-dividends { grid-area: dividends; min-width: 0; max-width: 44rem; }
+        .summary-dividends { grid-area: dividends; min-width: 0; }
         .dividends-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
         .dividends-average { color: var(--dividend); font: 500 0.85rem var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .dividends-total { margin: 0 0 0.35rem; color: var(--muted); font-size: 0.82rem; }
@@ -198,9 +198,39 @@
         .dividend-month.no-payment:hover .dividend-fill { background: var(--faint); }
         .dividend-month:hover .dividend-initial { color: var(--text); }
 
-        /* Less room: the two stay side by side, closer, and the account gives up some width */
+        /* The value of the account over time: the value as a line with a soft fill, what was put in as a faint step line under it.
+           The figure above it is the time-weighted return of the period chosen; pointing at the chart reads one day in the line above it */
+        .summary-chart { grid-area: chart; min-width: 0; }
+        .chart-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .chart-ranges { display: inline-flex; gap: 2px; }
+        .chart-ranges button { height: 1.5rem; padding: 0 0.45rem; border-radius: 6px; background: none; color: var(--faint); font: 500 0.75rem var(--figures); }
+        .chart-ranges button:hover { color: var(--text); }
+        .chart-ranges button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+        .chart-return { margin: 0 0 0.35rem; color: var(--muted); font-size: 0.82rem; }
+        .chart-return b { font-size: 1.15rem; margin-right: 0.35rem; }
+        .chart-readout { display: flex; justify-content: space-between; gap: 1rem; margin: 0 0 0.45rem; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+        .chart-readout b { font-size: 0.9rem; }
+        .chart-plot { position: relative; height: 3.4rem; border-radius: 3px; outline-offset: 3px; cursor: crosshair; }
+        .chart-plot:focus-visible { outline: 2px solid var(--accent); }
+        .chart-plot svg { display: block; width: 100%; height: 100%; overflow: visible; }
+        .chart-plot path, .chart-plot line { vector-effect: non-scaling-stroke; fill: none; }   /* the lines keep their width however the chart is stretched */
+        .chart-value { stroke: var(--line); stroke-width: 1.75; stroke-linejoin: round; }
+        .chart-plot .chart-area { fill: color-mix(in srgb, var(--line) 14%, transparent); }   /* .chart-plot too: it must win over the fill: none above */
+        .chart-deposits { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 3 3; }
+        .chart-cursor { stroke: var(--muted); stroke-width: 1; }
+        .chart-dot { position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: var(--line); box-shadow: 0 0 0 2px var(--bg); pointer-events: none; }
+        .summary-chart { --line: var(--green); }
+        .summary-chart.is-down { --line: var(--red); }
+        .chart-dates { display: flex; justify-content: space-between; margin-top: 0.25rem; color: var(--faint); font: 0.68rem var(--figures); }
+        .chart-empty { margin: 0.3rem 0 0; color: var(--faint); font-size: 0.82rem; }
+
+        /* Less room: the three stay side by side, closer */
         @media (max-width: 1300px) {
-            .summary { column-gap: 2.5rem; }
+            .summary { grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr) minmax(15rem, 20rem); column-gap: 2.5rem; }
+        }
+        /* Not enough room for three: the account and the dividends side by side, the chart in its own row under them */
+        @media (max-width: 1100px) {
+            .summary { grid-template-columns: minmax(0, 1fr) minmax(15rem, 20rem); grid-template-areas: "account dividends" "chart chart"; }
         }
 
         /* Coloured pills for gains and losses: colour + sign, so they do not depend on colour alone */
@@ -305,7 +335,7 @@
 
         /* ===== Narrow screens (phone, small window): a single column ===== */
         @media (max-width: 900px) {
-            .summary { grid-template-columns: minmax(0, 1fr); grid-template-areas: "account" "dividends"; padding: 1rem 1rem 0; gap: 1.5rem; }
+            .summary { grid-template-columns: minmax(0, 1fr); grid-template-areas: "account" "chart" "dividends"; padding: 1rem 1rem 0; gap: 1.5rem; }
             .summary-dividends { max-width: none; }
             .positions-tools { width: 100%; }
             .positions-search { flex: 1; width: auto; min-width: 7rem; }
@@ -421,6 +451,45 @@
                     <span class="split-key"><i class="split-cash"></i><span><b class="money" th:text="${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">312.40 €</b> cash<th:block th:if="${value > 0}" th:text="', ' + ${#numbers.formatDecimal(cash * 100 / value, 1, 0, 'POINT')} + ' %'">, 3 %</th:block></span></span>
                 </div>
             </div>
+        </div>
+
+        <!-- The value over time, from the daily snapshots. The script draws it from the lists in its data-* attributes
+             and works out the time-weighted return of the period chosen: growth on the last day / growth on the first day - 1 -->
+        <div class="summary-chart" id="account-chart" th:if="${history != null}">
+            <p class="summary-label chart-head">
+                <span>Performance</span>
+                <span class="chart-ranges" role="group" aria-label="Period" th:if="${history.size() >= 2}">
+                    <button type="button" data-range="1">1M</button>
+                    <button type="button" data-range="3">3M</button>
+                    <button type="button" data-range="12">1Y</button>
+                    <button type="button" data-range="0">All</button>
+                </span>
+            </p>
+            <p class="chart-empty" th:if="${history.size() < 2}">The chart fills in from here: the account's value is saved once a day, and the line starts with the second day.</p>
+            <th:block th:if="${history.size() >= 2}">
+                <p class="chart-return" title="Time-weighted return: how the investments did, whenever the money came in or out">
+                    <b id="chart-return">+0.0 %</b><span id="chart-period">in the period</span>
+                </p>
+                <p class="chart-readout" aria-hidden="true">
+                    <span id="chart-readout-date">—</span>
+                    <span><b class="money" id="chart-readout-value"></b> <span id="chart-readout-deposits" class="money"></span></span>
+                </p>
+                <div class="chart-plot" id="chart-plot" tabindex="0" role="img"
+                     th:data-dates="${#strings.listJoin(history.![date.toString()], ',')}"
+                     th:data-values="${#strings.listJoin(history.![value], ',')}"
+                     th:data-deposits="${#strings.listJoin(history.![netDeposits], ',')}"
+                     th:data-growth="${#strings.listJoin(history.![growth], ',')}"
+                     aria-label="Account value over time. Use the left and right arrows to read each day.">
+                    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+                        <path class="chart-area" id="chart-area"/>
+                        <path class="chart-deposits" id="chart-deposits"/>
+                        <path class="chart-value" id="chart-value"/>
+                        <line class="chart-cursor" id="chart-cursor" y1="0" y2="100" style="display: none"/>
+                    </svg>
+                    <span class="chart-dot" id="chart-dot" style="display: none"></span>
+                </div>
+                <div class="chart-dates" aria-hidden="true"><span id="chart-from"></span><span id="chart-to"></span></div>
+            </th:block>
         </div>
 
         <!-- Dividends of the last 12 months: only once something has been received.
@@ -638,7 +707,7 @@
                     <ul class="today-list">
                         <li th:each="n : ${portfolioNews}" th:if="${nStat.index < 5}">
                             <a class="today-row story-row" th:href="${n.url()}" target="_blank" rel="noopener noreferrer">
-                                <time class="today-figure" th:datetime="${n.publishedAt()}" th:text="${#temporals.format(n.publishedAt(), 'HH:mm')}">14:05</time>
+                                <time class="today-figure" th:datetime="${n.publishedAt(zone)}" th:text="${#temporals.format(n.publishedAt(zone), 'HH:mm')}">14:05</time>
                                 <!-- The logo of the holding, through its T212 ticker; its initial until there is one -->
                                 <span class="logo" aria-hidden="true" th:with="ticker=${tickers.get(n.related())}">
                                     <span class="logo-initial" th:text="${#strings.isEmpty(n.related()) ? '?' : #strings.substring(n.related(), 0, 1)}">N</span>
@@ -724,6 +793,98 @@
             chart.addEventListener('mouseleave', () => showMonth(latest));
             chart.addEventListener('focusout', () => showMonth(latest));
             showMonth(latest);
+        })();
+
+        // ===== Performance: the value over time, for 1, 3 or 12 months or all of it =====
+        (function () {
+            const plot = document.getElementById('chart-plot');
+            if (!plot) return;
+            const chart = document.getElementById('account-chart');
+            const split = key => plot.dataset[key].split(',');
+            const all = split('dates').map((date, i) => ({
+                date: new Date(date + 'T12:00:00'),   // midday: no time zone can move it to another day
+                value: Number(split('values')[i]),
+                deposits: Number(split('deposits')[i]),
+                growth: Number(split('growth')[i])
+            }));
+            const buttons = [...chart.querySelectorAll('[data-range]')];
+            const euros = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const shortDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+            const longDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            const el = id => document.getElementById(id);
+            let points = all;
+            let x = () => 0, y = () => 0;
+
+            function draw(months) {
+                const last = all[all.length - 1].date;
+                const from = new Date(last); from.setMonth(from.getMonth() - months);
+                points = months ? all.filter(p => p.date >= from) : all;
+                if (points.length < 2) points = all.slice(-2);   // a period shorter than the history: at least a line
+
+                // Both lines share the scale, with a little air above and below
+                const figures = points.flatMap(p => [p.value, p.deposits]);
+                const low = Math.min(...figures), high = Math.max(...figures);
+                const pad = (high - low) * 0.12 || 1;
+                const first = points[0].date.getTime(), span = points[points.length - 1].date.getTime() - first;
+                x = p => (p.date.getTime() - first) / span * 1000;
+                y = v => 100 - (v - low + pad) / (high - low + 2 * pad) * 100;
+
+                const line = points.map((p, i) => (i ? 'L' : 'M') + x(p).toFixed(1) + ' ' + y(p.value).toFixed(2)).join(' ');
+                el('chart-value').setAttribute('d', line);
+                el('chart-area').setAttribute('d', line + ' L1000 100 L0 100 Z');
+                // What was put in only changes on the day of a deposit: a step, not a slope
+                el('chart-deposits').setAttribute('d', points.map((p, i) => i ? 'H' + x(p).toFixed(1) + ' V' + y(p.deposits).toFixed(2) : 'M0 ' + y(p.deposits).toFixed(2)).join(' '));
+
+                // Time-weighted return of the period: the growth of its last day against its first
+                const twr = (points[points.length - 1].growth / points[0].growth - 1) * 100;
+                const up = twr >= 0;
+                chart.classList.toggle('is-down', !up);
+                el('chart-return').textContent = (up ? '+' : '−') + Math.abs(twr).toFixed(1) + ' %';
+                el('chart-return').className = up ? 'is-up' : 'is-down';
+                el('chart-period').textContent = months && points[0] !== all[0] ? 'in ' + (months === 12 ? 'a year' : months === 1 ? 'a month' : months + ' months') : 'since ' + longDate.format(all[0].date);
+                el('chart-from').textContent = shortDate.format(points[0].date);
+                el('chart-to').textContent = shortDate.format(points[points.length - 1].date);
+                buttons.forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.range) === months)));
+                read(points.length - 1, false);
+            }
+
+            // One day in the line above the chart; with "mark", also the cursor on the chart
+            let reading = 0;
+            function read(i, mark) {
+                reading = i;
+                const p = points[i];
+                el('chart-readout-date').textContent = longDate.format(p.date);
+                el('chart-readout-value').textContent = euros.format(p.value) + ' €';
+                el('chart-readout-deposits').textContent = 'with ' + euros.format(p.deposits) + ' € put in';
+                el('chart-cursor').style.display = el('chart-dot').style.display = mark ? '' : 'none';   // display and not hidden: an SVG line ignores hidden
+                if (!mark) return;
+                el('chart-cursor').setAttribute('x1', x(p)); el('chart-cursor').setAttribute('x2', x(p));
+                el('chart-dot').style.left = x(p) / 10 + '%';
+                el('chart-dot').style.top = y(p.value) + '%';
+            }
+
+            plot.addEventListener('pointermove', event => {
+                const box = plot.getBoundingClientRect();
+                const at = (event.clientX - box.left) / box.width * 1000;
+                let nearest = 0;
+                points.forEach((p, i) => { if (Math.abs(x(p) - at) < Math.abs(x(points[nearest]) - at)) nearest = i; });
+                read(nearest, true);
+            });
+            plot.addEventListener('pointerleave', () => read(points.length - 1, false));
+            plot.addEventListener('blur', () => read(points.length - 1, false));
+            plot.addEventListener('keydown', event => {
+                const step = { ArrowLeft: -1, ArrowRight: 1, Home: -points.length, End: points.length }[event.key];
+                if (!step) return;
+                event.preventDefault();
+                read(Math.max(0, Math.min(points.length - 1, reading + step)), true);
+            });
+            buttons.forEach(b => b.addEventListener('click', () => {
+                stored.set('t212-chart-range', b.dataset.range);
+                draw(Number(b.dataset.range));
+            }));
+
+            const remembered = stored.get('t212-chart-range');
+            draw(remembered === null ? 3 : Number(remembered));
         })();
 
         // ===== Positions: filter by text, gainers or losers, sort by any column, and the P/L in euros =====

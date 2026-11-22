@@ -7,29 +7,30 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneId;
 
 @Controller
 public class CalendarController {
     private final CalendarService calendarService;
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final Clock clock;
     private final CompanyProfileService companyProfileService;
 
-    public CalendarController(CalendarService calendarService, CompanyProfileService companyProfileService) {
+    public CalendarController(CalendarService calendarService, CompanyProfileService companyProfileService, Clock clock) {
         this.calendarService = calendarService;
         this.companyProfileService = companyProfileService;
+        this.clock = clock;
     }
 
     @GetMapping("/calendar")
     public String calendar(@RequestParam(required = false) YearMonth month, Model model) {
-        if (month == null) month = YearMonth.now(SPAIN);
+        if (month == null) month = YearMonth.now(clock);
         model.addAttribute("calendar",calendarService.getMonth(month));
         model.addAttribute("symbols", companyProfileService.currentSymbols());
         model.addAttribute("comingUp", calendarService.getComingUp());
         model.addAttribute("comingUpDividends", calendarService.getComingUpDividends());
-        model.addAttribute("today", LocalDate.now(SPAIN));
+        model.addAttribute("today", LocalDate.now(clock));
         return "calendar";
     }
 }

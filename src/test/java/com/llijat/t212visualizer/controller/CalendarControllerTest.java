@@ -1,5 +1,8 @@
 package com.llijat.t212visualizer.controller;
 
+import java.time.Clock;
+import java.time.Instant;
+
 import com.llijat.t212visualizer.dto.CalendarMonth;
 import com.llijat.t212visualizer.dto.UpcomingDividend;
 import com.llijat.t212visualizer.dto.UpcomingEarnings;
@@ -29,6 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class CalendarControllerTest {
 
+    // "Now" for the code under test: fixed, so a test run at midnight does not see two different days
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-15T11:00:00Z"), ZoneId.of("Europe/Madrid"));
+
     private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
 
     @Mock
@@ -42,14 +48,14 @@ class CalendarControllerTest {
     @BeforeEach
     void setUp() {
         // The same trick as in NewsControllerTest: the view name becomes a file name
-        mockMvc = MockMvcBuilders.standaloneSetup(new CalendarController(calendarService, companyProfileService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new CalendarController(calendarService, companyProfileService, CLOCK))
                 .setViewResolvers(new InternalResourceViewResolver("/templates/", ".html"))
                 .build();
     }
 
     @Test
     void withoutAMonth_itShowsTheCurrentOne_inSpanishTime() throws Exception {
-        YearMonth now = YearMonth.now(SPAIN);
+        YearMonth now = YearMonth.now(CLOCK);
         CalendarMonth month = new CalendarMonth(now, List.of());
         when(calendarService.getMonth(now)).thenReturn(month);
 
@@ -67,7 +73,7 @@ class CalendarControllerTest {
 
     @Test
     void thePanel_getsWhatComesUp_whateverMonthIsShown() throws Exception {
-        LocalDate today = LocalDate.now(SPAIN);
+        LocalDate today = LocalDate.now(CLOCK);
         List<UpcomingEarnings> earnings = List.of(new UpcomingEarnings("NVDA", "NVDA_US_EQ", today.plusDays(2), "amc"));
         List<UpcomingDividend> dividends = List.of(new UpcomingDividend("MU", "MU_US_EQ", today.plusDays(5), null, new BigDecimal("0.86")));
         when(calendarService.getComingUp()).thenReturn(earnings);

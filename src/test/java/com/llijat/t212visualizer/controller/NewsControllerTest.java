@@ -1,5 +1,8 @@
 package com.llijat.t212visualizer.controller;
 
+import java.time.Clock;
+import java.time.Instant;
+
 import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.dto.NewsDay;
@@ -39,6 +42,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class NewsControllerTest {
 
+    // "Now" for the code under test: fixed, so a test run at midnight does not see two different days
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-15T11:00:00Z"), ZoneId.of("Europe/Madrid"));
+
     @Mock
     private NewsService newsService;
 
@@ -54,7 +60,7 @@ class NewsControllerTest {
     void setUp() {
         // Without Thymeleaf, the view "news" would be looked for at the URL /news, which is this same page.
         // This resolver turns it into a file name instead, as Thymeleaf does in the real app.
-        mockMvc = MockMvcBuilders.standaloneSetup(new NewsController(newsService, quoteService, calendarService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new NewsController(newsService, quoteService, calendarService, CLOCK))
                 .setViewResolvers(new InternalResourceViewResolver("/templates/", ".html"))
                 .build();
     }
@@ -85,7 +91,7 @@ class NewsControllerTest {
         when(newsService.getTickerBySymbol()).thenReturn(Map.of());
 
         mockMvc.perform(get("/news"))
-                .andExpect(model().attribute("today", LocalDate.now(ZoneId.of("Europe/Madrid"))));
+                .andExpect(model().attribute("today", LocalDate.now(CLOCK)));
     }
 
     @Test

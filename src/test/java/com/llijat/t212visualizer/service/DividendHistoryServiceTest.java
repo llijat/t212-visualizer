@@ -1,5 +1,8 @@
 package com.llijat.t212visualizer.service;
 
+import java.time.Clock;
+import java.time.Instant;
+
 import com.llijat.t212visualizer.dto.DividendHistory;
 import com.llijat.t212visualizer.dto.DividendPayer;
 import com.llijat.t212visualizer.dto.MonthlyDividends;
@@ -23,7 +26,10 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class DividendHistoryServiceTest {
 
-    private static final YearMonth NOW = YearMonth.now(ZoneId.of("Europe/Madrid"));
+    // "Now" for the code under test: fixed, so a test run at midnight does not see two different days
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-15T11:00:00Z"), ZoneId.of("Europe/Madrid"));
+
+    private static final YearMonth NOW = YearMonth.now(CLOCK);
 
     @Mock
     private DividendEventRepository repository;
@@ -32,7 +38,7 @@ class DividendHistoryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DividendHistoryService(repository);
+        service = new DividendHistoryService(repository, CLOCK);
     }
 
     private static DividendEvent paid(String ticker, LocalDate day, String euros) {

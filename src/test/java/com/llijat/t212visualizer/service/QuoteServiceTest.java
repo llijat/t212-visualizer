@@ -1,5 +1,8 @@
 package com.llijat.t212visualizer.service;
 
+import java.time.Clock;
+import java.time.ZoneId;
+
 import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.MetalMove;
@@ -27,6 +30,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class QuoteServiceTest {
 
+    private static final Clock CLOCK = Clock.system(ZoneId.of("Europe/Madrid"));
+
     @Mock
     private FinnhubClient finnhubClient;
 
@@ -40,7 +45,7 @@ class QuoteServiceTest {
 
     @BeforeEach
     void setUp() {
-        quoteService = new QuoteService(finnhubClient, positionService, companyProfileService);
+        quoteService = new QuoteService(finnhubClient, positionService, companyProfileService, CLOCK);
     }
 
     // A real Position (not a mock): only the ticker and what it is worth today matter here

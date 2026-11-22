@@ -1,5 +1,9 @@
 package com.llijat.t212visualizer.controller;
 
+import java.time.Clock;
+import java.time.ZoneId;
+import java.time.Instant;
+
 import com.llijat.t212visualizer.service.BudgetService;
 import com.llijat.t212visualizer.service.CardExpenseImportService;
 import com.llijat.t212visualizer.service.CardExpenseSummaryService;
@@ -28,6 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class ExpenseControllerCategoryTest {
 
+    // "Now" for the code under test: fixed, so a test run at midnight does not see two different days
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-15T11:00:00Z"), ZoneId.of("Europe/Madrid"));
+
     @Mock
     private CardExpenseImportService importService;
 
@@ -48,7 +55,7 @@ class ExpenseControllerCategoryTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new ExpenseController(importService, summaryService, budgetService, merchantCategoryService, customCategoryService)).build();
+                new ExpenseController(importService, summaryService, budgetService, merchantCategoryService, customCategoryService, CLOCK)).build();
     }
 
     @Test

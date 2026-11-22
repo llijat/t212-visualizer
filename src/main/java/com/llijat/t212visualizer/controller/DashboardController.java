@@ -7,12 +7,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping; 
 import org.springframework.http.ResponseEntity;
 
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 
 @Controller
 public class DashboardController {
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final Clock clock;
 
     private final PositionService positionService;
     private final NewsService newsService;
@@ -25,7 +25,7 @@ public class DashboardController {
     private final AccountSnapshotService accountSnapshotService;
 
 
-    public DashboardController(PositionService positionService, NewsService newsService, AccountService accountService, TransactionService transactionService, CompanyProfileService companyProfileService, QuoteService quoteService, CalendarService calendarService, DividendHistoryService dividendHistoryService, AccountSnapshotService accountSnapshotService) {
+    public DashboardController(PositionService positionService, NewsService newsService, AccountService accountService, TransactionService transactionService, CompanyProfileService companyProfileService, QuoteService quoteService, CalendarService calendarService, DividendHistoryService dividendHistoryService, AccountSnapshotService accountSnapshotService, Clock clock) {
         this.positionService = positionService;
         this.newsService = newsService;
         this.accountService = accountService;
@@ -35,6 +35,7 @@ public class DashboardController {
         this.calendarService = calendarService;
         this.dividendHistoryService = dividendHistoryService;
         this.accountSnapshotService = accountSnapshotService;
+        this.clock = clock;
     }
 
     @GetMapping("/")
@@ -47,11 +48,12 @@ public class DashboardController {
         model.addAttribute("symbols", companyProfileService.currentSymbols());
         model.addAttribute("moves", quoteService.getMoves());
         model.addAttribute("comingUp", calendarService.getComingUp());
-        model.addAttribute("today", LocalDate.now(SPAIN));
+        model.addAttribute("today", LocalDate.now(clock));
         model.addAttribute("metals", quoteService.getMetals());
         model.addAttribute("dividendHistory", dividendHistoryService.getLast12Months());
         model.addAttribute("tickers", newsService.getTickerBySymbol());
         model.addAttribute("todayChange", accountSnapshotService.getTodayChange());
+        model.addAttribute("history", accountSnapshotService.getHistory());
         return "dashboard"; // resolves to templates/dashboard.html
     }
 

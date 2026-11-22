@@ -1,5 +1,6 @@
 package com.llijat.t212visualizer.service;
 
+import com.llijat.t212visualizer.dto.AccountPoint;
 import com.llijat.t212visualizer.dto.DailyChange;
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
 import com.llijat.t212visualizer.model.AccountSnapshot;
@@ -11,23 +12,26 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class AccountSnapshotService {
     private static final Logger log = LoggerFactory.getLogger(AccountSnapshotService.class);
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final Clock clock;
 
     private final AccountService accountService;
     private final TransactionService transactionService;
     private final AccountSnapshotRepository accountSnapshotRepository;
 
-    public AccountSnapshotService(AccountService accountService, TransactionService transactionService, AccountSnapshotRepository accountSnapshotRepository) {
+    public AccountSnapshotService(AccountService accountService, TransactionService transactionService, AccountSnapshotRepository accountSnapshotRepository, Clock clock) {
         this.accountService = accountService;
         this.transactionService = transactionService;
         this.accountSnapshotRepository = accountSnapshotRepository;
+        this.clock = clock;
     }
 
     /** What the account made today, without the money put in or taken out today. Null until there is an earlier day to compare with. */
@@ -35,7 +39,7 @@ public class AccountSnapshotService {
         T212AccountSummaryDto summary = accountService.getSummary();
         if (summary == null || !transactionService.isFirstSyncDone()) return null;
 
-        AccountSnapshot lastClose = accountSnapshotRepository.findFirstBySnapshotDateBeforeOrderBySnapshotDateDesc(LocalDate.now(SPAIN)).orElse(null);
+        AccountSnapshot lastClose = accountSnapshotRepository.findFirstBySnapshotDateBeforeOrderBySnapshotDateDesc(LocalDate.now(clock)).orElse(null);
         if (lastClose == null) return null;
 
         BigDecimal depositedToday = transactionService.getNetDeposits().subtract(lastClose.getNetDeposits());
@@ -47,6 +51,23 @@ public class AccountSnapshotService {
         return new DailyChange(amount, percent);
     }
 
+    public List<AccountPoint> getHistory() {
+        List<AccountPoint> points = new ArrayList<>();
+        BigDecimal growth = BigDecimal.ONE;
+        AccountSnapshot previous = null;
+
+        for (AccountSnapshot day : accountSnapshotRepository.findAllByOrderBySnapshotDateAsc()) {
+            if (previous != null) {
+                BigDecimal deposited = day.getNetDeposits().subtract(previous.getNetDeposits());
+                BigDecimal start = previous.getTotalValue().add(deposited);
+                if (start.signum() > 0) growth = growth.multiply(day.getTotalValue()).divide(start, 10, RoundingMode.HALF_UP);
+            }
+            points.add(new AccountPoint(day.getSnapshotDate(), day.getTotalValue(), day.getNetDeposits(), growth));
+            previous = day;
+        }
+        return points;
+    }
+
     @Scheduled(fixedRate = 60*60*1000, initialDelay = 10*60*1000)
     public void takeSnapshot() {
         T212AccountSummaryDto summary = accountService.getSummary();
@@ -56,7 +77,7 @@ public class AccountSnapshotService {
         }
 
         try {
-            LocalDate today = LocalDate.now(SPAIN);
+            LocalDate today = LocalDate.now(clock);
             accountSnapshotRepository.save(new AccountSnapshot(today, summary.totalValue(),transactionService.getNetDeposits(),Instant.now()));
             log.info("Saved the account snapshot of {}.", today);
         }

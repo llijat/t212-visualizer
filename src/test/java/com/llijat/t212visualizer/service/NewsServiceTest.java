@@ -1,5 +1,8 @@
 package com.llijat.t212visualizer.service;
 
+import java.time.Clock;
+import java.time.ZoneId;
+
 import com.llijat.t212visualizer.dto.FinnhubNewsDto;
 import com.llijat.t212visualizer.dto.NewsDay;
 import com.llijat.t212visualizer.model.NewsFeed;
@@ -39,6 +42,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class NewsServiceTest {
 
+    private static final Clock CLOCK = Clock.system(ZoneId.of("Europe/Madrid"));
+
     @Mock
     private FinnhubClient finnhubClient;
 
@@ -59,7 +64,7 @@ class NewsServiceTest {
 
     @BeforeEach
     void setUp() {
-        newsService = new NewsService(finnhubClient, positionService, companyProfileService, newsItemRepository);
+        newsService = new NewsService(finnhubClient, positionService, companyProfileService, newsItemRepository, CLOCK);
     }
 
     private static FinnhubNewsDto news(long id, String related, String utc) {

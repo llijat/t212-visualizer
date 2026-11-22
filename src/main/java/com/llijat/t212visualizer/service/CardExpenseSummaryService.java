@@ -9,26 +9,27 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Service
 public class CardExpenseSummaryService {
-    private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final Clock clock;
     private static final int TYPICAL_MONTHS = 3;
 
     private final CardExpenseRepository cardExpenseRepository;
     private final CardCashbackRepository cardCashbackRepository;
     private final MerchantCategoryService merchantCategoryService;
 
-    public CardExpenseSummaryService(CardExpenseRepository cardExpenseRepository, CardCashbackRepository cardCashbackRepository, MerchantCategoryService merchantCategoryService) {
+    public CardExpenseSummaryService(CardExpenseRepository cardExpenseRepository, CardCashbackRepository cardCashbackRepository, MerchantCategoryService merchantCategoryService, Clock clock) {
         this.cardExpenseRepository = cardExpenseRepository;
         this.cardCashbackRepository = cardCashbackRepository;
         this.merchantCategoryService = merchantCategoryService;
+        this.clock = clock;
     }
 
     public CardExpenseSummary getSummary() {
@@ -54,7 +55,7 @@ public class CardExpenseSummaryService {
     }
 
     private LocalDate dateOf(CardExpense expense) {
-        return expense.getDateTime().atZone(SPAIN).toLocalDate();
+        return expense.getDateTime().atZone(clock.getZone()).toLocalDate();
     }
 
     private BigDecimal calculateTotal(List<CardExpense> expenses) {
@@ -211,7 +212,7 @@ public class CardExpenseSummaryService {
     }
 
     public List<Subscription> getSubscriptions(LocalDate today) {
-        return SubscriptionDetector.detect(cardExpenseRepository.findAll(), today);
+        return SubscriptionDetector.detect(cardExpenseRepository.findAll(), today, clock.getZone());
     }
 
     private List<DailySpending> calculateDays(List<CardExpense> inMonth, YearMonth month, int lastDay) {
@@ -236,7 +237,7 @@ public class CardExpenseSummaryService {
 
     public BigDecimal getCashback(YearMonth month) {
         return cardCashbackRepository.findAll().stream()
-                .filter(cashback -> YearMonth.from(cashback.getDateTime().atZone(SPAIN)).equals(month))
+                .filter(cashback -> YearMonth.from(cashback.getDateTime().atZone(clock.getZone())).equals(month))
                         .map(CardCashback::getAmount)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
     }

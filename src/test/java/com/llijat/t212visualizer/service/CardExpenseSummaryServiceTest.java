@@ -1,5 +1,8 @@
 package com.llijat.t212visualizer.service;
 
+import java.time.Clock;
+import java.time.ZoneId;
+
 import com.llijat.t212visualizer.dto.CardExpenseSummary;
 import com.llijat.t212visualizer.dto.CategorySpending;
 import com.llijat.t212visualizer.dto.MerchantSpending;
@@ -34,6 +37,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class CardExpenseSummaryServiceTest {
 
+    private static final Clock CLOCK = Clock.system(ZoneId.of("Europe/Madrid"));
+
     @Mock
     private CardExpenseRepository repository;
 
@@ -48,7 +53,7 @@ class CardExpenseSummaryServiceTest {
 
     @BeforeEach
     void setUp() {
-        summaryService = new CardExpenseSummaryService(repository, cashbackRepository, merchantCategoryService);
+        summaryService = new CardExpenseSummaryService(repository, cashbackRepository, merchantCategoryService, CLOCK);
     }
 
     private CardExpense expense(String amount, String dateTime, String merchant, String category) {
