@@ -268,29 +268,8 @@
         <nav class="sources" aria-label="Show news from">
             <h1>News</h1>
 
-            <p class="source-group-name">Your holdings</p>
-            <ul class="source-group">
-                <li>
-                    <button type="button" class="source" data-show="portfolio" aria-pressed="true">
-                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-briefcase"/></svg></span>
-                        <span class="source-symbol">All holdings</span>
-                        <span class="source-count" th:text="${total}">48</span>
-                    </button>
-                </li>
-                <!-- One button per holding with news: its logo (through its T212 ticker), its symbol and how many stories -->
-                <li th:each="entry : ${newsCount}" th:with="ticker=${tickers.get(entry.key)}">
-                    <button type="button" class="source" data-show="portfolio" th:data-symbol="${entry.key}" aria-pressed="false">
-                        <span class="logo" aria-hidden="true">
-                            <span class="logo-initial" th:text="${#strings.substring(entry.key, 0, 1)}">A</span>
-                            <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
-                        </span>
-                        <span class="source-symbol" th:text="${entry.key}">AAPL</span>
-                        <span class="source-count" th:text="${entry.value}">12</span>
-                    </button>
-                </li>
-            </ul>
-
-            <p class="source-group-name">Everything else</p>
+            <!-- First, so that with many holdings they are still in sight without scrolling -->
+            <p class="source-group-name">General</p>
             <ul class="source-group">
                 <li>
                     <button type="button" class="source" data-show="market" aria-pressed="false">
@@ -311,6 +290,28 @@
                         <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-star"/></svg></span>
                         <span class="source-symbol">Starred</span>
                         <span class="source-count" id="starred-count" th:text="${starredIds.size()}">3</span>
+                    </button>
+                </li>
+            </ul>
+
+            <p class="source-group-name">Your holdings</p>
+            <ul class="source-group">
+                <li>
+                    <button type="button" class="source" data-show="portfolio" aria-pressed="true">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-briefcase"/></svg></span>
+                        <span class="source-symbol">All holdings</span>
+                        <span class="source-count" th:text="${total}">48</span>
+                    </button>
+                </li>
+                <!-- One button per holding with news: its logo (through its T212 ticker), its symbol and how many stories -->
+                <li th:each="entry : ${newsCount}" th:with="ticker=${tickers.get(entry.key)}">
+                    <button type="button" class="source" data-show="portfolio" th:data-symbol="${entry.key}" aria-pressed="false">
+                        <span class="logo" aria-hidden="true">
+                            <span class="logo-initial" th:text="${#strings.substring(entry.key, 0, 1)}">A</span>
+                            <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
+                        </span>
+                        <span class="source-symbol" th:text="${entry.key}">AAPL</span>
+                        <span class="source-count" th:text="${entry.value}">12</span>
                     </button>
                 </li>
             </ul>
