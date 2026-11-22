@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DividendHistoryTest {
 
     private static MonthlyDividends month(int year, int month, String euros) {
-        return new MonthlyDividends(YearMonth.of(year, month), new BigDecimal(euros));
+        return new MonthlyDividends(YearMonth.of(year, month), new BigDecimal(euros), List.of());   // who paid does not matter here
     }
 
     private final DividendHistory history = new DividendHistory(List.of(
@@ -50,5 +50,40 @@ class DividendHistoryTest {
 
         assertEquals(BigDecimal.ZERO, empty.total());
         assertEquals(0, empty.heightOf(empty.months().get(0)));
+    }
+
+    // ===== Monthly average of a year =====
+
+    @Test
+    void theMonthlyAverage_dividesTheYear_onlyAmongItsMonthsInTheList() {
+        // 2026 has three months in the list (January with nothing, March and June): 18.90 / 3
+        assertEquals(new BigDecimal("6.30"), history.monthlyAverageIn(2026));
+        // 2025 only has December
+        assertEquals(new BigDecimal("4.20"), history.monthlyAverageIn(2025));
+    }
+
+    @Test
+    void theMonthlyAverage_isRounded_toTwoDecimals() {
+        DividendHistory thirds = new DividendHistory(List.of(month(2026, 1, "10.00"), month(2026, 2, "0"), month(2026, 3, "0")));
+
+        assertEquals(new BigDecimal("3.33"), thirds.monthlyAverageIn(2026));   // 10 / 3 = 3.333..., which BigDecimal cannot hold exactly
+    }
+
+    @Test
+    void aYearNotInTheList_averagesZero_insteadOfDividingByZero() {
+        assertEquals(BigDecimal.ZERO, history.monthlyAverageIn(2024));
+    }
+
+    // ===== Who paid =====
+
+    @Test
+    void aPayer_isShownWithItsSymbol_withoutTheT212Ending() {
+        assertEquals("VICI", new DividendPayer("VICI_US_EQ", new BigDecimal("0.42")).symbol());
+        assertEquals("RWEd", new DividendPayer("RWEd_EQ", new BigDecimal("1.10")).symbol());
+    }
+
+    @Test
+    void aTickerWithoutUnderscore_isLeftAsItIs() {
+        assertEquals("VICI", new DividendPayer("VICI", new BigDecimal("0.42")).symbol());
     }
 }

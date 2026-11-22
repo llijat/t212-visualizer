@@ -19,6 +19,13 @@ public record DividendHistory(
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    /** What a month of that year left on average, counting only its months in the list (this year: up to now). */
+    public BigDecimal monthlyAverageIn(int year) {
+        long monthsOfYear = months.stream().filter(month -> month.month().getYear() == year).count();
+        if (monthsOfYear == 0) return BigDecimal.ZERO;
+        return totalIn(year).divide(BigDecimal.valueOf(monthsOfYear), 2, RoundingMode.HALF_UP);
+    }
+
     public BigDecimal best() {
         return months.stream().map(MonthlyDividends::receivedEur).max(Comparator.naturalOrder()).orElse(BigDecimal.ZERO);
     }

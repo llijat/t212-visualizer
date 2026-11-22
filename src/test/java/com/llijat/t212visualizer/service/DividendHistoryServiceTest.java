@@ -1,6 +1,7 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.DividendHistory;
+import com.llijat.t212visualizer.dto.DividendPayer;
 import com.llijat.t212visualizer.dto.MonthlyDividends;
 import com.llijat.t212visualizer.model.DividendEvent;
 import com.llijat.t212visualizer.repository.DividendEventRepository;
@@ -79,5 +80,52 @@ class DividendHistoryServiceTest {
         assertEquals(new BigDecimal("4.49"), history.months().get(11).receivedEur());
         assertEquals(new BigDecimal("0.84"), history.months().get(8).receivedEur());
         assertEquals(new BigDecimal("5.33"), history.total());
+    }
+
+    // ===== Who paid each month =====
+
+    @Test
+    void eachMonth_saysWhoPaid_theBiggestFirst() {
+        theTableHolds(
+                paid("O_US_EQ", NOW.atDay(15), "0.30"),
+                paid("VICI_US_EQ", NOW.atDay(8), "0.42"));
+
+        List<DividendPayer> payers = service.getLast12Months().months().get(11).payers();
+
+        assertEquals(List.of(
+                new DividendPayer("VICI_US_EQ", new BigDecimal("0.42")),
+                new DividendPayer("O_US_EQ", new BigDecimal("0.30"))), payers);
+    }
+
+    @Test
+    void twoPaymentsOfTheSameStockInAMonth_areOnePayer_withBothAddedUp() {
+        // The ordinary and the extraordinary dividend, on different days of the same month
+        theTableHolds(
+                paid("MU_US_EQ", NOW.atDay(3), "0.84"),
+                paid("MU_US_EQ", NOW.atDay(24), "1.50"));
+
+        MonthlyDividends month = service.getLast12Months().months().get(11);
+
+        assertEquals(List.of(new DividendPayer("MU_US_EQ", new BigDecimal("2.34"))), month.payers());
+        assertEquals(new BigDecimal("2.34"), month.receivedEur());
+    }
+
+    @Test
+    void theMonthTotal_isTheSumOfItsPayers() {
+        theTableHolds(
+                paid("O_US_EQ", NOW.minusMonths(1).atDay(15), "0.30"),
+                paid("VICI_US_EQ", NOW.minusMonths(1).atDay(8), "0.42"));
+
+        assertEquals(new BigDecimal("0.72"), service.getLast12Months().months().get(10).receivedEur());
+    }
+
+    @Test
+    void aMonthWithoutDividends_hasNoPayers() {
+        theTableHolds();
+
+        MonthlyDividends month = service.getLast12Months().months().get(0);
+
+        assertEquals(List.of(), month.payers());
+        assertEquals(BigDecimal.ZERO, month.receivedEur());
     }
 }

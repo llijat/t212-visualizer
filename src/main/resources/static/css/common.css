@@ -197,6 +197,12 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
 }
 .topbar-action:hover { background: var(--raised); }
 .topbar-action:disabled { opacity: 0.6; cursor: wait; }
+.topbar-action.icon-action { padding: 0.45rem 0.6rem; }
+.topbar-action[aria-pressed="true"] { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-bg); color: var(--accent); }
+
+/* ===== Privacy mode: every amount in euros marked "money" is blurred; percentages stay readable =====
+   For screenshots or showing the app to someone. The page's <html> gets the class "privacy" */
+.privacy .money { filter: blur(7px); user-select: none; }
 
 /* ===== Demo mode notice ===== */
 .demo-badge {
@@ -265,6 +271,12 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+}
+
+/* ===== Medium screens: the top bar buttons keep only their icons (screen readers still read their text) ===== */
+@media (max-width: 1150px) {
+    .action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .topbar-action { padding: 0.45rem 0.6rem; }
 }
 
 /* ===== Narrow screens: the page does scroll ===== */

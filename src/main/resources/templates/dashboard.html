@@ -6,6 +6,8 @@
     <title>T212 Visualizer</title>
     <!-- @{...} adds a fingerprint of the file to its name, so a changed stylesheet is never taken from the cache -->
     <link rel="stylesheet" th:href="@{/css/common.css}" href="/css/common.css">
+    <!-- Privacy mode before the first paint, so the amounts never flash on screen -->
+    <script>try { if (localStorage.getItem('t212-privacy') === 'on') document.documentElement.classList.add('privacy'); } catch (e) { }</script>
     <style>
         /* ===== Content: two columns that fill the rest of the screen ===== */
         .layout {
@@ -38,7 +40,7 @@
 
         /* ===== Compact positions table ===== */
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        th, td { text-align: left; padding: 0.6rem 0.6rem; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+        th, td { text-align: left; padding: 0.6rem 0.45rem; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
         th {
             color: var(--faint);
             font-weight: 500;
@@ -124,37 +126,66 @@
         }
         .story-row:hover .story-headline { color: var(--accent); }
 
-        /* ===== Account summary: no cards, the same voice as the expenses page =====
-           Three parts side by side, bottoms aligned: the value and a sentence that reads it, then the same money as a sum
-           with a bar (next to it, because it reads the same thing), and the dividends of the year at the end. It sits on the page itself, apart from the cards below. */
+        /* ===== Account summary: no cards, on the page itself =====
+           On the left, the account: what it is worth, what it made all-time, and the same money as a short sum over a bar
+           of what it is made of. On the right, the dividends of the year. The chart of the value will go between the two. */
         .summary {
             display: grid;
-            grid-template-columns: auto minmax(0, 44rem) minmax(16rem, 1fr);   /* the chart never below 16rem */
-            grid-template-areas: "value split dividends";
+            grid-template-columns: minmax(0, 46rem) minmax(16rem, 1fr);   /* the account takes its room first */
+            grid-template-areas: "account dividends";
             align-items: end;
-            gap: 1.25rem 3.5rem;
+            gap: 1.25rem 4.5rem;
             padding: 1.35rem 2rem 0.4rem;
         }
-        .summary.no-dividends { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "value split"; }
-        .summary-value { grid-area: value; }
+        .summary-account { grid-area: account; min-width: 0; }
         .summary-label { margin: 0 0 0.2rem; color: var(--muted); font-size: 0.85rem; }
+        .summary-headline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 1.1rem; margin: 0; }
         .summary-figure {
-            margin: 0;
             font: 300 clamp(2.6rem, 4vw, 3.5rem)/1 var(--figures);
             letter-spacing: -0.02em;
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
         }
         .summary-figure small { margin-left: 0.15em; font-size: 0.42em; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+        .summary-alltime { color: var(--muted); font-size: 0.9rem; white-space: nowrap; }
+        .summary-alltime .is-up, .summary-alltime .is-down { font: 500 1.05rem var(--figures); font-variant-numeric: tabular-nums; }
         .summary-verdict { margin: 0.55rem 0 0; color: var(--muted); font-size: 0.92rem; }
         .summary b { color: var(--text); font: 500 0.95rem var(--figures); font-variant-numeric: tabular-nums; }
-        .summary b.is-up { color: var(--green); }
-        .summary b.is-down { color: var(--red); }
+        .summary .is-up { color: var(--green); }
+        .summary .is-down { color: var(--red); }
 
-        /* Dividends: a bar per month, with its initial; each one opens that month in the calendar */
-        .summary-dividends { grid-area: dividends; justify-self: end; width: 100%; max-width: 34rem; }
-        .dividends-total { margin: 0 0 0.5rem; color: var(--muted); font-size: 0.82rem; }
+        /* The same money as a sum, in one line: what you put in, and what was earned or lost on it.
+           The big figure above is the result, so it is not repeated. */
+        .split { margin-top: 0.85rem; }
+        .ledger { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin: 0; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+        .ledger b { margin-left: 0.45rem; font-size: 1.1rem; }
+        .ledger-op { color: var(--faint); font: 300 1.15rem var(--figures); }
+        /* The bar measures the longer of the two: what you put in when you lost (the red part is the loss, in proportion),
+           what it is worth when you earned (the green line under it is the gain). The gain goes under it, not inside:
+           it is part of what the account is worth, and inside it would hide part of the cash. */
+        .split-track { position: relative; margin-top: 0.55rem; }
+        .split-bar { display: flex; height: 10px; border-radius: 3px; overflow: hidden; }
+        .split-bar span { min-width: 2px; }
+        .split-bar span + span { box-shadow: inset 2px 0 0 var(--bg); }   /* a thin gap between the parts, without moving them */
+        .split-invested { background: color-mix(in srgb, var(--muted) 70%, var(--raised)); }
+        .split-cash { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 70%, var(--raised)) 0 2px, var(--raised) 2px 5px); }
+        .split-lost { background: color-mix(in srgb, var(--red) 70%, var(--raised)); }
+        .split-gain { position: absolute; left: var(--at); right: 0; bottom: -7px; height: 4px; border-radius: 2px; background: var(--green); }
+        .split-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.3rem 1rem; margin-top: 0.6rem; color: var(--muted); font-size: 0.82rem; }
+        .split-key { display: inline-flex; align-items: baseline; gap: 0.4rem; }
+        .split-key i { align-self: center; width: 0.7rem; height: 0.7rem; border-radius: 2px; }
+        .split-key + .split-key { margin-left: auto; }
+
+        /* Dividends: a bar per month, with its initial; each one opens that month in the calendar.
+           Pointing at a month (or reaching it with Tab) shows it in the line above the bars */
+        .summary-dividends { grid-area: dividends; min-width: 0; max-width: 44rem; }
+        .dividends-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+        .dividends-average { color: var(--dividend); font: 500 0.85rem var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .dividends-total { margin: 0 0 0.35rem; color: var(--muted); font-size: 0.82rem; }
         .dividends-total b { font-size: 1.15rem; margin-right: 0.35rem; }
+        .dividend-readout { display: flex; justify-content: space-between; gap: 1rem; margin: 0 0 0.45rem; color: var(--muted); font-size: 0.8rem; }
+        .dividend-readout b { color: var(--dividend); font-size: 0.9rem; }
+        .dividend-readout-paid { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }   /* a month with many payers ends in "…" */
         .dividend-chart { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; }
         .dividend-month { display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; border-radius: 3px; color: var(--faint); text-decoration: none; }
         .dividend-month:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -163,42 +194,13 @@
         .dividend-month.no-payment .dividend-fill { background: var(--raised); }
         .dividend-initial { text-align: center; font: 0.68rem var(--figures); }
         .dividend-month.current .dividend-initial { color: var(--text); }
-        .dividend-month:hover .dividend-fill { filter: brightness(1.25); }
+        .dividend-month:hover .dividend-fill, .dividend-month:focus-visible .dividend-fill { filter: brightness(1.25); }
         .dividend-month.no-payment:hover .dividend-fill { background: var(--faint); }
         .dividend-month:hover .dividend-initial { color: var(--text); }
 
-        /* Where the money is, read as a sum: what you put in, plus what you earned (or minus what you lost), is what
-           the account is worth now. Under it, one short bar of what "now" is made of: invested and cash. */
-        .split { grid-area: split; width: 100%; max-width: 44rem; justify-self: start; padding-bottom: 0.15rem; }
-        .ledger { display: flex; align-items: last baseline; justify-content: space-between; gap: 0.75rem; margin: 0; }
-        .ledger-item { display: flex; flex-direction: column; gap: 0.1rem; margin: 0; white-space: nowrap; }   /* margin: they are paragraphs */
-        .ledger-item .summary-label { margin: 0; font-size: 0.78rem; }
-        .ledger-item b { font-size: 1.3rem; }
-        .ledger-now { text-align: right; }
-        .ledger-op { color: var(--muted); font: 300 1.3rem var(--figures); }
-        .split-track { position: relative; margin-top: 0.7rem; }
-        .split-bar { display: flex; height: 10px; border-radius: 3px; overflow: hidden; }
-        .split-lost { background: color-mix(in srgb, var(--red) 70%, var(--raised)); }
-        /* The gain is part of "now", so it goes under the bar instead of inside it: inside, it would hide part of the cash */
-        .split-gain { position: absolute; left: var(--at); right: 0; bottom: -7px; height: 4px; border-radius: 2px; background: var(--green); }
-        .split-bar span { min-width: 2px; }
-        .split-bar span + span { box-shadow: inset 2px 0 0 var(--bg); }   /* a thin gap between the parts, without moving them */
-        .split-invested { background: color-mix(in srgb, var(--muted) 70%, var(--raised)); }
-        .split-cash { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 70%, var(--raised)) 0 2px, var(--raised) 2px 5px); }
-        .split-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.3rem 1rem; margin-top: 0.75rem; color: var(--muted); font-size: 0.82rem; }
-        .split-key { display: inline-flex; align-items: baseline; gap: 0.4rem; }
-        .split-key i { align-self: center; width: 0.7rem; height: 0.7rem; border-radius: 2px; }
-        .split-key + .split-key { margin-left: auto; }
-
-        /* Less room: the three stay in one row, with a narrower chart */
+        /* Less room: the two stay side by side, closer, and the account gives up some width */
         @media (max-width: 1300px) {
             .summary { column-gap: 2.5rem; }
-            .summary-dividends { max-width: 16rem; }
-        }
-        /* Not enough room for three: the money (value and the sum) stays together on top, the dividends go under */
-        @media (max-width: 1100px) {
-            .summary { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "value split" "dividends dividends"; }
-            .summary-dividends { justify-self: start; }
         }
 
         /* Coloured pills for gains and losses: colour + sign, so they do not depend on colour alone */
@@ -242,11 +244,66 @@
         .weight-track { width: 3.2rem; height: 5px; border-radius: 3px; background: var(--raised); overflow: hidden; }
         .weight-fill { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
 
+        /* ===== Positions: count, filters and sorting ===== */
+        .positions-head { flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; }
+        .positions-head h2 { display: flex; align-items: baseline; gap: 0.6rem; }
+        .positions-head .count, .count-total { font-family: var(--text-font); font-weight: 400; }
+        .count-total { font: 500 0.88rem var(--figures); font-variant-numeric: tabular-nums; }
+        .positions-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+        .positions-search {
+            width: 11.5rem;
+            height: 2rem;
+            padding: 0 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-small);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.85rem;
+        }
+        .positions-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        /* Three buttons in one rail: the pressed one is lifted */
+        .segmented { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-small); background: var(--bg); }
+        .segmented button { height: calc(2rem - 6px); padding: 0 0.7rem; border-radius: 7px; background: none; color: var(--muted); font-size: 0.82rem; }
+        .segmented button:hover { color: var(--text); }
+        .segmented button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+        .toggle { height: 2rem; padding: 0 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-small); background: none; color: var(--muted); font: 500 0.82rem var(--figures); }
+        .toggle:hover { color: var(--text); }
+        .toggle[aria-pressed="true"] { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-bg); color: var(--accent); }
+
+        /* Column headers that sort: an arrow shows which one, and which way */
+        /* The arrow sits in the cell's padding (left of right-aligned figures), so it adds no width to the table */
+        .sort { position: relative; padding: 0; background: none; color: inherit; font: inherit; white-space: nowrap; }
+        .sort:hover { color: var(--text); }
+        .sort::after { content: "↕"; position: absolute; right: calc(100% + 0.2rem); font-size: 0.85em; opacity: 0; }
+        th:not(.num) .sort::after { right: auto; left: calc(100% + 0.25rem); }
+        .sort:hover::after, .sort:focus-visible::after { opacity: 0.45; }
+        th[aria-sort] { color: var(--text); }
+        th[aria-sort="ascending"] .sort::after { content: "▲"; opacity: 1; color: var(--accent); font-size: 0.7em; }
+        th[aria-sort="descending"] .sort::after { content: "▼"; opacity: 1; color: var(--accent); font-size: 0.7em; }
+
+        /* The P/L in euros: only with "€ P/L" pressed */
+        .positions-table:not(.show-eur) .pl-eur { display: none; }
+        td.pl-eur { font-size: 0.88rem; }
+
+        /* The exchange rate has helped (FX+) or hurt (FX−) a position */
+        .fx-badge {
+            margin-left: 0.35rem;
+            padding: 0.05rem 0.32rem;
+            border-radius: 5px;
+            background: var(--accent-bg);
+            color: var(--accent);
+            font: 600 0.62rem var(--figures);
+            letter-spacing: 0.03em;
+            vertical-align: 0.15em;
+        }
+        .fx-badge.down { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); }
+
         /* ===== Narrow screens (phone, small window): a single column ===== */
         @media (max-width: 900px) {
-            .summary, .summary.no-dividends { grid-template-columns: minmax(0, 1fr); grid-template-areas: "value" "split" "dividends"; padding: 1rem 1rem 0; gap: 1.25rem; }
-            .summary-dividends { justify-self: start; }
-            .split { max-width: none; justify-self: stretch; }
+            .summary { grid-template-columns: minmax(0, 1fr); grid-template-areas: "account" "dividends"; padding: 1rem 1rem 0; gap: 1.5rem; }
+            .summary-dividends { max-width: none; }
+            .positions-tools { width: 100%; }
+            .positions-search { flex: 1; width: auto; min-width: 7rem; }
             .layout { padding: 1rem; gap: 1rem; }
             .layout { grid-template-columns: minmax(0, 1fr); }   /* minmax: a wide table scrolls inside its card */
             .card { max-height: 70vh; }
@@ -258,6 +315,10 @@
     <!-- ===== Top bar ===== -->
     <header class="topbar">
         <th:block th:replace="~{fragments/topbar :: bar('portfolio')}"></th:block>
+        <button id="privacy-btn" class="topbar-action icon-action" type="button" aria-pressed="false" title="Hide the amounts">
+            <svg class="icon" aria-hidden="true"><use href="#icon-eye"/></svg>
+            <span class="visually-hidden">Hide the amounts</span>
+        </button>
         <button id="refresh-btn" class="topbar-action" title="Refresh" onclick="refresh()">
             <svg class="icon" aria-hidden="true"><use href="#icon-refresh"/></svg>
             <span class="action-label" id="refresh-label">Refresh</span>
@@ -273,13 +334,15 @@
         <symbol id="icon-coins" viewBox="0 0 24 24"><ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v4c0 1.7 2.7 3 6 3s6-1.3 6-3V7M3 11v4c0 1.7 2.7 3 6 3 1.1 0 2.1-.1 3-.4M15 13.5c3.3 0 6 1.3 6 3s-2.7 3-6 3-6-1.3-6-3"/></symbol>
         <symbol id="icon-cash" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v.01M18 15v.01"/></symbol>
         <symbol id="icon-trend-up" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></symbol>
+        <symbol id="icon-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="icon-eye-off" viewBox="0 0 24 24"><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.6 3.6M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></symbol>
         <symbol id="icon-trend-down" viewBox="0 0 24 24"><path d="M3 7l6 6 4-4 8 8M14 17h7v-7"/></symbol>
     </svg>
 
     <section class="summary" th:if="${summary == null}" aria-label="Account summary">
-        <div>
+        <div class="summary-account">
             <p class="summary-label">Account value</p>
-            <p class="summary-figure">—</p>
+            <p class="summary-headline"><span class="summary-figure">—</span></p>
             <p class="summary-verdict">Loading your account…</p>
         </div>
     </section>
@@ -301,83 +364,81 @@
                       totalReturn=${hasDeposits ? value - netDeposits : 0},
                       returnPercent=${hasDeposits ? totalReturn / netDeposits * 100 : 0},
                       gained=${totalReturn >= 0},
-                      hasDividends=${dividendHistory.total().signum() > 0}"
-             th:classappend="${hasDividends} ? '' : 'no-dividends'">
+                      hasDividends=${dividendHistory.total().signum() > 0}">
 
-        <!-- What the account is worth, and one sentence that reads it -->
-        <div class="summary-value">
+        <!-- The account: what it is worth and what it made all-time; under it, the same money as a sum over a bar -->
+        <div class="summary-account">
             <p class="summary-label">Account value</p>
-            <p class="summary-figure"><th:block th:text="${#numbers.formatDecimal(value, 1, 'COMMA', 2, 'POINT')}">12,480.20</th:block><small th:text="${cur}">€</small></p>
-            <p class="summary-verdict" th:if="${hasDeposits}">
-                <b th:class="${gained} ? 'is-up' : 'is-down'"
-                   th:text="${gained ? '+' : '−'} + ${#numbers.formatDecimal(totalReturn.abs(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">+1,240.55 €</b>
-                <th:block th:text="${gained} ? 'more than you put in, a' : 'less than you put in, a'">more than you put in, a</th:block>
-                <b th:class="${gained} ? 'is-up' : 'is-down'"
-                   th:text="${gained ? '' : '−'} + ${#numbers.formatDecimal(returnPercent.abs(), 1, 'COMMA', 1, 'POINT')} + ' %'">11.0 %</b>
-                return.
+            <p class="summary-headline">
+                <span class="summary-figure money"><th:block th:text="${#numbers.formatDecimal(value, 1, 'COMMA', 2, 'POINT')}">12,480.20</th:block><small th:text="${cur}">€</small></span>
+                <span class="summary-alltime" th:if="${hasDeposits}"
+                      th:title="${'Of which ' + (inv.unrealizedProfitLoss() >= 0 ? '+' : '−') + #numbers.formatDecimal(inv.unrealizedProfitLoss().abs(), 1, 'COMMA', 2, 'POINT') + ' in open positions and '
+                                 + (inv.realizedProfitLoss() >= 0 ? '+' : '−') + #numbers.formatDecimal(inv.realizedProfitLoss().abs(), 1, 'COMMA', 2, 'POINT') + ' in closed ones'}">
+                    <span class="money" th:classappend="${gained} ? 'is-up' : 'is-down'"
+                          th:text="${gained ? '+' : '−'} + ${#numbers.formatDecimal(totalReturn.abs(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">+1,240.55 €</span>
+                    <span th:classappend="${gained} ? 'is-up' : 'is-down'"
+                          th:text="'(' + ${gained ? '+' : '−'} + ${#numbers.formatDecimal(returnPercent.abs(), 1, 'COMMA', 1, 'POINT')} + ' %)'">(+11.0 %)</span>
+                    all-time
+                </span>
             </p>
             <p class="summary-verdict" th:unless="${hasDeposits}">Syncing your movements to calculate the return…</p>
+
+            <div class="split" th:if="${hasDeposits}" th:with="invested=${value - cash}">
+                <p class="ledger">
+                    <span>Put in<b class="money" th:text="${#numbers.formatDecimal(netDeposits, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">10,112.00 €</b></span>
+                    <span class="ledger-op" aria-hidden="true" th:text="${gained} ? '+' : '−'">−</span>
+                    <span><th:block th:text="${gained} ? 'Earned' : 'Lost'">Lost</th:block><b class="money" th:classappend="${gained} ? 'is-up' : 'is-down'"
+                          th:text="${#numbers.formatDecimal(totalReturn.abs(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">1,081.14 €</b></span>
+                </p>
+                <div class="split-track" role="img"
+                     th:style="${gained} ? '--at:' + ${netDeposits * 100 / value} + '%'"
+                     th:attr="aria-label=${#numbers.formatDecimal(invested, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' invested and '
+                              + ${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' in cash'
+                              + (${gained} ? '' : ', next to the part that was lost')">
+                    <div class="split-bar">
+                        <span class="split-invested" th:style="'flex:' + ${invested}"></span>
+                        <span class="split-cash" th:if="${cash.signum() > 0}" th:style="'flex:' + ${cash}"></span>
+                        <span class="split-lost" th:unless="${gained}" th:style="'flex:' + ${totalReturn.abs()}"></span>
+                    </div>
+                    <span class="split-gain" th:if="${gained}"></span>
+                </div>
+                <div class="split-foot">
+                    <span class="split-key"><i class="split-invested"></i><span><b class="money" th:text="${#numbers.formatDecimal(invested, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">8,718.46 €</b> invested<th:block th:if="${value > 0}" th:text="', ' + ${#numbers.formatDecimal(invested * 100 / value, 1, 0, 'POINT')} + ' %'">, 97 %</th:block></span></span>
+                    <span class="split-key"><i class="split-cash"></i><span><b class="money" th:text="${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">312.40 €</b> cash<th:block th:if="${value > 0}" th:text="', ' + ${#numbers.formatDecimal(cash * 100 / value, 1, 0, 'POINT')} + ' %'">, 3 %</th:block></span></span>
+                </div>
+            </div>
         </div>
 
-        <!-- Dividends of the last 12 months: only once something has been received -->
+        <!-- Dividends of the last 12 months: only once something has been received.
+             The line above the bars shows the month pointed at; until then, the latest month that paid. -->
         <div class="summary-dividends" th:if="${hasDividends}" th:with="year=${today.getYear()}">
-            <p class="summary-label">Dividends, last 12 months</p>
-            <p class="dividends-total">
-                <b th:text="${#numbers.formatDecimal(dividendHistory.total(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">52.08 €</b>
-                <th:block th:text="${#numbers.formatDecimal(dividendHistory.totalIn(year), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' in ' + ${year}">18.90 € in 2026</th:block>
+            <p class="summary-label dividends-head">
+                <span>Dividends, last 12 months</span>
+                <span class="dividends-average" th:title="'What a month of ' + ${year} + ' has left on average, up to now'">~<span class="money" th:text="${#numbers.formatDecimal(dividendHistory.monthlyAverageIn(year), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">2.15 €</span>/mo</span>
             </p>
-            <div class="dividend-chart">
+            <p class="dividends-total">
+                <b class="money" th:text="${#numbers.formatDecimal(dividendHistory.total(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">52.08 €</b>
+                <span class="money" th:text="${#numbers.formatDecimal(dividendHistory.totalIn(year), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">18.90 €</span>
+                <th:block th:text="'in ' + ${year}">in 2026</th:block>
+            </p>
+            <p class="dividend-readout" id="dividend-readout" aria-hidden="true">
+                <span id="dividend-readout-month">—</span>
+                <span class="dividend-readout-paid"><b class="money" id="dividend-readout-amount"></b> <span id="dividend-readout-payers"></span></span>
+            </p>
+            <div class="dividend-chart" id="dividend-chart">
                 <a class="dividend-month" th:each="m : ${dividendHistory.months()}"
                    th:with="monthName=${#strings.capitalize(#strings.toLowerCase(m.month().getMonth().name()))},
-                            label=${monthName + ' ' + m.month().getYear() + ': ' + #numbers.formatDecimal(m.receivedEur(), 1, 'COMMA', 2, 'POINT') + ' €'}"
+                            amount=${#numbers.formatDecimal(m.receivedEur(), 1, 'COMMA', 2, 'POINT') + ' €'}"
                    th:href="@{/calendar(month=${m.month()})}"
                    th:classappend="${(m.receivedEur().signum() == 0 ? 'no-payment ' : '') + (m.month().getYear() == year and m.month().getMonthValue() == today.getMonthValue() ? 'current' : '')}"
-                   th:title="${label}" th:attr="aria-label=${label + ' received. Open the calendar of that month'}">
+                   th:data-month="${#strings.substring(monthName, 0, 3) + ' ' + m.month().getYear()}" th:data-amount="${amount}"
+                   th:data-payers="${#strings.listJoin(m.payers().![symbol()], ', ')}"
+                   th:attr="aria-label=${monthName + ' ' + m.month().getYear() + ': ' + amount + ' received'
+                            + (m.payers().isEmpty() ? '' : ' from ' + #strings.listJoin(m.payers().![symbol() + ' ' + #numbers.formatDecimal(receivedEur(), 1, 'COMMA', 2, 'POINT') + ' €'], ', '))
+                            + '. Open the calendar of that month'}">
                     <span class="dividend-track"><span class="dividend-fill" th:style="'--height:' + ${dividendHistory.heightOf(m)} + '%'"></span></span>
                     <span class="dividend-initial" th:text="${#strings.substring(monthName, 0, 1)}" aria-hidden="true">J</span>
                 </a>
-            </div>
-        </div>
-
-        <!-- Where the money is, as a sum: put in, plus earned or minus lost, equals now.
-             Then what "now" is made of: invested and cash, in one short bar with each figure under its part. -->
-        <div class="split" th:if="${hasDeposits}" th:with="invested=${value - cash}">
-            <div class="ledger">
-                <p class="ledger-item">
-                    <span class="summary-label">Put in</span>
-                    <b th:text="${#numbers.formatDecimal(netDeposits, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">10,112.00 €</b>
-                </p>
-                <span class="ledger-op" aria-hidden="true" th:text="${gained} ? '+' : '−'">−</span>
-                <p class="ledger-item"
-                   th:title="${'Of which ' + (inv.unrealizedProfitLoss() >= 0 ? '+' : '−') + #numbers.formatDecimal(inv.unrealizedProfitLoss().abs(), 1, 'COMMA', 2, 'POINT') + ' in open positions and '
-                              + (inv.realizedProfitLoss() >= 0 ? '+' : '−') + #numbers.formatDecimal(inv.realizedProfitLoss().abs(), 1, 'COMMA', 2, 'POINT') + ' in closed ones'}">
-                    <span class="summary-label" th:text="${gained} ? 'Earned' : 'Lost'">Lost</span>
-                    <b th:class="${gained} ? 'is-up' : 'is-down'"
-                       th:text="${#numbers.formatDecimal(totalReturn.abs(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">1,081.14 €</b>
-                </p>
-                <span class="ledger-op" aria-hidden="true">=</span>
-                <p class="ledger-item ledger-now">
-                    <span class="summary-label">Now</span>
-                    <b th:text="${#numbers.formatDecimal(value, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">9,030.86 €</b>
-                </p>
-            </div>
-            <!-- The bar measures the longer of the two: what you put in when you lost (the red part is the loss, in proportion),
-                 what it is worth now when you earned (the green line under it is the gain, from where what you put in reaches) -->
-            <div class="split-track" role="img"
-                 th:style="${gained} ? '--at:' + ${netDeposits * 100 / value} + '%'"
-                 th:attr="aria-label=${#numbers.formatDecimal(invested, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' invested and '
-                          + ${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' in cash'
-                          + (${gained} ? '' : ', next to the part that was lost')">
-                <div class="split-bar">
-                    <span class="split-invested" th:style="'flex:' + ${invested}"></span>
-                    <span class="split-cash" th:if="${cash.signum() > 0}" th:style="'flex:' + ${cash}"></span>
-                    <span class="split-lost" th:unless="${gained}" th:style="'flex:' + ${totalReturn.abs()}"></span>
-                </div>
-                <span class="split-gain" th:if="${gained}"></span>
-            </div>
-            <div class="split-foot">
-                <span class="split-key"><i class="split-invested"></i><span><b th:text="${#numbers.formatDecimal(invested, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">8,718.46 €</b> invested</span></span>
-                <span class="split-key"><i class="split-cash"></i><span><b th:text="${#numbers.formatDecimal(cash, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">312.40 €</b> cash<th:block th:if="${value > 0}" th:text="', ' + ${#numbers.formatDecimal(cash * 100 / value, 1, 0, 'POINT')} + ' %'">, 3 %</th:block></span></span>
             </div>
         </div>
     </section>
@@ -385,10 +446,24 @@
     <main class="layout">
 
         <!-- ===== Left column: positions ===== -->
-        <section class="card">
-            <div class="card-header">
-                <h2>Positions</h2>
-                <span class="count" th:text="${positions.size()} + ' holdings'">0 holdings</span>
+        <!-- Filtering, sorting and the P/L in euros all happen in the page (script below): the data is already here -->
+        <section class="card" aria-labelledby="positions-title">
+            <div class="card-header positions-head">
+                <h2 id="positions-title">Positions
+                    <span class="count" id="positions-count" th:text="${positions.size()} + ' holdings'">0 holdings</span>
+                    <span class="count-total money" id="positions-total" hidden></span>
+                </h2>
+                <div class="positions-tools" th:unless="${positions.isEmpty()}">
+                    <input type="search" class="positions-search" id="position-search" placeholder="Filter ticker or name"
+                           aria-label="Filter the positions by ticker or name" autocomplete="off">
+                    <div class="segmented" role="group" aria-label="Which positions">
+                        <button type="button" data-show="all" aria-pressed="true">All</button>
+                        <button type="button" data-show="gainers" aria-pressed="false" title="Only the positions that are up">Gainers</button>
+                        <button type="button" data-show="losers" aria-pressed="false" title="Only the positions that are down">Losers</button>
+                    </div>
+                    <button type="button" class="toggle" id="pl-eur-toggle" aria-pressed="false"
+                            title="Show the profit or loss in euros, and the total of the positions shown">€ P/L</button>
+                </div>
             </div>
             <!-- Built by the script below from the rows of the table: the biggest positions, "Other" and cash -->
             <div class="allocation" id="allocation" th:if="${summary != null and !positions.isEmpty()}"
@@ -397,24 +472,31 @@
                 <div class="allocation-legend" id="allocation-legend"></div>
             </div>
             <div class="scroll">
-                <table>
+                <table class="positions-table" id="positions-table">
                     <thead>
                     <tr>
-                        <th>Holding</th>
-                        <th class="num" title="Share of your account value. The bar compares each position with your largest one.">Weight</th>
-                        <th class="num">Quantity</th>
-                        <th class="num">Avg. price</th>
-                        <th class="num">Current price</th>
-                        <th class="num">Total value</th>
-                        <th class="num" title="Unrealized profit or loss since you bought it, as a % of what you paid">P/L %</th>
+                        <th><button type="button" class="sort" data-sort="symbol">Holding</button></th>
+                        <th class="num" title="Share of your account value. The bar compares each position with your largest one."><button type="button" class="sort" data-sort="value">Weight</button></th>
+                        <th class="num"><button type="button" class="sort" data-sort="quantity">Quantity</button></th>
+                        <th class="num"><button type="button" class="sort" data-sort="avg">Avg. price</button></th>
+                        <th class="num"><button type="button" class="sort" data-sort="price">Current price</button></th>
+                        <th class="num"><button type="button" class="sort" data-sort="value">Total value</button></th>
+                        <th class="num pl-eur" title="Unrealized profit or loss in euros, exchange rate included"><button type="button" class="sort" data-sort="plEur">P/L €</button></th>
+                        <th class="num" title="Unrealized profit or loss since you bought it, as a % of what you paid"><button type="button" class="sort" data-sort="pl">P/L %</button></th>
                     </tr>
                     </thead>
                     <tbody>
-                    <!-- symbol: the current ticker resolved with OpenFIGI (META), or the T212 one (FB) until there is one -->
+                    <!-- symbol: the current ticker resolved with OpenFIGI (META), or the T212 one (FB) until there is one.
+                         pre/post: the instrument's currency around its prices ($564.47, 12.30 €, 1,234.50p) -->
                     <tr th:each="p : ${positions}" class="position-row"
                         th:with="symbol=${symbols.getOrDefault(p.ticker, p.symbol)},
-                                 weight=${summary != null and summary.totalValue() > 0 ? p.currentValue * 100 / summary.totalValue() : null}"
-                        th:data-symbol="${symbol}" th:data-value="${p.currentValue}">
+                                 weight=${summary != null and summary.totalValue() > 0 ? p.currentValue * 100 / summary.totalValue() : null},
+                                 pre=${p.currencyType == 'USD' ? '$' : (p.currencyType == 'GBP' ? '£' : '')},
+                                 post=${p.currencyType == 'EUR' ? ' €' : (p.currencyType == 'GBX' ? 'p' : (p.currencyType == null or pre != '' ? '' : ' ' + p.currencyType))},
+                                 plEur=${p.unrealizedProfitLoss}"
+                        th:data-symbol="${symbol}" th:data-search="${#strings.toLowerCase(symbol + ' ' + p.name + ' ' + p.ticker)}"
+                        th:data-value="${p.currentValue}" th:data-quantity="${p.quantity}" th:data-avg="${p.averagePricePaid}"
+                        th:data-price="${p.currentPrice}" th:data-pl="${p.unrealizedPlPercent}" th:data-pl-eur="${plEur}">
                         <td>
                             <div class="holding">
                                 <span class="logo" aria-hidden="true">
@@ -424,6 +506,11 @@
                                 </span>
                                 <div>
                                     <span class="symbol" th:text="${symbol}">AAPL</span>
+                                    <!-- The exchange rate has helped (FX+) or hurt (FX−) this position: it is part of its P/L -->
+                                    <span class="fx-badge" th:if="${p.fxImpact != null and p.fxImpact.signum() != 0}"
+                                          th:classappend="${p.fxImpact.signum() < 0} ? 'down'"
+                                          th:text="${p.fxImpact.signum() > 0} ? 'FX+' : 'FX−'"
+                                          th:title="'The exchange rate has ' + (${p.fxImpact.signum() > 0} ? 'added ' : 'taken ') + ${#numbers.formatDecimal(p.fxImpact.abs(), 1, 'COMMA', 2, 'POINT')} + ' € ' + (${p.fxImpact.signum() > 0} ? 'to' : 'from') + ' this position'">FX+</span>
                                     <span class="company" th:text="${p.name}">Apple Inc.</span>
                                 </div>
                             </div>
@@ -435,10 +522,12 @@
                             </span>
                             <span th:unless="${weight != null}">—</span>
                         </td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.quantity, 1, 'COMMA', 4, 'POINT')}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.averagePricePaid, 1, 'COMMA', 2, 'POINT')}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.currentPrice, 1, 'COMMA', 2, 'POINT')}">0</td>
-                        <td class="num" th:text="${#numbers.formatDecimal(p.currentValue, 1, 'COMMA', 2, 'POINT')}">0</td>
+                        <td class="num money" th:text="${#numbers.formatDecimal(p.quantity, 1, 'COMMA', 4, 'POINT')}">0</td>
+                        <td class="num" th:text="${pre} + ${#numbers.formatDecimal(p.averagePricePaid, 1, 'COMMA', 2, 'POINT')} + ${post}">$0.00</td>
+                        <td class="num" th:text="${pre} + ${#numbers.formatDecimal(p.currentPrice, 1, 'COMMA', 2, 'POINT')} + ${post}">$0.00</td>
+                        <td class="num money" th:text="${#numbers.formatDecimal(p.currentValue, 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</td>
+                        <td class="num pl-eur money" th:classappend="${plEur.signum() < 0} ? 'negative' : 'positive'"
+                            th:text="${plEur.signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(plEur.abs(), 1, 'COMMA', 2, 'POINT')} + ' €'">+0.00 €</td>
                         <td class="num">
                             <span class="pill" th:classappend="${p.unrealizedPlPercent >= 0} ? 'up' : 'down'"
                                   th:text="${p.unrealizedPlPercent >= 0 ? '+' : '−'} + ${#numbers.formatDecimal(p.unrealizedPlPercent.abs(), 1, 'COMMA', 2, 'POINT')} + '%'">+0.00%</span>
@@ -449,6 +538,7 @@
                 <p class="empty" th:if="${positions.isEmpty()}">
                     No data yet: press "Refresh" or wait for the first scheduled update.
                 </p>
+                <p class="empty" id="positions-none" hidden>No position matches. Try another ticker, or show all of them.</p>
             </div>
         </section>
 
@@ -567,6 +657,140 @@
                 }
             });
         }
+    </script>
+
+    <script>
+        // Remembered choices of this browser (privacy, filters, sorting). Never needed: without them the page starts as usual
+        const stored = {
+            get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
+            set(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* private window: nothing remembered */ } }
+        };
+
+        // ===== Privacy: hides the amounts in euros (percentages stay), for screenshots or showing the app to someone =====
+        (function () {
+            const button = document.getElementById('privacy-btn');
+            if (!button) return;
+            const show = on => {
+                document.documentElement.classList.toggle('privacy', on);
+                button.setAttribute('aria-pressed', String(on));
+                button.title = on ? 'Show the amounts' : 'Hide the amounts';
+                button.querySelector('use').setAttribute('href', on ? '#icon-eye-off' : '#icon-eye');
+            };
+            show(document.documentElement.classList.contains('privacy'));
+            button.addEventListener('click', () => {
+                const on = !document.documentElement.classList.contains('privacy');
+                show(on);
+                stored.set('t212-privacy', on ? 'on' : 'off');
+            });
+        })();
+
+        // ===== Dividends: the month pointed at, in the line above the bars =====
+        (function () {
+            const chart = document.getElementById('dividend-chart');
+            if (!chart) return;
+            const month = document.getElementById('dividend-readout-month');
+            const amount = document.getElementById('dividend-readout-amount');
+            const payers = document.getElementById('dividend-readout-payers');
+            const months = [...chart.querySelectorAll('.dividend-month')];
+            // Until something is pointed at: the latest month that paid
+            const latest = months.filter(m => !m.classList.contains('no-payment')).pop() || months[months.length - 1];
+            const showMonth = m => {
+                month.textContent = m.dataset.month;
+                amount.textContent = m.dataset.amount;
+                payers.textContent = m.dataset.payers ? '— ' + m.dataset.payers : '';   // who paid, the biggest first
+            };
+            months.forEach(m => {
+                m.addEventListener('mouseenter', () => showMonth(m));
+                m.addEventListener('focus', () => showMonth(m));
+            });
+            chart.addEventListener('mouseleave', () => showMonth(latest));
+            chart.addEventListener('focusout', () => showMonth(latest));
+            showMonth(latest);
+        })();
+
+        // ===== Positions: filter by text, gainers or losers, sort by any column, and the P/L in euros =====
+        (function () {
+            const table = document.getElementById('positions-table');
+            const search = document.getElementById('position-search');
+            if (!table || !search) return;
+            const body = table.tBodies[0];
+            const rows = [...body.rows];
+            const original = rows.slice();
+            const count = document.getElementById('positions-count');
+            const total = document.getElementById('positions-total');
+            const none = document.getElementById('positions-none');
+            const showButtons = [...document.querySelectorAll('[data-show]')];
+            const eurButton = document.getElementById('pl-eur-toggle');
+            const euros = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            let show = stored.get('t212-positions-show') || 'all';
+            let eur = stored.get('t212-positions-eur') === 'on';
+            let [sortKey, sortDirection] = (stored.get('t212-positions-sort') || ':').split(':');
+            sortDirection = Number(sortDirection) || 1;
+
+            function filter() {
+                const words = search.value.trim().toLowerCase();
+                let shown = 0;
+                let sum = 0;
+                rows.forEach(row => {
+                    const pl = Number(row.dataset.pl);
+                    const fits = (!words || row.dataset.search.includes(words))
+                        && (show === 'all' || (show === 'gainers' ? pl > 0 : pl < 0));
+                    row.hidden = !fits;
+                    if (fits) { shown++; sum += Number(row.dataset.plEur) || 0; }
+                });
+                count.textContent = shown === rows.length ? rows.length + ' holdings' : shown + ' of ' + rows.length;
+                total.hidden = !eur || shown === 0;
+                total.textContent = (sum < 0 ? '−' : '+') + euros.format(Math.abs(sum)) + ' €';
+                total.className = 'count-total money ' + (sum < 0 ? 'negative' : 'positive');
+                total.title = 'Profit or loss of the ' + shown + ' positions shown';
+                none.hidden = shown > 0;
+            }
+
+            function sort() {
+                const order = !sortKey ? original : rows.slice().sort((a, b) => {
+                    if (sortKey === 'symbol') return a.dataset.symbol.localeCompare(b.dataset.symbol) * sortDirection;
+                    return (Number(a.dataset[sortKey]) - Number(b.dataset[sortKey])) * sortDirection;
+                });
+                order.forEach(row => body.append(row));
+                table.querySelectorAll('th').forEach(th => {
+                    const button = th.querySelector('.sort');
+                    if (button && button.dataset.sort === sortKey) th.setAttribute('aria-sort', sortDirection > 0 ? 'ascending' : 'descending');
+                    else th.removeAttribute('aria-sort');
+                });
+            }
+
+            function showEur() {
+                table.classList.toggle('show-eur', eur);
+                eurButton.setAttribute('aria-pressed', String(eur));
+            }
+
+            search.addEventListener('input', filter);
+            showButtons.forEach(button => button.addEventListener('click', () => {
+                show = button.dataset.show;
+                showButtons.forEach(other => other.setAttribute('aria-pressed', String(other === button)));
+                stored.set('t212-positions-show', show);
+                filter();
+            }));
+            eurButton.addEventListener('click', () => {
+                eur = !eur;
+                stored.set('t212-positions-eur', eur ? 'on' : 'off');
+                showEur();
+                filter();
+            });
+            // The first click sorts names A to Z and figures from the biggest; the next one, the other way
+            table.querySelectorAll('.sort').forEach(button => button.addEventListener('click', () => {
+                if (sortKey === button.dataset.sort) sortDirection = -sortDirection;
+                else { sortKey = button.dataset.sort; sortDirection = sortKey === 'symbol' ? 1 : -1; }
+                stored.set('t212-positions-sort', sortKey + ':' + sortDirection);
+                sort();
+            }));
+
+            showButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.show === show)));
+            showEur();
+            sort();
+            filter();
+        })();
     </script>
 
     <script>
