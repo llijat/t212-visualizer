@@ -1,10 +1,14 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.CalendarDay;
+import com.llijat.t212visualizer.dto.CalendarDividend;
 import com.llijat.t212visualizer.dto.CalendarMonth;
+import com.llijat.t212visualizer.dto.UpcomingDividend;
 import com.llijat.t212visualizer.dto.UpcomingEarnings;
+import com.llijat.t212visualizer.model.DividendEvent;
 import com.llijat.t212visualizer.model.EarningsEvent;
 import com.llijat.t212visualizer.model.Position;
+import com.llijat.t212visualizer.repository.DividendEventRepository;
 import com.llijat.t212visualizer.repository.EarningsEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +27,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -41,11 +46,15 @@ class CalendarServiceTest {
     @Mock
     private CompanyProfileService companyProfileService;
 
+    // Without stubbing, no dividends at all: the earnings tests above do not need any
+    @Mock
+    private DividendEventRepository dividendRepository;
+
     private CalendarService service;
 
     @BeforeEach
     void setUp() {
-        service = new CalendarService(repository, positionService, companyProfileService);
+        service = new CalendarService(repository, positionService, companyProfileService, dividendRepository);
     }
 
     private static Position position(String ticker) {
@@ -220,5 +229,186 @@ class CalendarServiceTest {
                 earnings("NVDA_US_EQ", TODAY), earnings("AAPL_US_EQ", TODAY.plusDays(9))));
 
         assertEquals(List.of("NVDA", "AAPL"), service.getComingUp().stream().map(UpcomingEarnings::symbol).toList());
+    }
+    // ===== Dividends =====
+
+    private static final YearMonth DECEMBER = YearMonth.of(2026, 12);
+    private static final LocalDate NEXT_PAYMENT = LocalDate.of(2026, 12, 10);
+
+    private static Position holding(String ticker, String shares) {
+        BigDecimal one = BigDecimal.ONE;
+        return new Position(ticker, ticker + " Inc.", "US0000000001", new BigDecimal(shares), one, one, one, BigDecimal.ZERO, null, one, "USD", "EUR");
+    }
+
+    private static DividendEvent announced(String ticker, LocalDate payment, String perShare) {
+        DividendEvent dividend = new DividendEvent(ticker, payment);
+        dividend.updateAnnouncement(payment.minusDays(14), new BigDecimal(perShare));
+        return dividend;
+    }
+
+    private static DividendEvent received(String ticker, LocalDate payment, String perShare, String inEuro, String shares) {
+        DividendEvent dividend = new DividendEvent(ticker, payment);
+        dividend.recordPayment(new BigDecimal(inEuro), new BigDecimal(perShare), new BigDecimal(shares));
+        return dividend;
+    }
+
+    private void theGridHas(DividendEvent... dividends) {
+        when(dividendRepository.findByPaymentDateBetween(LocalDate.of(2026, 11, 30), LocalDate.of(2027, 1, 3))).thenReturn(List.of(dividends));
+    }
+
+    private void receivedBefore(DividendEvent... newestFirst) {
+        when(dividendRepository.findByReceivedEurIsNotNullOrderByPaymentDateDesc()).thenReturn(List.of(newestFirst));
+    }
+
+    private CalendarDividend theOnlyDividendOn(LocalDate date) {
+        List<CalendarDividend> dividends = dayOf(service.getMonth(DECEMBER), date).dividends();
+        assertEquals(1, dividends.size());
+        return dividends.get(0);
+    }
+
+    @Test
+    void anAnnouncedDividend_goesToItsPaymentDay_withItsExDateAndAmount() {
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "8.5")));
+        theGridHas(announced("MU_US_EQ", NEXT_PAYMENT, "0.115"));
+
+        CalendarDividend dividend = theOnlyDividendOn(NEXT_PAYMENT);
+
+        assertEquals("MU_US_EQ", dividend.ticker());
+        assertEquals(NEXT_PAYMENT.minusDays(14), dividend.exDividendDate());
+        assertEquals(new BigDecimal("0.115"), dividend.amountPerShare());
+        assertFalse(dividend.isReceived());
+    }
+
+    @Test
+    void theEstimate_usesTheShareOfTheGrossThatArrivedLastTime() {
+        // Last time: 0.115 $ x 8.5 shares = 0.9775 $ gross, and 0.70 € arrived (tax and exchange rate)
+        // Now 10 shares and 0.12 $ announced: 0.12 x 10 x 0.70 / 0.9775 = 0.859... -> 0.86 €
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "10")));
+        theGridHas(announced("MU_US_EQ", NEXT_PAYMENT, "0.12"));
+        receivedBefore(received("MU_US_EQ", LocalDate.of(2026, 9, 10), "0.115", "0.70", "8.5"));
+
+        assertEquals(new BigDecimal("0.86"), theOnlyDividendOn(NEXT_PAYMENT).estimatedEur());
+    }
+
+    @Test
+    void theEstimate_isBasedOnTheMostRecentPayment_notAnOlderOne() {
+        // The repository gives the newest first: the September payment (more tax) must be the one used
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "10")));
+        theGridHas(announced("MU_US_EQ", NEXT_PAYMENT, "0.10"));
+        receivedBefore(
+                received("MU_US_EQ", LocalDate.of(2026, 9, 10), "0.10", "0.50", "10"),
+                received("MU_US_EQ", LocalDate.of(2026, 6, 10), "0.10", "0.90", "10"));
+
+        assertEquals(new BigDecimal("0.50"), theOnlyDividendOn(NEXT_PAYMENT).estimatedEur());
+    }
+
+    @Test
+    void withoutAPreviousPayment_thereIsNoEstimate_onlyTheDate() {
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "8.5")));
+        theGridHas(announced("MU_US_EQ", NEXT_PAYMENT, "0.115"));
+
+        assertNull(theOnlyDividendOn(NEXT_PAYMENT).estimatedEur());
+    }
+
+    @Test
+    void aReceivedDividend_showsTheRealFigure_andNoEstimate() {
+        LocalDate paid = LocalDate.of(2026, 12, 3);
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "8.5")));
+        DividendEvent december = received("MU_US_EQ", paid, "0.115", "0.84", "8.5");
+        theGridHas(december);
+        receivedBefore(december);
+
+        CalendarDividend dividend = theOnlyDividendOn(paid);
+
+        assertTrue(dividend.isReceived());
+        assertEquals(new BigDecimal("0.84"), dividend.receivedEur());
+        assertNull(dividend.estimatedEur());
+    }
+
+    @Test
+    void aStockYouSold_keepsWhatItPaid_butLosesWhatWasOnlyAnnounced() {
+        // Received money was real, so it stays; an announcement for shares you no longer have does not
+        LocalDate paid = LocalDate.of(2026, 12, 3);
+        theGridHas(received("ORCL_US_EQ", paid, "0.50", "3.65", "10"), announced("ORCL_US_EQ", NEXT_PAYMENT, "0.50"));
+
+        CalendarMonth calendar = service.getMonth(DECEMBER);
+
+        assertEquals(1, dayOf(calendar, paid).dividends().size());
+        assertTrue(dayOf(calendar, NEXT_PAYMENT).dividends().isEmpty());
+    }
+
+    @Test
+    void aPaymentRecordedBeforeTheQuantityWasStored_givesNoEstimate_insteadOfFailing() {
+        DividendEvent withoutQuantity = new DividendEvent("MU_US_EQ", LocalDate.of(2026, 9, 10));
+        withoutQuantity.recordPayment(new BigDecimal("0.70"), new BigDecimal("0.115"), null);
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "10")));
+        theGridHas(announced("MU_US_EQ", NEXT_PAYMENT, "0.12"));
+        receivedBefore(withoutQuantity);
+
+        assertNull(theOnlyDividendOn(NEXT_PAYMENT).estimatedEur());
+    }
+
+    @Test
+    void severalDividendsOnOneDay_comeSortedByTicker() {
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("ORCL_US_EQ", "1"), holding("MU_US_EQ", "1")));
+        theGridHas(announced("ORCL_US_EQ", NEXT_PAYMENT, "0.50"), announced("MU_US_EQ", NEXT_PAYMENT, "0.115"));
+
+        List<CalendarDividend> dividends = dayOf(service.getMonth(DECEMBER), NEXT_PAYMENT).dividends();
+
+        assertEquals(List.of("MU_US_EQ", "ORCL_US_EQ"), dividends.stream().map(CalendarDividend::ticker).toList());
+    }
+
+    @Test
+    void aDayWithoutDividends_getsAnEmptyList_neverNull() {
+        assertNotNull(dayOf(service.getMonth(DECEMBER), NEXT_PAYMENT).dividends());
+    }
+    // ===== Coming up: dividends of the next two weeks =====
+
+    private void comingUpHolds(DividendEvent... dividends) {
+        LocalDate today = LocalDate.now(ZoneId.of("Europe/Madrid"));
+        when(dividendRepository.findByPaymentDateBetweenOrderByPaymentDateAsc(today, today.plusDays(13))).thenReturn(List.of(dividends));
+    }
+
+    @Test
+    void comingUpDividends_asksForTodayAndTheNext13Days() {
+        comingUpHolds();
+
+        assertTrue(service.getComingUpDividends().isEmpty());
+    }
+
+    @Test
+    void comingUpDividends_carryTheCurrentSymbol_andTheEstimate() {
+        LocalDate soon = LocalDate.now(ZoneId.of("Europe/Madrid")).plusDays(4);
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("FB_US_EQ", "10")));
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of("FB_US_EQ", "META"));
+        comingUpHolds(announced("FB_US_EQ", soon, "0.525"));
+        receivedBefore(received("FB_US_EQ", soon.minusMonths(3), "0.525", "4.13", "10"));
+
+        UpcomingDividend dividend = service.getComingUpDividends().get(0);
+
+        assertEquals("META", dividend.symbol());
+        assertEquals("FB_US_EQ", dividend.ticker());
+        assertEquals(soon, dividend.date());
+        assertNull(dividend.receivedEur());
+        // 0.525 x 10 x 4.13 / (0.525 x 10) = 4.13: same shares and amount as last time, so the same euros
+        assertEquals(new BigDecimal("4.13"), dividend.estimatedEur());
+    }
+
+    @Test
+    void comingUpDividends_leaveOutStocksYouNoLongerHold_becauseThoseWillNotPayYou() {
+        LocalDate soon = LocalDate.now(ZoneId.of("Europe/Madrid")).plusDays(4);
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "8.5")));
+        comingUpHolds(announced("ORCL_US_EQ", soon, "0.50"), announced("MU_US_EQ", soon.plusDays(1), "0.115"));
+
+        assertEquals(List.of("MU"), service.getComingUpDividends().stream().map(UpcomingDividend::symbol).toList());
+    }
+
+    @Test
+    void comingUpDividends_keepTheOrderOfTheQuery() {
+        LocalDate today = LocalDate.now(ZoneId.of("Europe/Madrid"));
+        when(positionService.getAllPositions()).thenReturn(List.of(holding("MU_US_EQ", "1"), holding("ORCL_US_EQ", "1")));
+        comingUpHolds(announced("ORCL_US_EQ", today.plusDays(2), "0.50"), announced("MU_US_EQ", today.plusDays(9), "0.115"));
+
+        assertEquals(List.of("ORCL", "MU"), service.getComingUpDividends().stream().map(UpcomingDividend::symbol).toList());
     }
 }

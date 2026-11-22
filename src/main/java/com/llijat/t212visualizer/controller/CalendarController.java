@@ -7,6 +7,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 
@@ -26,6 +27,9 @@ public class CalendarController {
         if (month == null) month = YearMonth.now(SPAIN);
         model.addAttribute("calendar",calendarService.getMonth(month));
         model.addAttribute("symbols", companyProfileService.currentSymbols());
+        model.addAttribute("comingUp", calendarService.getComingUp());
+        model.addAttribute("comingUpDividends", calendarService.getComingUpDividends());
+        model.addAttribute("today", LocalDate.now(SPAIN));
         return "calendar";
     }
 }

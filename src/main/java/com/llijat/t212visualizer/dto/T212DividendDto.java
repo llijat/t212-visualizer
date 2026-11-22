@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 
 public record T212DividendDto(
         String ticker,
+        BigDecimal quantity,
         BigDecimal grossAmountPerShare,
         BigDecimal amountInEuro,
         String paidOn
@@ -13,4 +14,6 @@ public record T212DividendDto(
     public LocalDate paidDay() {
         return OffsetDateTime.parse(paidOn).toLocalDate();
     }
+
+
 }

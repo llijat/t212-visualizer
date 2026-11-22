@@ -78,6 +78,7 @@ class DemoT212ClientTest {
 
         assertEquals(new BigDecimal("0.11"), globex.grossAmountPerShare());
         assertEquals(new BigDecimal("0.36"), globex.amountInEuro());
+        assertEquals(new BigDecimal("4.2"), globex.quantity());
     }
 
     @Test

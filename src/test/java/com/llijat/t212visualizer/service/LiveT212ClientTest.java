@@ -60,6 +60,7 @@ class LiveT212ClientTest {
         assertEquals(2, page.items().size());
         T212DividendDto newest = page.items().get(0);
         assertEquals("MU_US_EQ", newest.ticker());
+        assertEquals(new BigDecimal("8.5"), newest.quantity());
         assertEquals(new BigDecimal("0.115"), newest.grossAmountPerShare());
         assertEquals(new BigDecimal("0.84"), newest.amountInEuro());
         assertEquals(LocalDate.of(2026, 10, 16), newest.paidDay());

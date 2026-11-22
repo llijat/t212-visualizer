@@ -51,13 +51,13 @@ class DividendPaymentServiceTest {
 
     private static T212DividendDto paid(String ticker, int daysAgo, String perShare, String inEuro) {
         LocalDate day = LocalDate.now().minusDays(daysAgo);
-        return new T212DividendDto(ticker, perShare == null ? null : new BigDecimal(perShare),
+        return new T212DividendDto(ticker, new BigDecimal("8.5"), perShare == null ? null : new BigDecimal(perShare),
                 inEuro == null ? null : new BigDecimal(inEuro), day + "T09:30:00.000+01:00");
     }
 
     private static T212DividendDto paidMonthsAgo(String ticker, int months) {
         LocalDate day = LocalDate.now().minusMonths(months);
-        return new T212DividendDto(ticker, new BigDecimal("0.115"), new BigDecimal("0.84"), day + "T09:30:00.000+01:00");
+        return new T212DividendDto(ticker, new BigDecimal("8.5"), new BigDecimal("0.115"), new BigDecimal("0.84"), day + "T09:30:00.000+01:00");
     }
 
     private void onePage(T212DividendDto... payments) {
@@ -84,6 +84,7 @@ class DividendPaymentServiceTest {
         assertEquals(LocalDate.now().minusDays(20), saved.getPaymentDate());
         assertEquals(new BigDecimal("8.80"), saved.getReceivedEur());
         assertEquals(new BigDecimal("1.10"), saved.getAmountPerShare());
+        assertEquals(new BigDecimal("8.5"), saved.getReceivedQuantity());
         assertNull(saved.getExDividendDate());
     }
 
@@ -114,6 +115,8 @@ class DividendPaymentServiceTest {
         verify(repository, times(1)).save(savedCaptor.capture());
         assertEquals(new BigDecimal("4.49"), savedCaptor.getValue().getReceivedEur());
         assertEquals(new BigDecimal("0.615"), savedCaptor.getValue().getAmountPerShare());
+        // Both payments are for the same 8.5 shares: adding them up would give 17 and halve the estimate's percentage
+        assertEquals(new BigDecimal("8.5"), savedCaptor.getValue().getReceivedQuantity());
     }
 
     @Test
@@ -172,7 +175,7 @@ class DividendPaymentServiceTest {
     void anOldPaymentWithoutAnAmount_stillStopsTheReading() {
         // The date is checked before the amount: otherwise this one would be skipped and the reading would go on
         when(t212Client.fetchDividends(FIRST_PAGE)).thenReturn(new T212DividendPageDto(
-                List.of(new T212DividendDto("MU_US_EQ", null, null, LocalDate.now().minusMonths(14) + "T09:30:00.000+01:00")),
+                List.of(new T212DividendDto("MU_US_EQ", null, null, null, LocalDate.now().minusMonths(14) + "T09:30:00.000+01:00")),
                 "/api/v0/equity/history/dividends?limit=50&cursor=123"));
 
         service.importPayments();

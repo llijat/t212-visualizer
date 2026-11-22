@@ -7,11 +7,12 @@
     <!-- @{...} adds a fingerprint of the file to its name, so a changed stylesheet is never taken from the cache -->
     <link rel="stylesheet" th:href="@{/css/common.css}" href="/css/common.css">
     <style>
-        /* ===== Colours of each type of event (dividends will get their own) ===== */
+        /* ===== Colours of each type of event ===== */
         :root {
             --earnings: var(--accent);
             --earnings-bg: color-mix(in srgb, var(--accent) 14%, var(--panel));
             --dividend: #f2c25a;
+            --dividend-bg: color-mix(in srgb, var(--dividend) 12%, var(--panel));
         }
 
         /* ===== Page: the calendar on the left, the side panel on the right ===== */
@@ -146,11 +147,21 @@
             border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
             border-left: 3px solid var(--earnings);
         }
+        /* Dividends: the same chip in their own colour; dashed while they are only announced */
+        .chip[data-type="dividend"] { border-left-color: var(--dividend); background: var(--dividend-bg); }
+        .chip[data-type="dividend"].upcoming {
+            background: transparent;
+            border: 1px dashed color-mix(in srgb, var(--dividend) 45%, transparent);
+            border-left: 3px solid var(--dividend);
+        }
+        .chip[data-type="dividend"].selected { outline-color: var(--dividend); }
+        .chip-amount { color: var(--muted); font: 500 0.72rem var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .chip-ticker { font: 600 0.8rem var(--figures); letter-spacing: 0.01em; }
         .chip .logo { font-size: 0.85rem; }
         /* The word "Earnings" only shows when it fits whole; the colour and the panel still tell the type */
         .day { container-type: inline-size; }
         @container (max-width: 175px) { .chip-type { display: none; } }
+        @container (max-width: 129px) { .chip-amount { display: none; } }   /* "≈ 12.28 €" with its ticker needs about 128 px */
         .side-head .logo { font-size: 2.4rem; }
         .chip-type { color: var(--muted); font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .chip-end { margin-left: auto; display: inline-flex; align-items: center; gap: 0.3rem; }
@@ -173,7 +184,7 @@
 
         /* Filters: a hidden type disappears from the grid */
         .calendar.hide-earnings .chip[data-type="earnings"] { display: none; }
-        .calendar.hide-earnings .more[data-type="earnings"] { display: none; }
+        .calendar.hide-dividend .chip[data-type="dividend"] { display: none; }
 
         .empty-month {
             margin: 0;
@@ -222,6 +233,7 @@
         .tag.neutral { background: var(--raised); color: var(--muted); }
         .tag.beat { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
         .tag.miss { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); }
+        .tag.dividend { background: var(--dividend-bg); color: var(--dividend); }
 
         .metric { border-top: 1px solid var(--border); padding-top: 0.9rem; }
         .metric h3 { margin: 0 0 0.6rem; font: 500 0.95rem var(--figures); color: var(--muted); }
@@ -237,8 +249,33 @@
         .day-list { display: flex; flex-direction: column; gap: 0.35rem; }
         .day-list .chip { font-size: 0.85rem; padding: 0.4rem 0.6rem; }
 
-        .side-empty { margin: auto 0; text-align: center; color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
-        .side-empty .icon { width: 2rem; height: 2rem; margin-bottom: 0.4rem; opacity: 0.6; }
+        /* With nothing in the next two weeks there is no panel: the calendar takes the whole width */
+        .side.idle.nothing-coming { display: none; }
+
+        /* ===== Coming up: what the panel shows while no event is open ===== */
+        .side-coming { display: flex; flex-direction: column; gap: 1.1rem; }
+        .coming-group h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.35rem; font: 500 0.95rem var(--figures); color: var(--muted); }
+        .coming-group .swatch { width: 0.55rem; height: 0.55rem; border-radius: 2px; background: var(--swatch); }
+        .coming-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.1rem; }
+        .coming-row {
+            display: grid;
+            grid-template-columns: 4.7rem auto minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.45rem 0.55rem;
+            margin: 0 -0.55rem;
+            border-radius: 8px;
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.88rem;
+        }
+        .coming-row:hover { background: var(--raised); }
+        .coming-date { color: var(--muted); font: 0.82rem var(--figures); font-variant-numeric: tabular-nums; }
+        .coming-date.is-soon { color: var(--accent); }
+        .coming-row .logo { font-size: 1.2rem; }
+        .coming-symbol { font: 600 0.88rem var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .coming-extra { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted); font: 500 0.8rem var(--figures); white-space: nowrap; }
+        .coming-row[data-type="dividend"] .coming-extra { color: var(--dividend); }
 
         /* ===== Narrower screens: the panel goes over the calendar ===== */
         @media (max-width: 1100px) {
@@ -307,7 +344,7 @@
                     <button type="button" class="filter" data-filter="earnings" aria-pressed="true" style="--swatch: var(--earnings)">
                         <span class="swatch"></span>Earnings
                     </button>
-                    <button type="button" class="filter" disabled aria-pressed="false" title="Dividends: coming soon" style="--swatch: var(--dividend)">
+                    <button type="button" class="filter" data-filter="dividend" aria-pressed="true" style="--swatch: var(--dividend)">
                         <span class="swatch"></span>Dividends
                     </button>
                     <span class="legend-hint" title="Before the US market opens"><svg class="icon session" aria-hidden="true"><use href="#icon-sun"/></svg>Pre-market</span>
@@ -316,8 +353,8 @@
             </div>
 
             <p class="empty-month"
-               th:if="${#lists.isEmpty(calendar.days().?[!earnings().isEmpty()])}">
-                No earnings this month for the US stocks you hold.
+               th:if="${#lists.isEmpty(calendar.days().?[!earnings().isEmpty() or !dividends().isEmpty()])}">
+                No earnings or dividends this month for the stocks you hold.
             </p>
 
             <div class="weekdays" aria-hidden="true">
@@ -326,14 +363,14 @@
 
             <div class="grid">
                 <div class="day" th:each="day : ${calendar.days()}"
-                     th:classappend="${(day.inMonth() ? '' : 'outside ') + (day.today() ? 'today ' : '') + (day.earnings().isEmpty() ? 'no-events' : '')}"
+                     th:classappend="${(day.inMonth() ? '' : 'outside ') + (day.today() ? 'today ' : '') + (day.earnings().isEmpty() and day.dividends().isEmpty() ? 'no-events' : '')}"
                      th:attr="data-date=${day.date()}">
                     <div class="day-head">
                         <span class="day-number" th:text="${day.date().getDayOfMonth()}">1</span>
                         <span class="day-label" th:text="${#strings.capitalize(#strings.toLowerCase(day.date().getDayOfWeek().name())) + ' ' + day.date().getDayOfMonth() + (day.today() ? ', today' : '')}">Monday 1</span>
                         <!-- The script shows it, with the right number, when the chips do not fit in the day -->
-                        <button type="button" class="more hidden" data-type="earnings"
-                                th:unless="${day.earnings().isEmpty()}">more</button>
+                        <button type="button" class="more hidden"
+                                th:unless="${day.earnings().isEmpty() and day.dividends().isEmpty()}">more</button>
                     </div>
 
                     <button type="button" class="chip" data-type="earnings"
@@ -370,17 +407,92 @@
                         </span>
                     </button>
 
+                    <!-- Dividends on their payment day: what arrived, or an estimate (≈) while it is only announced -->
+                    <button type="button" class="chip" data-type="dividend"
+                            th:each="dividend : ${day.dividends()}"
+                            th:with="symbol=${symbols.getOrDefault(dividend.ticker(), #strings.contains(dividend.ticker(), '_') ? #strings.substringBefore(dividend.ticker(), '_') : dividend.ticker())},
+                                     amount=${dividend.isReceived() ? dividend.receivedEur() : dividend.estimatedEur()}"
+                            th:classappend="${dividend.isReceived() ? '' : 'upcoming'}"
+                            th:data-symbol="${symbol}"
+                            th:data-ticker="${dividend.ticker()}"
+                            th:data-date="${dividend.paymentDate()}"
+                            th:data-ex-date="${dividend.exDividendDate()}"
+                            th:data-per-share="${dividend.amountPerShare()}"
+                            th:data-received="${dividend.receivedEur()}"
+                            th:data-estimate="${dividend.estimatedEur()}"
+                            th:title="${symbol + ' dividend' + (dividend.isReceived() ? ', received' : ' (announced)')}">
+                        <span class="logo" aria-hidden="true">
+                            <span class="logo-initial" th:text="${#strings.substring(symbol, 0, 1)}">M</span>
+                            <img th:src="@{/logos/{ticker}(ticker=${dividend.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                        </span>
+                        <span class="chip-ticker" th:text="${symbol}">MU</span>
+                        <span class="chip-type">Dividend</span>
+                        <span class="chip-end" th:if="${amount != null}">
+                            <span class="chip-amount"
+                                  th:text="${(dividend.isReceived() ? '' : '≈ ') + #numbers.formatDecimal(amount, 1, 'COMMA', 2, 'POINT') + ' €'}">0.84 €</span>
+                        </span>
+                    </button>
+
                 </div>
             </div>
         </section>
 
-        <!-- Side panel: filled in by the script below when a chip is clicked -->
-        <aside class="side idle" id="side" aria-live="polite" aria-label="Details">
-            <div class="side-empty" id="side-empty">
-                <svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg><br>
-                Click an event to see its details.<br>
-                Published results show revenue and EPS against the estimates.
+        <!-- Side panel. While no event is open it shows what comes up in the next two weeks, whatever month is on screen;
+             with nothing coming up there is no panel at all. The script fills it with the details of a clicked event. -->
+        <aside class="side idle" id="side" aria-live="polite" aria-label="Details"
+               th:with="nothingComingUp=${comingUp.isEmpty() and comingUpDividends.isEmpty()}"
+               th:classappend="${nothingComingUp} ? 'nothing-coming'">
+            <div class="side-coming" id="side-empty">
+                <div class="side-head" th:unless="${nothingComingUp}">
+                    <div>
+                        <h2>Coming up</h2>
+                        <p class="side-sub">The next two weeks</p>
+                    </div>
+                </div>
+
+                <section class="coming-group" th:if="${!comingUp.isEmpty()}" aria-labelledby="coming-earnings">
+                    <h3 id="coming-earnings"><span class="swatch" style="--swatch: var(--earnings)"></span>Earnings</h3>
+                    <ul class="coming-list">
+                        <li th:each="e : ${comingUp}">
+                            <a class="coming-row" data-type="earnings" th:data-ticker="${e.ticker()}" th:data-date="${e.date()}"
+                               th:href="@{/calendar(month=${#temporals.format(e.date(), 'yyyy-MM')})} + '#type=earnings&ticker=' + ${e.ticker()} + '&date=' + ${e.date()}">
+                                <th:block th:replace="~{fragments/coming-date :: coming-date(${e.date()})}"></th:block>
+                                <span class="logo" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(e.symbol(), 0, 1)}">N</span>
+                                    <img th:src="@{/logos/{ticker}(ticker=${e.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                </span>
+                                <span class="coming-symbol" th:text="${e.symbol()}">NVDA</span>
+                                <span class="coming-extra">
+                                    <svg class="icon session" th:if="${e.hour() == 'bmo'}" aria-hidden="true"><use href="#icon-sun"/></svg>
+                                    <svg class="icon session" th:if="${e.hour() == 'amc'}" aria-hidden="true"><use href="#icon-moon"/></svg>
+                                    <span th:text="${e.hourLabel()}">after the close</span>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="coming-group" th:if="${!comingUpDividends.isEmpty()}" aria-labelledby="coming-dividends">
+                    <h3 id="coming-dividends"><span class="swatch" style="--swatch: var(--dividend)"></span>Dividends</h3>
+                    <ul class="coming-list">
+                        <li th:each="d : ${comingUpDividends}"
+                            th:with="amount=${d.receivedEur() != null ? d.receivedEur() : d.estimatedEur()}">
+                            <a class="coming-row" data-type="dividend" th:data-ticker="${d.ticker()}" th:data-date="${d.date()}"
+                               th:href="@{/calendar(month=${#temporals.format(d.date(), 'yyyy-MM')})} + '#type=dividend&ticker=' + ${d.ticker()} + '&date=' + ${d.date()}">
+                                <th:block th:replace="~{fragments/coming-date :: coming-date(${d.date()})}"></th:block>
+                                <span class="logo" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(d.symbol(), 0, 1)}">M</span>
+                                    <img th:src="@{/logos/{ticker}(ticker=${d.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                </span>
+                                <span class="coming-symbol" th:text="${d.symbol()}">MU</span>
+                                <span class="coming-extra" th:if="${amount != null}"
+                                      th:text="${(d.receivedEur() != null ? '' : '≈ ') + #numbers.formatDecimal(amount, 1, 'COMMA', 2, 'POINT') + ' €'}">≈ 0.86 €</span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
             </div>
+
         </aside>
     </main>
 
@@ -393,6 +505,8 @@
             // ----- Formatting -----
             const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const bigMoney = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 });
+            // Euros the way the rest of the app writes them: 1,234.56 €
+            const euros = value => value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
             const longDate = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
             const number = value => (value === undefined || value === '' ? null : Number(value));
@@ -510,11 +624,74 @@
                 openPanel([head, tags, revenue, eps, yoy]);
             }
 
+            // ----- Details of one dividend -----
+            // The amount per share is in the stock's own currency, which is only known for sure for US stocks
+            function perShareText(data) {
+                const perShare = number(data.perShare);
+                if (perShare === null) return '—';
+                const digits = Math.max(2, (data.perShare.split('.')[1] || '').replace(/0+$/, '').length);
+                const text = perShare.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits });
+                return data.ticker.includes('_US_') ? '$' + text : text;
+            }
+
+            function showDividend(chip) {
+                const data = chip.dataset;
+                const received = number(data.received);
+                const estimate = number(data.estimate);
+                const paymentDay = dateOf(data.date);
+                const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
+
+                const head = element('div', 'side-head');
+                const logo = chip.querySelector('.logo');
+                if (logo) head.append(logo.cloneNode(true));
+                const titles = element('div');
+                titles.append(element('h2', '', data.symbol), element('p', 'side-sub', 'Dividend, ' + longDate.format(paymentDay)));
+                head.append(titles, closeButton());
+
+                const tags = element('div', 'tags');
+                tags.append(element('span', 'tag dividend', 'Dividend'));
+                if (received !== null) tags.append(element('span', 'tag beat', 'Received'));
+                else if (paymentDay < today) tags.append(element('span', 'tag neutral', 'No payment recorded'));
+                else tags.append(element('span', 'tag neutral', 'Announced'));
+
+                const amount = element('section', 'metric');
+                if (received !== null) {
+                    amount.append(element('h3', '', 'You received'), element('div', 'metric-main', euros(received)));
+                } else if (estimate !== null) {
+                    amount.append(element('h3', '', 'You should receive'), element('div', 'metric-main', '≈ ' + euros(estimate)));
+                } else {
+                    amount.append(element('h3', '', 'Amount'));
+                }
+                amount.append(row('Per share', perShareText(data)));
+                if (received === null && estimate !== null) {
+                    amount.append(element('p', 'note', 'An estimate: the announced amount, times the shares you hold now, times the part of the gross that reached you last time (after tax and the exchange rate).'));
+                } else if (received === null) {
+                    amount.append(element('p', 'note', 'No estimate yet: there is no earlier payment of this stock to base it on.'));
+                }
+
+                const dates = element('section', 'metric');
+                dates.append(element('h3', '', 'Dates'),
+                             row('Ex-dividend', data.exDate ? longDate.format(dateOf(data.exDate)) : '—'),
+                             row('Payment', longDate.format(paymentDay)));
+                if (data.exDate && received === null) {
+                    dates.append(element('p', 'note', 'Shares bought on the ex-dividend date or later do not get this dividend.'));
+                }
+
+                calendar.querySelectorAll('.chip.selected').forEach(other => other.classList.remove('selected'));
+                chip.classList.add('selected');
+                openPanel([head, tags, amount, dates]);
+            }
+
+            function showEvent(chip) {
+                if (chip.dataset.type === 'dividend') showDividend(chip);
+                else showEarnings(chip);
+            }
+
             // ----- Every event of a busy day ("+N more") -----
             function showDay(day) {
                 const head = element('div', 'side-head');
                 const titles = element('div');
-                const chips = day.querySelectorAll('.chip');
+                const chips = [...day.querySelectorAll('.chip')].filter(chip => !calendar.classList.contains('hide-' + chip.dataset.type));
                 titles.append(element('h2', '', longDate.format(dateOf(day.dataset.date))),
                               element('p', 'side-sub', chips.length + ' events'));
                 head.append(titles, closeButton());
@@ -523,7 +700,7 @@
                 chips.forEach(chip => {
                     const copy = chip.cloneNode(true);
                     copy.classList.remove('extra', 'selected');
-                    copy.addEventListener('click', () => showEarnings(chip));
+                    copy.addEventListener('click', () => showEvent(chip));
                     list.append(copy);
                 });
                 openPanel([head, list]);
@@ -531,13 +708,33 @@
 
             calendar.addEventListener('click', event => {
                 const chip = event.target.closest('.chip');
-                if (chip) { showEarnings(chip); return; }
+                if (chip) { showEvent(chip); return; }
                 const more = event.target.closest('.more');
                 if (more) showDay(more.closest('.day'));
             });
             document.addEventListener('keydown', event => {
                 if (event.key === 'Escape' && !side.classList.contains('idle')) closePanel();
             });
+
+            // ----- Coming up: a row opens its event here, or goes to its month and opens it there -----
+            function chipFor(type, ticker, date) {
+                return [...calendar.querySelectorAll('.chip')].find(chip =>
+                    chip.dataset.type === type && chip.dataset.ticker === ticker && chip.dataset.date === date);
+            }
+            side.addEventListener('click', event => {
+                const row = event.target.closest('.coming-row');
+                if (!row) return;
+                const chip = chipFor(row.dataset.type, row.dataset.ticker, row.dataset.date);
+                if (!chip) return;            // another month: the link goes there
+                event.preventDefault();
+                showEvent(chip);
+            });
+            const wanted = new URLSearchParams(location.hash.slice(1));
+            if (wanted.has('type')) {
+                const chip = chipFor(wanted.get('type'), wanted.get('ticker'), wanted.get('date'));
+                if (chip) showEvent(chip);
+                history.replaceState(null, '', location.pathname + location.search);   // a reload should not open it again
+            }
 
             // ----- Filters in the legend, remembered in this browser -----
             const STORAGE_KEY = 'calendar-hidden-types';
@@ -573,10 +770,12 @@
                 calendar.querySelectorAll('.day').forEach(day => {
                     const more = day.querySelector('.more');
                     if (!more) return;
-                    const chips = [...day.querySelectorAll('.chip')];
-                    chips.forEach(chip => chip.classList.remove('extra'));
+                    const allChips = [...day.querySelectorAll('.chip')];
+                    allChips.forEach(chip => chip.classList.remove('extra'));
                     more.classList.add('hidden');
-                    if (phone.matches || calendar.classList.contains('hide-earnings')) return;   // the phone list shows them all
+                    if (phone.matches) return;   // the phone list shows them all
+                    // Only the types that are not hidden by the legend take room in the day
+                    const chips = allChips.filter(chip => !calendar.classList.contains('hide-' + chip.dataset.type));
 
                     let hiddenCount = 0;
                     while (day.scrollHeight > day.clientHeight && hiddenCount < chips.length) {

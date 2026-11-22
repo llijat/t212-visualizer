@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class T212DividendDtoTest {
 
     private static T212DividendDto paidOn(String paidOn) {
-        return new T212DividendDto("MU_US_EQ", new BigDecimal("0.115"), new BigDecimal("0.93"), paidOn);
+        return new T212DividendDto("MU_US_EQ", new BigDecimal("8.5"), new BigDecimal("0.115"), new BigDecimal("0.93"), paidOn);
     }
 
     @Test

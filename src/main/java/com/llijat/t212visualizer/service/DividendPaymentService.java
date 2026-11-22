@@ -41,6 +41,7 @@ public class DividendPaymentService {
         LocalDate from = LocalDate.now().minusMonths(MONTHS_BACK);
         Map<PaymentDay, BigDecimal> receivedByDay = new HashMap<>();
         Map<PaymentDay, BigDecimal> grossByDay = new HashMap<>();
+        Map<PaymentDay, BigDecimal> quantityByDay = new HashMap<>();
 
         try {
             String path = FIRST_PAGE;
@@ -56,6 +57,7 @@ public class DividendPaymentService {
                     PaymentDay key = new PaymentDay(payment.ticker(), payment.paidDay());
                     receivedByDay.merge(key, payment.amountInEuro(), BigDecimal::add);
                     if (payment.grossAmountPerShare() != null) grossByDay.merge(key, payment.grossAmountPerShare(), BigDecimal::add);
+                    if (payment.quantity() != null) quantityByDay.putIfAbsent(key, payment.quantity());
                 }
 
                 if (page.nextPagePath() == null) path = null;
@@ -72,15 +74,15 @@ public class DividendPaymentService {
         }
 
         for (Map.Entry<PaymentDay, BigDecimal> entry : receivedByDay.entrySet()) {
-            save(entry.getKey(), entry.getValue(), grossByDay.get(entry.getKey()));
+            save(entry.getKey(), entry.getValue(), grossByDay.get(entry.getKey()), quantityByDay.get(entry.getKey()));
         }
         log.info("Recorded {} dividend payments.", receivedByDay.size());
     }
 
-    private void save(PaymentDay key, BigDecimal receivedEur, BigDecimal grossAmountPerShare) {
+    private void save(PaymentDay key, BigDecimal receivedEur, BigDecimal grossAmountPerShare, BigDecimal receivedQuantity) {
         DividendEvent event = dividendEventRepository.findByTickerAndPaymentDate(key.ticker(), key.day())
                 .orElseGet(() -> new DividendEvent(key.ticker(), key.day()));
-        event.recordPayment(receivedEur, grossAmountPerShare);
+        event.recordPayment(receivedEur, grossAmountPerShare, receivedQuantity);
         dividendEventRepository.save(event);
     }
 }

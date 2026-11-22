@@ -89,7 +89,7 @@ public class DemoT212Client implements T212Client {
                     .divide(new BigDecimal("1.08"), 2, RoundingMode.HALF_UP);
             for (int quarter = 1; quarter <= 3; quarter++) {
                 LocalDate paid = DemoAlphaVantageClient.nextPayment(symbol).minusMonths(3L * quarter);
-                payments.add(new T212DividendDto(ticker, perShare, inEuro, paid + "T09:30:00.000+01:00"));
+                payments.add(new T212DividendDto(ticker, position.quantity(), perShare, inEuro, paid + "T09:30:00.000+01:00"));
             }
         }
         // Newest first, like the real API
