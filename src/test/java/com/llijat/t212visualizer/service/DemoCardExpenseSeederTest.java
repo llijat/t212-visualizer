@@ -2,8 +2,11 @@ package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.model.CardExpense;
 import com.llijat.t212visualizer.model.CardCashback;
+import com.llijat.t212visualizer.model.MerchantCategory;
 import com.llijat.t212visualizer.repository.CardCashbackRepository;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
+import com.llijat.t212visualizer.repository.CustomCategoryRepository;
+import com.llijat.t212visualizer.repository.MerchantCategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,11 +42,17 @@ class DemoCardExpenseSeederTest {
     @Mock
     private CardCashbackRepository cashbackRepository;
 
+    @Mock
+    private CustomCategoryRepository customCategoryRepository;
+
+    @Mock
+    private MerchantCategoryRepository merchantCategoryRepository;
+
     private DemoCardExpenseSeeder seeder;
 
     @BeforeEach
     void setUp() {
-        seeder = new DemoCardExpenseSeeder(repository, cashbackRepository);
+        seeder = new DemoCardExpenseSeeder(repository, cashbackRepository, customCategoryRepository, merchantCategoryRepository);
     }
 
     @Test
@@ -127,5 +136,14 @@ class DemoCardExpenseSeederTest {
             assertFalse(c.getDateTime().isAfter(Instant.parse("2026-11-15T23:59:59Z")));
         }
         assertEquals(cashback.size(), cashback.stream().map(CardCashback::getReference).distinct().count());
+    }
+
+    @Test
+    void theMerchantsMovedToYourCategories_arePaymentsOfTheDemo() {
+        List<String> merchants = seeder.buildExpenses(TODAY).stream().map(CardExpense::getMerchantName).distinct().toList();
+
+        for (MerchantCategory moved : seeder.buildMerchantsMoved()) {
+            assertTrue(merchants.contains(moved.getMerchantName()), moved.getMerchantName() + " has no payments in the demo");
+        }
     }
 }

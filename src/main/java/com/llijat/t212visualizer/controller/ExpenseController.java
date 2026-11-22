@@ -1,10 +1,7 @@
 package com.llijat.t212visualizer.controller;
 
 import com.llijat.t212visualizer.dto.MonthReport;
-import com.llijat.t212visualizer.service.BudgetService;
-import com.llijat.t212visualizer.service.CardExpenseImportService;
-import com.llijat.t212visualizer.service.CardExpenseSummaryService;
-import com.llijat.t212visualizer.service.MerchantCategoryService;
+import com.llijat.t212visualizer.service.*;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,13 +27,15 @@ public class ExpenseController {
     private final BudgetService budgetService;
     private final MerchantCategoryService merchantCategoryService;
     private static final ZoneId SPAIN = ZoneId.of("Europe/Madrid");
+    private final CustomCategoryService customCategoryService;
 
 
-    public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService, BudgetService budgetService, MerchantCategoryService merchantCategoryService) {
+    public ExpenseController(CardExpenseImportService cardExpenseImportService, CardExpenseSummaryService cardExpenseSummaryService, BudgetService budgetService, MerchantCategoryService merchantCategoryService, CustomCategoryService customCategoryService) {
         this.cardExpenseImportService = cardExpenseImportService;
         this.cardExpenseSummaryService = cardExpenseSummaryService;
         this.budgetService = budgetService;
         this.merchantCategoryService = merchantCategoryService;
+        this.customCategoryService = customCategoryService;
     }
 
     @GetMapping("/expenses")
@@ -52,6 +51,8 @@ public class ExpenseController {
         model.addAttribute("subscriptions", cardExpenseSummaryService.getSubscriptions(today));
         model.addAttribute("cashbackMonth", cardExpenseSummaryService.getCashback(month));
         model.addAttribute("cashbackTotal", cardExpenseSummaryService.getTotalCashback());
+        model.addAttribute("categoryNames", customCategoryService.getCategoryNames());
+        model.addAttribute("customCategories", customCategoryService.getAll());
         return "expenses";
     }
 
@@ -104,6 +105,27 @@ public class ExpenseController {
     public String resetCategory(@RequestParam String merchant,
                                 @RequestParam(required = false) YearMonth month) {
         merchantCategoryService.resetCategory(merchant);
+        return redirectToMonth(month);
+    }
+
+    @PostMapping("/expenses/custom-categories")
+    public String createCategory(@RequestParam String name,
+                                 @RequestParam(required = false) String merchant,
+                                 @RequestParam(required = false) YearMonth month,
+                                 RedirectAttributes redirect) {
+        try {
+            String created = customCategoryService.create(name);
+            if (merchant != null) merchantCategoryService.saveCategory(merchant, created);
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("categoryError", e.getMessage());
+        }
+        return redirectToMonth(month);
+    }
+
+    @PostMapping("/expenses/custom-categories/delete")
+    public String deleteCategory(@RequestParam String name,
+                                 @RequestParam(required = false) YearMonth month) {
+        customCategoryService.delete(name);
         return redirectToMonth(month);
     }
 

@@ -3,6 +3,7 @@ package com.llijat.t212visualizer.controller;
 import com.llijat.t212visualizer.service.BudgetService;
 import com.llijat.t212visualizer.service.CardExpenseImportService;
 import com.llijat.t212visualizer.service.CardExpenseSummaryService;
+import com.llijat.t212visualizer.service.CustomCategoryService;
 import com.llijat.t212visualizer.service.MerchantCategoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,12 +40,15 @@ class ExpenseControllerCategoryTest {
     @Mock
     private MerchantCategoryService merchantCategoryService;
 
+    @Mock
+    private CustomCategoryService customCategoryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new ExpenseController(importService, summaryService, budgetService, merchantCategoryService)).build();
+                new ExpenseController(importService, summaryService, budgetService, merchantCategoryService, customCategoryService)).build();
     }
 
     @Test
@@ -109,5 +114,46 @@ class ExpenseControllerCategoryTest {
 
         verify(merchantCategoryService, never()).saveCategory(anyString(), anyString());
         verify(merchantCategoryService, never()).resetCategory(anyString());
+    }
+
+    // ===== Your own categories =====
+
+    @Test
+    void creatingACategoryFromAPayment_alsoGivesItThatMerchant() throws Exception {
+        when(customCategoryService.create(" Gym ")).thenReturn("Gym");
+
+        mockMvc.perform(post("/expenses/custom-categories").param("name", " Gym ").param("merchant", "Globo Gym"))
+                .andExpect(redirectedUrl("/expenses"));
+
+        verify(merchantCategoryService).saveCategory("Globo Gym", "Gym");   // the name as it was saved, trimmed
+    }
+
+    @Test
+    void creatingACategoryFromTheList_givesItNoMerchant() throws Exception {
+        when(customCategoryService.create("Groceries")).thenReturn("Groceries");
+
+        mockMvc.perform(post("/expenses/custom-categories").param("name", "Groceries").param("month", "2026-08"))
+                .andExpect(redirectedUrl("/expenses?month=2026-08"));
+
+        verify(merchantCategoryService, never()).saveCategory(anyString(), anyString());
+    }
+
+    @Test
+    void aRefusedName_isShownAfterTheRedirect_andNoMerchantIsChanged() throws Exception {
+        doThrow(new IllegalArgumentException("That category already exists.")).when(customCategoryService).create("Gym");
+
+        mockMvc.perform(post("/expenses/custom-categories").param("name", "Gym").param("merchant", "Globo Gym"))
+                .andExpect(redirectedUrl("/expenses"))
+                .andExpect(flash().attribute("categoryError", "That category already exists."));
+
+        verify(merchantCategoryService, never()).saveCategory(anyString(), anyString());
+    }
+
+    @Test
+    void deletingACategory_goesBackToTheMonthShown() throws Exception {
+        mockMvc.perform(post("/expenses/custom-categories/delete").param("name", "Gym & Padel").param("month", "2026-08"))
+                .andExpect(redirectedUrl("/expenses?month=2026-08"));
+
+        verify(customCategoryService).delete("Gym & Padel");
     }
 }

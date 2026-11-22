@@ -2,8 +2,12 @@ package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.model.CardCashback;
 import com.llijat.t212visualizer.model.CardExpense;
+import com.llijat.t212visualizer.model.CustomCategory;
+import com.llijat.t212visualizer.model.MerchantCategory;
 import com.llijat.t212visualizer.repository.CardCashbackRepository;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
+import com.llijat.t212visualizer.repository.CustomCategoryRepository;
+import com.llijat.t212visualizer.repository.MerchantCategoryRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -57,12 +61,23 @@ public class DemoCardExpenseSeeder implements ApplicationRunner {
     // Like the real card: a small share of each payment comes back the following night
     private static final BigDecimal CASHBACK_RATE = new BigDecimal("0.015");
 
+    // Two categories of your own, each with a merchant moved into it, so the demo shows them too
+    private static final List<String> CUSTOM_CATEGORIES = List.of("Groceries", "Gym & Padel");
+    private static final List<List<String>> MERCHANTS_MOVED = List.of(
+            List.of("Acme Market", "Groceries"),
+            List.of("Globo Gym", "Gym & Padel"));
+
     private final CardExpenseRepository cardExpenseRepository;
     private final CardCashbackRepository cardCashbackRepository;
+    private final CustomCategoryRepository customCategoryRepository;
+    private final MerchantCategoryRepository merchantCategoryRepository;
 
-    public DemoCardExpenseSeeder(CardExpenseRepository cardExpenseRepository, CardCashbackRepository cardCashbackRepository) {
+    public DemoCardExpenseSeeder(CardExpenseRepository cardExpenseRepository, CardCashbackRepository cardCashbackRepository,
+                                 CustomCategoryRepository customCategoryRepository, MerchantCategoryRepository merchantCategoryRepository) {
         this.cardExpenseRepository = cardExpenseRepository;
         this.cardCashbackRepository = cardCashbackRepository;
+        this.customCategoryRepository = customCategoryRepository;
+        this.merchantCategoryRepository = merchantCategoryRepository;
     }
 
     @Override
@@ -72,7 +87,19 @@ public class DemoCardExpenseSeeder implements ApplicationRunner {
             List<CardExpense> expenses = buildExpenses(today);
             cardExpenseRepository.saveAll(expenses);
             cardCashbackRepository.saveAll(buildCashback(expenses, today));
+            customCategoryRepository.saveAll(CUSTOM_CATEGORIES.stream().map(CustomCategory::new).toList());
+            merchantCategoryRepository.saveAll(buildMerchantsMoved());
         }
+    }
+
+    List<MerchantCategory> buildMerchantsMoved() {
+        List<MerchantCategory> moved = new ArrayList<>();
+        for (List<String> merchantAndCategory : MERCHANTS_MOVED) {
+            MerchantCategory correction = new MerchantCategory(merchantAndCategory.get(0));
+            correction.changeCategory(merchantAndCategory.get(1));
+            moved.add(correction);
+        }
+        return moved;
     }
 
     /** 1.5 % of every payment, paid at 01:10 UTC the next day; nothing that would arrive after today. */
