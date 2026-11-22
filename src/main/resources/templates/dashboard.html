@@ -269,14 +269,19 @@
         .toggle { height: 2rem; padding: 0 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-small); background: none; color: var(--muted); font: 500 0.82rem var(--figures); }
         .toggle:hover { color: var(--text); }
         .toggle[aria-pressed="true"] { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-bg); color: var(--accent); }
+        /* Only there while a filter or an order is on */
+        .clear-filters { display: inline-flex; align-items: center; gap: 0.3rem; height: 2rem; padding: 0 0.6rem; border-radius: var(--radius-small); background: none; color: var(--muted); font-size: 0.82rem; }
+        .clear-filters:hover { color: var(--text); background: var(--raised); }
+        .clear-filters[hidden] { display: none; }
 
         /* Column headers that sort: an arrow shows which one, and which way */
         /* The arrow sits in the cell's padding (left of right-aligned figures), so it adds no width to the table */
         .sort { position: relative; padding: 0; background: none; color: inherit; font: inherit; white-space: nowrap; }
         .sort:hover { color: var(--text); }
-        .sort::after { content: "↕"; position: absolute; right: calc(100% + 0.2rem); font-size: 0.85em; opacity: 0; }
+        /* Every column that can sort shows the two arrows, faint; pointing at it brightens them */
+        .sort::after { content: "↕"; position: absolute; right: calc(100% + 0.2rem); font-size: 0.85em; opacity: 0.35; transition: opacity 0.15s; }
         th:not(.num) .sort::after { right: auto; left: calc(100% + 0.25rem); }
-        .sort:hover::after, .sort:focus-visible::after { opacity: 0.45; }
+        .sort:hover::after, .sort:focus-visible::after { opacity: 0.8; }
         th[aria-sort] { color: var(--text); }
         th[aria-sort="ascending"] .sort::after { content: "▲"; opacity: 1; color: var(--accent); font-size: 0.7em; }
         th[aria-sort="descending"] .sort::after { content: "▼"; opacity: 1; color: var(--accent); font-size: 0.7em; }
@@ -380,6 +385,15 @@
                           th:text="'(' + ${gained ? '+' : '−'} + ${#numbers.formatDecimal(returnPercent.abs(), 1, 'COMMA', 1, 'POINT')} + ' %)'">(+11.0 %)</span>
                     all-time
                 </span>
+                <!-- Only once there is an earlier day's snapshot to compare with -->
+                <span class="summary-alltime" th:if="${todayChange != null}" th:with="up=${todayChange.amount().signum() >= 0}"
+                      title="Since the last close of the day, without the money put in or taken out today">
+                    <span class="money" th:classappend="${up} ? 'is-up' : 'is-down'"
+                          th:text="${up ? '+' : '−'} + ${#numbers.formatDecimal(todayChange.amount().abs(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">+12.30 €</span>
+                    <span th:classappend="${up} ? 'is-up' : 'is-down'"
+                          th:text="'(' + ${up ? '+' : '−'} + ${#numbers.formatDecimal(todayChange.percent().abs(), 1, 'COMMA', 2, 'POINT')} + ' %)'">(+0.14 %)</span>
+                    today
+                </span>
             </p>
             <p class="summary-verdict" th:unless="${hasDeposits}">Syncing your movements to calculate the return…</p>
 
@@ -463,6 +477,10 @@
                     </div>
                     <button type="button" class="toggle" id="pl-eur-toggle" aria-pressed="false"
                             title="Show the profit or loss in euros, and the total of the positions shown">€ P/L</button>
+                    <button type="button" class="clear-filters" id="clear-filters" hidden
+                            title="Show every position again, in the usual order">
+                        <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>Clear
+                    </button>
                 </div>
             </div>
             <!-- Built by the script below from the rows of the table: the biggest positions, "Other" and cash -->
@@ -721,6 +739,7 @@
             const none = document.getElementById('positions-none');
             const showButtons = [...document.querySelectorAll('[data-show]')];
             const eurButton = document.getElementById('pl-eur-toggle');
+            const clearButton = document.getElementById('clear-filters');
             const euros = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             let show = stored.get('t212-positions-show') || 'all';
@@ -745,6 +764,12 @@
                 total.className = 'count-total money ' + (sum < 0 ? 'negative' : 'positive');
                 total.title = 'Profit or loss of the ' + shown + ' positions shown';
                 none.hidden = shown > 0;
+                showClear();
+            }
+
+            // The P/L in euros is not a filter: it stays as it is
+            function showClear() {
+                clearButton.hidden = !search.value.trim() && show === 'all' && !sortKey;
             }
 
             function sort() {
@@ -758,6 +783,7 @@
                     if (button && button.dataset.sort === sortKey) th.setAttribute('aria-sort', sortDirection > 0 ? 'ascending' : 'descending');
                     else th.removeAttribute('aria-sort');
                 });
+                showClear();
             }
 
             function showEur() {
@@ -785,6 +811,18 @@
                 stored.set('t212-positions-sort', sortKey + ':' + sortDirection);
                 sort();
             }));
+            clearButton.addEventListener('click', () => {
+                search.value = '';
+                show = 'all';
+                sortKey = '';
+                sortDirection = 1;
+                stored.set('t212-positions-show', show);
+                stored.set('t212-positions-sort', ':');
+                showButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.show === show)));
+                sort();
+                filter();
+                search.focus();   // the button hides itself: the keyboard goes back to the search box instead of getting lost
+            });
 
             showButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.show === show)));
             showEur();
