@@ -14,6 +14,7 @@
     --accent-bg: color-mix(in srgb, var(--accent) 16%, transparent);
     --green: #6fd3a0;       /* up, beat, less spending */
     --red: #f58b8b;         /* down, missed, more spending */
+    --dividend: #f2c25a;    /* dividends, in the calendar and the portfolio */
     --radius: 14px;         /* cards */
     --radius-small: 9px;    /* buttons, fields, menus */
 

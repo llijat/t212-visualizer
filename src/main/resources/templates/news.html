@@ -49,8 +49,32 @@
         /* ===== Right: the stories, a day at a time ===== */
         .stories { min-height: 0; overflow-y: auto; padding: 1.75rem 2rem 3rem; }
         .stories:focus { outline: none; }   /* it gets the focus only to start from there after "Skip to the stories" */
-        .stories-inner { max-width: 760px; }
+        /* The stories keep a comfortable line length (760 px). On wide screens a column next to them shows what moves
+           and what comes up; on narrower ones that column goes above the stories, under the search. */
+        .stories-layout { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 760px; }
         .stories-tools { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+        .rail { display: flex; flex-direction: column; gap: 1.5rem; order: 1; margin: 0.5rem 0 1rem; }
+        .stories-tools { order: 0; }
+        .stories-feeds { order: 2; min-width: 0; }
+        /* Wide screens: a third column of its own, which scrolls on its own like the sources and the stories.
+           The script moves the column there from above the stories (see placeRail). */
+        @media (min-width: 1400px) {
+            .news-page { grid-template-columns: 270px minmax(0, 1fr) 360px; }
+            .stories-layout { margin-inline: auto; }
+            .news-page > .rail {
+                min-height: 0;
+                overflow-y: auto;
+                margin: 0;
+                padding: 1.75rem 2rem 2rem 1.5rem;
+                border-left: 1px solid var(--border);
+            }
+            .rail .moves-list { grid-template-columns: minmax(0, 1fr); gap: 0.4rem; }
+            .rail .coming-item { grid-template-columns: 4.6rem auto minmax(0, 1fr) auto; gap: 0.55rem; padding: 0.45rem 0.6rem; }
+        }
+        /* Narrower screens: the column steps aside when one holding is chosen or the headlines are searched */
+        @media (max-width: 1399px) {
+            .rail.focused { display: none; }
+        }
         .stories-search {
             flex: 1;
             min-width: 0;
@@ -146,7 +170,7 @@
         .star[aria-pressed="true"] .icon { fill: currentColor; }
 
         /* ===== Moving today: the holdings that move most, before their news ===== */
-        .moves { margin: 0.75rem 0 0.25rem; }
+        .moves { margin: 0; }
         .moves-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.6rem; }
         .moves-head h2 { margin: 0; font: 500 1.15rem var(--figures); letter-spacing: 0.01em; }
         .moves-head span { color: var(--faint); font-size: 0.82rem; }
@@ -173,13 +197,12 @@
         .move-change.down { color: var(--red); }
         .move-weight { grid-column: 2 / 4; color: var(--faint); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 
-        /* Gold and silver: the same cards, but not buttons, with a coin of the metal's colour instead of a logo */
-        .move.is-static:hover { background: var(--panel); }
+        /* Gold and silver: the same cards, with a coin of the metal's colour instead of a logo */
         .metal-logo { background: #c9a227; color: #1a1406; }
         .metal-logo.is-silver { background: #b9c0cb; color: #14171c; }
 
         /* ===== Coming up: the next results of the holdings, one line each ===== */
-        .coming { margin: 1.25rem 0 0.25rem; }
+        .coming { margin: 0; }
         .coming-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
         .coming-item {
             width: 100%;
@@ -200,6 +223,9 @@
         .coming-item .logo { font-size: 1.35rem; }
         .coming-symbol { font: 500 0.95rem var(--figures); letter-spacing: 0.01em; }
         .coming-hour { color: var(--faint); font-size: 0.82rem; }
+        .coming-group { margin: 0.6rem 0 0.25rem; color: var(--muted); font: 500 0.85rem var(--text-font); }
+        .coming-dividend { text-decoration: none; }
+        .coming-amount { color: var(--dividend); font: 500 0.82rem var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
         .empty { margin: 2rem 0; color: var(--muted); line-height: 1.6; }
 
@@ -294,72 +320,17 @@
 
         <!-- ===== The stories ===== -->
         <section class="stories" id="stories" aria-label="Stories" tabindex="-1">
-            <div class="stories-inner">
+            <div class="stories-layout">
                 <div class="stories-tools">
                     <input type="search" class="stories-search" id="search" placeholder="Search the headlines" aria-label="Search the headlines" autocomplete="off">
                     <span class="stories-count" id="count" aria-live="polite"></span>
                 </div>
 
+                <div class="stories-feeds">
+
                 <!-- Your holdings, a day at a time -->
                 <!-- The days and their stories are drawn by fragments/news-story.html, the same in the three folders -->
                 <div id="portfolio" class="feed">
-                    <!-- Moving today: the six US holdings that move most, up or down; pressing one shows its news -->
-                    <section class="moves overview" id="moves" th:if="${!moves.isEmpty()}" aria-labelledby="moves-title">
-                        <div class="moves-head">
-                            <h2 id="moves-title"
-                                th:text="${lastSession.isPresent() and lastSession.get().equals(today)} ? 'Moving today'
-                                       : 'Moving on ' + ${lastSession.isPresent()
-                                           ? #strings.capitalize(#strings.toLowerCase(lastSession.get().getDayOfWeek().name())) + ' ' + lastSession.get().getDayOfMonth() + ' '
-                                             + #strings.capitalize(#strings.toLowerCase(lastSession.get().getMonth().name()))
-                                           : 'the last session'}">Moving today</h2>
-                            <span>Against the previous close</span>
-                        </div>
-                        <ul class="moves-list">
-                            <li th:each="m : ${moves}" th:if="${mStat.index < 6}"
-                                th:with="hasNews=${newsCount.containsKey(m.symbol())}">
-                                <button type="button" class="move" th:data-symbol="${m.symbol()}" th:disabled="${!hasNews}"
-                                        th:title="${hasNews} ? 'Show the news of ' + ${m.symbol()} : 'No news of ' + ${m.symbol()} + ' in the last 7 days'">
-                                    <span class="logo" aria-hidden="true">
-                                        <span class="logo-initial" th:text="${#strings.substring(m.symbol(), 0, 1)}">A</span>
-                                        <img th:src="@{/logos/{ticker}(ticker=${m.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
-                                    </span>
-                                    <span class="move-symbol" th:text="${m.symbol()}">AAPL</span>
-                                    <span class="move-change" th:classappend="${m.changePercent().signum() < 0} ? 'down' : 'up'"
-                                          th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">−4.19 %</span>
-                                    <span class="move-weight" th:text="${#numbers.formatDecimal(m.weightPercent(), 1, 1, 'POINT')} + ' % of your portfolio'">15.0 % of your portfolio</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </section>
-
-                    <!-- Coming up: the quarterly results of the holdings in the next two weeks, the closest first -->
-                    <section class="coming overview" id="coming" th:if="${!comingUp.isEmpty()}" aria-labelledby="coming-title">
-                        <div class="moves-head">
-                            <h2 id="coming-title">Coming up</h2>
-                            <span>Quarterly results in the next two weeks</span>
-                        </div>
-                        <ul class="coming-list">
-                            <li th:each="e : ${comingUp}" th:if="${eStat.index < 6}"
-                                th:with="hasNews=${newsCount.containsKey(e.symbol())},
-                                         soon=${!e.date().isAfter(today.plusDays(1))}">
-                                <button type="button" class="coming-item" th:data-symbol="${e.symbol()}" th:disabled="${!hasNews}"
-                                        th:title="${hasNews} ? 'Show the news of ' + ${e.symbol()} : 'No news of ' + ${e.symbol()} + ' in the last 7 days'">
-                                    <time class="coming-date" th:classappend="${soon} ? 'is-soon'" th:datetime="${e.date()}"
-                                          th:text="${e.date().equals(today)} ? 'Today'
-                                                 : (${e.date().equals(today.plusDays(1))} ? 'Tomorrow'
-                                                 : ${#strings.capitalize(#strings.toLowerCase(#strings.substring(e.date().getDayOfWeek().name(), 0, 3))) + ' ' + e.date().getDayOfMonth() + ' '
-                                                     + #strings.capitalize(#strings.toLowerCase(#strings.substring(e.date().getMonth().name(), 0, 3)))})">Thu 20 Nov</time>
-                                    <span class="logo" aria-hidden="true">
-                                        <span class="logo-initial" th:text="${#strings.substring(e.symbol(), 0, 1)}">N</span>
-                                        <img th:src="@{/logos/{ticker}(ticker=${e.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
-                                    </span>
-                                    <span class="coming-symbol" th:text="${e.symbol()}">NVDA</span>
-                                    <span class="coming-hour" th:text="${e.hourLabel()}">after the close</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </section>
-
                     <p class="empty" th:if="${portfolioDays.isEmpty()}">No news from your holdings in the last 7 days. If the app has just started, reload the page in a few seconds.</p>
                     <th:block th:each="day : ${portfolioDays}">
                         <section th:replace="~{fragments/news-story :: day(${day})}"></section>
@@ -374,29 +345,8 @@
                     </th:block>
                 </div>
 
-                <!-- Metals: how gold and silver moved, then the market news about them -->
+                <!-- Metals: the market news about gold and silver; how they moved is in the column on the right -->
                 <div id="metals" class="feed hidden">
-                    <section class="moves overview" th:if="${!metals.isEmpty()}" aria-labelledby="metals-title">
-                        <div class="moves-head">
-                            <h2 id="metals-title">Gold and silver</h2>
-                            <span>Through the GLD and SLV funds, against the previous close</span>
-                        </div>
-                        <ul class="moves-list">
-                            <li th:each="m : ${metals}">
-                                <!-- Only the change: a fund share holds a fraction of an ounce, so its price is not the metal's -->
-                                <div class="move is-static">
-                                    <span class="logo metal-logo" th:classappend="${m.etf() == 'SLV'} ? 'is-silver'" aria-hidden="true">
-                                        <span class="logo-initial" th:text="${#strings.substring(m.name(), 0, 1)}">G</span>
-                                    </span>
-                                    <span class="move-symbol" th:text="${m.name()}">Gold</span>
-                                    <span class="move-change" th:classappend="${m.changePercent().signum() < 0} ? 'down' : 'up'"
-                                          th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">+1.20 %</span>
-                                    <span class="move-weight" th:text="${m.etf()} + ' fund'">GLD fund</span>
-                                </div>
-                            </li>
-                        </ul>
-                    </section>
-
                     <p class="empty" th:if="${metalDays.isEmpty()}">No market news about gold or silver in the last 7 days.</p>
                     <th:block th:each="day : ${metalDays}">
                         <section th:replace="~{fragments/news-story :: day(${day})}"></section>
@@ -412,6 +362,111 @@
                 </div>
 
                 <p class="empty hidden" id="nothing">No story matches. Try another word or choose another source.</p>
+                </div>
+
+            <!-- ===== What moves and what comes up: next to the stories on wide screens, above them on narrower ones ===== -->
+            <aside class="rail" id="rail" aria-label="Today in short"
+                   th:if="${!moves.isEmpty() or !metals.isEmpty() or !comingUp.isEmpty() or !comingUpDividends.isEmpty()}">
+                <!-- Moving today: the six US holdings that move most, up or down; pressing one shows its news -->
+                <section class="moves" id="moves" th:if="${!moves.isEmpty()}" aria-labelledby="moves-title">
+                    <div class="moves-head">
+                        <h2 id="moves-title"
+                            th:text="${lastSession.isPresent() and lastSession.get().equals(today)} ? 'Moving today'
+                                   : 'Moving on ' + ${lastSession.isPresent()
+                                       ? #strings.capitalize(#strings.toLowerCase(lastSession.get().getDayOfWeek().name())) + ' ' + lastSession.get().getDayOfMonth() + ' '
+                                         + #strings.capitalize(#strings.toLowerCase(lastSession.get().getMonth().name()))
+                                       : 'the last session'}">Moving today</h2>
+                        <span>Against the previous close</span>
+                    </div>
+                    <ul class="moves-list">
+                        <li th:each="m : ${moves}" th:if="${mStat.index < 6}"
+                            th:with="hasNews=${newsCount.containsKey(m.symbol())}">
+                            <button type="button" class="move" th:data-symbol="${m.symbol()}" th:disabled="${!hasNews}"
+                                    th:title="${hasNews} ? 'Show the news of ' + ${m.symbol()} : 'No news of ' + ${m.symbol()} + ' in the last 7 days'">
+                                <span class="logo" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(m.symbol(), 0, 1)}">A</span>
+                                    <img th:src="@{/logos/{ticker}(ticker=${m.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                </span>
+                                <span class="move-symbol" th:text="${m.symbol()}">AAPL</span>
+                                <span class="move-change" th:classappend="${m.changePercent().signum() < 0} ? 'down' : 'up'"
+                                      th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">−4.19 %</span>
+                                <span class="move-weight" th:text="${#numbers.formatDecimal(m.weightPercent(), 1, 1, 'POINT')} + ' % of your portfolio'">15.0 % of your portfolio</span>
+                            </button>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- Gold and silver: pressing one opens the Metals folder -->
+                <section class="moves" th:if="${!metals.isEmpty()}" aria-labelledby="metals-title">
+                    <div class="moves-head">
+                        <h2 id="metals-title">Gold and silver</h2>
+                        <span>Through the GLD and SLV funds</span>
+                    </div>
+                    <ul class="moves-list">
+                        <li th:each="m : ${metals}">
+                            <!-- Only the change: a fund share holds a fraction of an ounce, so its price is not the metal's -->
+                            <button type="button" class="move metal-card" title="Show the news about gold and silver">
+                                <span class="logo metal-logo" th:classappend="${m.etf() == 'SLV'} ? 'is-silver'" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(m.name(), 0, 1)}">G</span>
+                                </span>
+                                <span class="move-symbol" th:text="${m.name()}">Gold</span>
+                                <span class="move-change" th:classappend="${m.changePercent().signum() < 0} ? 'down' : 'up'"
+                                      th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">+1.20 %</span>
+                                <span class="move-weight" th:text="${m.etf()} + ' fund'">GLD fund</span>
+                            </button>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- Coming up: the results and dividends of the holdings in the next two weeks, the closest first -->
+                <section class="coming" id="coming" th:if="${!comingUp.isEmpty() or !comingUpDividends.isEmpty()}" aria-labelledby="coming-title">
+                    <div class="moves-head">
+                        <h2 id="coming-title">Coming up</h2>
+                        <span>The next two weeks</span>
+                    </div>
+
+                    <th:block th:if="${!comingUp.isEmpty()}">
+                        <h3 class="coming-group">Earnings</h3>
+                        <ul class="coming-list">
+                            <li th:each="e : ${comingUp}" th:if="${eStat.index < 6}"
+                                th:with="hasNews=${newsCount.containsKey(e.symbol())}">
+                                <!-- Pressing one shows the news of that holding -->
+                                <button type="button" class="coming-item" th:data-symbol="${e.symbol()}" th:disabled="${!hasNews}"
+                                        th:title="${hasNews} ? 'Show the news of ' + ${e.symbol()} : 'No news of ' + ${e.symbol()} + ' in the last 7 days'">
+                                    <th:block th:replace="~{fragments/coming-date :: coming-date(${e.date()})}"></th:block>
+                                    <span class="logo" aria-hidden="true">
+                                        <span class="logo-initial" th:text="${#strings.substring(e.symbol(), 0, 1)}">N</span>
+                                        <img th:src="@{/logos/{ticker}(ticker=${e.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                    </span>
+                                    <span class="coming-symbol" th:text="${e.symbol()}">NVDA</span>
+                                    <span class="coming-hour" th:text="${e.hourLabel()}">after the close</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </th:block>
+
+                    <th:block th:if="${!comingUpDividends.isEmpty()}">
+                        <h3 class="coming-group">Dividends</h3>
+                        <ul class="coming-list">
+                            <li th:each="d : ${comingUpDividends}" th:if="${dStat.index < 6}"
+                                th:with="amount=${d.receivedEur() != null ? d.receivedEur() : d.estimatedEur()}">
+                                <!-- Pressing one opens it in the calendar, with what you received or the estimate -->
+                                <a class="coming-item coming-dividend" th:title="'See the dividend of ' + ${d.symbol()} + ' in the calendar'"
+                                   th:href="@{/calendar(month=${#temporals.format(d.date(), 'yyyy-MM')})} + '#type=dividend&ticker=' + ${d.ticker()} + '&date=' + ${d.date()}">
+                                    <th:block th:replace="~{fragments/coming-date :: coming-date(${d.date()})}"></th:block>
+                                    <span class="logo" aria-hidden="true">
+                                        <span class="logo-initial" th:text="${#strings.substring(d.symbol(), 0, 1)}">M</span>
+                                        <img th:src="@{/logos/{ticker}(ticker=${d.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                    </span>
+                                    <span class="coming-symbol" th:text="${d.symbol()}">MU</span>
+                                    <span class="coming-amount" th:if="${amount != null}"
+                                          th:text="${(d.receivedEur() != null ? '' : '≈ ') + #numbers.formatDecimal(amount, 1, 'COMMA', 2, 'POINT') + ' €'}">≈ 0.86 €</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </th:block>
+                </section>
+            </aside>
             </div>
         </section>
     </main>
@@ -426,7 +481,20 @@
             starred: document.getElementById('starred')
         };
         const starredCount = document.getElementById('starred-count');
-        const overviews = [...document.querySelectorAll('.overview')];   // Moving today and Coming up, when they have something
+        const rail = document.getElementById('rail');   // Moving today, gold and silver and Coming up, when there is any
+
+        // On wide screens the column is a third one, with its own scroll; on narrower ones it goes back above the stories
+        const wideScreen = window.matchMedia('(min-width: 1400px)');
+        const newsPage = document.querySelector('.news-page');
+        const storiesFeeds = document.querySelector('.stories-feeds');
+        function placeRail() {
+            if (!rail) return;
+            if (wideScreen.matches && rail.parentElement !== newsPage) newsPage.append(rail);
+            if (!wideScreen.matches && rail.parentElement === newsPage) storiesFeeds.before(rail);
+        }
+        placeRail();
+        wideScreen.addEventListener('change', placeRail);
+        window.addEventListener('resize', placeRail);   // also when the window is resized, in case a browser does not report the change
         let starsChanged = false;
         const search = document.getElementById('search');
         const count = document.getElementById('count');
@@ -454,7 +522,7 @@
                 shown += inDay;
             });
             // Moving today and Coming up belong to all the holdings: they step aside for one holding or a search
-            overviews.forEach(overview => overview.classList.toggle('hidden', symbol !== null || words !== ''));
+            if (rail) rail.classList.toggle('focused', symbol !== null || words !== '');
             count.textContent = total === 0 ? '' : (shown === total ? total + ' stories' : shown + ' of ' + total);
             nothing.classList.toggle('hidden', shown > 0 || total === 0);
         }
@@ -481,8 +549,15 @@
         search.addEventListener('input', filter);
 
         // The symbol on a story, or a holding in Moving today or Coming up, shows only that holding's stories
-        storiesArea.addEventListener('click', event => {
-            const chip = event.target.closest('.story-symbol, .move, .coming-item');
+        // Listened on the whole page: on wide screens the column with Moving today is outside the stories
+        newsPage.addEventListener('click', event => {
+            // Gold or silver opens the Metals folder
+            if (event.target.closest('.metal-card')) {
+                choose(sources.find(button => button.dataset.show === 'metals'));
+                return;
+            }
+            // Only what names a holding; a dividend in Coming up is a link to the calendar and goes there
+            const chip = event.target.closest('.story-symbol[data-symbol], .move[data-symbol], .coming-item[data-symbol]');
             if (!chip) return;
             const source = sources.find(button => button.dataset.symbol === chip.dataset.symbol);
             if (source) choose(source);

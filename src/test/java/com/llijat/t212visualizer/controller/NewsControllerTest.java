@@ -3,6 +3,7 @@ package com.llijat.t212visualizer.controller;
 import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.dto.NewsDay;
+import com.llijat.t212visualizer.dto.UpcomingDividend;
 import com.llijat.t212visualizer.dto.UpcomingEarnings;
 import com.llijat.t212visualizer.service.CalendarService;
 import com.llijat.t212visualizer.service.NewsService;
@@ -115,6 +116,15 @@ class NewsControllerTest {
         mockMvc.perform(get("/news"))
                 .andExpect(model().attribute("metals", metals))
                 .andExpect(model().attribute("metalDays", metalDays));
+    }
+
+    @Test
+    void thePage_getsTheDividendsComingUp() throws Exception {
+        List<UpcomingDividend> dividends = List.of(new UpcomingDividend("MU", "MU_US_EQ", LocalDate.of(2026, 12, 3), null, new BigDecimal("0.86")));
+        when(calendarService.getComingUpDividends()).thenReturn(dividends);
+
+        mockMvc.perform(get("/news"))
+                .andExpect(model().attribute("comingUpDividends", dividends));
     }
 
     @Test

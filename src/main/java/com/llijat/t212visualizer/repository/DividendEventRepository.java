@@ -12,4 +12,5 @@ public interface DividendEventRepository extends JpaRepository<DividendEvent, Lo
     List<DividendEvent> findByPaymentDateBetween(LocalDate from, LocalDate to);
     List<DividendEvent> findByReceivedEurIsNotNullOrderByPaymentDateDesc();
     List<DividendEvent> findByPaymentDateBetweenOrderByPaymentDateAsc(LocalDate from, LocalDate to);
+    List<DividendEvent> findByReceivedEurIsNotNullAndPaymentDateBetween(LocalDate from, LocalDate to);
 }

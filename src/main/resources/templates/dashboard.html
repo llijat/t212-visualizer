@@ -154,6 +154,19 @@
         .stat-main .stat-value { font-size: 2.9rem; font-weight: 300; line-height: 1.1; letter-spacing: -0.02em; }
         .stat-return { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.6rem; }
 
+        /* Dividends received: a fourth card, with a small bar for each of the last 12 months.
+           When the account value chart arrives, "Total value" gets a small line in the same spirit. */
+        .stats.with-dividends { grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); }
+        .stat-dividends-body { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.3rem 0.75rem; }
+        .stat-dividends-figures { display: flex; flex-direction: column; gap: 0.3rem; }
+        .mini-bars { display: flex; align-items: flex-end; gap: 2px; height: 2.2rem; margin-bottom: 0.15rem; }
+        .mini-bar { width: 5px; height: 100%; display: flex; align-items: flex-end; border-radius: 2px; }
+        .mini-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .mini-fill { width: 100%; height: var(--height); min-height: 2px; border-radius: 2px 2px 1px 1px; background: var(--dividend); }
+        .mini-bar.no-payment .mini-fill { background: var(--raised); }
+        .mini-bar:hover .mini-fill { filter: brightness(1.25); }
+        .mini-bar.no-payment:hover .mini-fill { background: var(--faint); }
+
         /* Coloured pills for gains and losses: colour + sign, so they do not depend on colour alone */
         .pill {
             display: inline-flex;
@@ -198,7 +211,8 @@
 
         /* ===== Narrow screens (phone, small window): a single column ===== */
         @media (max-width: 900px) {
-            .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 1rem 1rem 0; gap: 1rem; }
+            .stats, .stats.with-dividends { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 1rem 1rem 0; gap: 1rem; }
+            .stats.with-dividends .stat:last-child { grid-column: 1 / -1; }   /* the dividends, with room for their bars */
             .layout { padding: 1rem; gap: 1rem; }
             .stat-main { grid-column: 1 / -1; }
             .layout { grid-template-columns: minmax(0, 1fr); }   /* minmax: a wide table scrolls inside its card */
@@ -223,6 +237,7 @@
     <svg class="sprite" aria-hidden="true">
         <symbol id="icon-wallet" viewBox="0 0 24 24"><path d="M17 8V5a1 1 0 0 0-1-1H6a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3M19 16v3a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V6"/><path d="M20 12v4h-4a2 2 0 0 1 0-4z"/></symbol>
         <symbol id="icon-bank" viewBox="0 0 24 24"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/></symbol>
+        <symbol id="icon-coins" viewBox="0 0 24 24"><ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v4c0 1.7 2.7 3 6 3s6-1.3 6-3V7M3 11v4c0 1.7 2.7 3 6 3 1.1 0 2.1-.1 3-.4M15 13.5c3.3 0 6 1.3 6 3s-2.7 3-6 3-6-1.3-6-3"/></symbol>
         <symbol id="icon-cash" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v.01M18 15v.01"/></symbol>
         <symbol id="icon-trend-up" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></symbol>
         <symbol id="icon-trend-down" viewBox="0 0 24 24"><path d="M3 7l6 6 4-4 8 8M14 17h7v-7"/></symbol>
@@ -250,7 +265,9 @@
                       cur=${summary.currency() == 'EUR' ? '€' : summary.currency()},
                       hasDeposits=${firstSyncDone and netDeposits != null and netDeposits > 0},
                       totalReturn=${hasDeposits ? summary.totalValue() - netDeposits : 0},
-                      returnPercent=${hasDeposits ? totalReturn / netDeposits * 100 : 0}">
+                      returnPercent=${hasDeposits ? totalReturn / netDeposits * 100 : 0},
+                      hasDividends=${dividendHistory.total().signum() > 0}"
+             th:classappend="${hasDividends} ? 'with-dividends'">
         <!-- Main card: what the account is worth and how much it has earned -->
         <div class="stat stat-main">
             <span class="stat-label"><svg class="icon" aria-hidden="true"><use href="#icon-wallet"/></svg>Total value</span>
@@ -283,6 +300,26 @@
             <span class="stat-sub" th:text="${summary.totalValue() > 0}
                     ? ${#numbers.formatDecimal(cash * 100 / summary.totalValue(), 1, 0, 'POINT')} + ' % of the total, ready to invest'
                     : 'Available to invest'">Available to invest</span>
+        </div>
+        <!-- Dividends received: only once something has been received. Each bar is a month and opens it in the calendar. -->
+        <div class="stat" th:if="${hasDividends}" th:with="year=${today.getYear()}">
+            <span class="stat-label"><svg class="icon" aria-hidden="true"><use href="#icon-coins"/></svg>Dividends, 12 months</span>
+            <div class="stat-dividends-body">
+                <div class="stat-dividends-figures">
+                    <span class="stat-value" th:text="${#numbers.formatDecimal(dividendHistory.total(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">52.08 €</span>
+                    <span class="stat-sub" th:text="${#numbers.formatDecimal(dividendHistory.totalIn(year), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur} + ' in ' + ${year}">18.90 € in 2026</span>
+                </div>
+                <div class="mini-bars">
+                    <a class="mini-bar" th:each="m : ${dividendHistory.months()}"
+                       th:with="label=${#strings.capitalize(#strings.toLowerCase(m.month().getMonth().name())) + ' ' + m.month().getYear() + ': '
+                                       + #numbers.formatDecimal(m.receivedEur(), 1, 'COMMA', 2, 'POINT') + ' €'}"
+                       th:href="@{/calendar(month=${m.month()})}"
+                       th:classappend="${m.receivedEur().signum() == 0} ? 'no-payment'"
+                       th:title="${label}" th:attr="aria-label=${label + ' received. Open the calendar of that month'}">
+                        <span class="mini-fill" th:style="'--height:' + ${dividendHistory.heightOf(m)} + '%'"></span>
+                    </a>
+                </div>
+            </div>
         </div>
     </section>
 

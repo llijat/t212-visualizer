@@ -1,10 +1,12 @@
 package com.llijat.t212visualizer.controller;
 
+import com.llijat.t212visualizer.dto.DividendHistory;
 import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.service.AccountService;
 import com.llijat.t212visualizer.service.CalendarService;
 import com.llijat.t212visualizer.service.CompanyProfileService;
+import com.llijat.t212visualizer.service.DividendHistoryService;
 import com.llijat.t212visualizer.service.NewsService;
 import com.llijat.t212visualizer.service.PositionService;
 import com.llijat.t212visualizer.service.QuoteService;
@@ -38,6 +40,7 @@ class DashboardControllerTest {
     @Mock private CompanyProfileService companyProfileService;
     @Mock private QuoteService quoteService;
     @Mock private CalendarService calendarService;
+    @Mock private DividendHistoryService dividendHistoryService;
 
     private MockMvc mockMvc;
 
@@ -45,7 +48,7 @@ class DashboardControllerTest {
     void setUp() {
         // The same trick as in NewsControllerTest: the view name becomes a file name, so "/" is not looked up again
         DashboardController controller = new DashboardController(positionService, newsService, accountService,
-                transactionService, companyProfileService, quoteService, calendarService);
+                transactionService, companyProfileService, quoteService, calendarService, dividendHistoryService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setViewResolvers(new InternalResourceViewResolver("/templates/", ".html"))
                 .build();
@@ -68,5 +71,14 @@ class DashboardControllerTest {
         mockMvc.perform(get("/"))
                 .andExpect(model().attribute("moves", moves))
                 .andExpect(model().attribute("metals", metals));
+    }
+
+    @Test
+    void thePage_getsTheDividendsOfTheLast12Months() throws Exception {
+        DividendHistory history = new DividendHistory(List.of());
+        when(dividendHistoryService.getLast12Months()).thenReturn(history);
+
+        mockMvc.perform(get("/"))
+                .andExpect(model().attribute("dividendHistory", history));
     }
 }

@@ -39,6 +39,7 @@ public class NewsController {
         model.addAttribute("moves", quoteService.getMoves());
         model.addAttribute("lastSession", quoteService.getLastSession());
         model.addAttribute("comingUp", calendarService.getComingUp());
+        model.addAttribute("comingUpDividends", calendarService.getComingUpDividends());
         model.addAttribute("metals", quoteService.getMetals());
         model.addAttribute("metalDays", newsService.getMetalNewsByDay());
         return "news";
