@@ -19,18 +19,29 @@ public class DemoAlphaVantageClient implements AlphaVantageClient {
 
     @Override
     public List<AlphaVantageDividendDto> fetchDividends(String symbol) {
-        int seed = symbol.hashCode();
-        if (Math.floorMod(seed, 3) == 0) return List.of();
+        if (!pays(symbol)) return List.of();
 
-        LocalDate nextPayment = LocalDate.now().plusDays(Math.floorMod(seed, 30) + 3);
-        String amount = BigDecimal.valueOf(10 + Math.floorMod(seed, 90), 2).toPlainString();
-
+        String amount = amountPerShare(symbol).toPlainString();
         // Newest first, as Alpha Vantage sends them: the announced one and the three before it
         List<AlphaVantageDividendDto> dividends = new ArrayList<>();
         for (int quarter = 0; quarter < 4; quarter++) {
-            LocalDate payment = nextPayment.minusMonths(3L * quarter);
+            LocalDate payment = nextPayment(symbol).minusMonths(3L * quarter);
             dividends.add(new AlphaVantageDividendDto(payment.minusDays(14).toString(), payment.toString(), amount));
         }
         return dividends;
+    }
+
+    // Shared with DemoT212Client, so the demo's received payments fall on the same days as these announcements
+
+    static boolean pays(String symbol) {
+        return Math.floorMod(symbol.hashCode(), 3) != 0;
+    }
+
+    static LocalDate nextPayment(String symbol) {
+        return LocalDate.now().plusDays(Math.floorMod(symbol.hashCode(), 30) + 3);
+    }
+
+    static BigDecimal amountPerShare(String symbol) {
+        return BigDecimal.valueOf(10 + Math.floorMod(symbol.hashCode(), 90), 2);
     }
 }

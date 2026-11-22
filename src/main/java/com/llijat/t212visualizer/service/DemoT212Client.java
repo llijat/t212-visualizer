@@ -1,6 +1,8 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
+import com.llijat.t212visualizer.dto.T212DividendDto;
+import com.llijat.t212visualizer.dto.T212DividendPageDto;
 import com.llijat.t212visualizer.dto.T212PositionDto;
 import com.llijat.t212visualizer.dto.T212TransactionDto;
 import com.llijat.t212visualizer.dto.T212TransactionPageDto;
@@ -8,8 +10,12 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /** Invented companies and figures, to try the app without a T212 account. */
@@ -64,6 +70,31 @@ public class DemoT212Client implements T212Client {
     @Override
     public T212TransactionPageDto fetchTransactions(String path) {
         return new T212TransactionPageDto(TRANSACTIONS, null);
+    }
+
+    /**
+     * The last three quarterly payments of the demo companies that pay, on the same days DemoAlphaVantageClient
+     * announced them. In euros, after the 15 % US withholding tax and at a made-up rate of 1.08 dollars per euro.
+     */
+    @Override
+    public T212DividendPageDto fetchDividends(String path) {
+        List<T212DividendDto> payments = new ArrayList<>();
+        for (T212PositionDto position : POSITIONS) {
+            String ticker = position.instrument().ticker();
+            String symbol = ticker.substring(0, ticker.indexOf('_'));
+            if (!ticker.contains("_US_") || !DemoAlphaVantageClient.pays(symbol)) continue;
+
+            BigDecimal perShare = DemoAlphaVantageClient.amountPerShare(symbol);
+            BigDecimal inEuro = perShare.multiply(position.quantity()).multiply(new BigDecimal("0.85"))
+                    .divide(new BigDecimal("1.08"), 2, RoundingMode.HALF_UP);
+            for (int quarter = 1; quarter <= 3; quarter++) {
+                LocalDate paid = DemoAlphaVantageClient.nextPayment(symbol).minusMonths(3L * quarter);
+                payments.add(new T212DividendDto(ticker, perShare, inEuro, paid + "T09:30:00.000+01:00"));
+            }
+        }
+        // Newest first, like the real API
+        payments.sort(Comparator.comparing(T212DividendDto::paidDay).reversed());
+        return new T212DividendPageDto(payments, null);
     }
 
     private static BigDecimal sum(List<BigDecimal> values) {

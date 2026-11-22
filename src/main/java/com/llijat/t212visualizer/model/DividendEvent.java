@@ -33,6 +33,11 @@ public class DividendEvent {
         this.amountPerShare = amountPerShare;
     }
 
+    public void recordPayment(BigDecimal receivedEur, BigDecimal grossAmountPerShare) {
+        this.receivedEur = receivedEur;
+        if (this.amountPerShare == null) this.amountPerShare = grossAmountPerShare;
+    }
+
     public Long getId() {return id;}
     public String getTicker() {return ticker;}
     public LocalDate getPaymentDate() {return paymentDate;}
