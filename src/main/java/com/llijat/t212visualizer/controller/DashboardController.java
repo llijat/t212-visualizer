@@ -48,6 +48,7 @@ public class DashboardController {
         model.addAttribute("today", LocalDate.now(SPAIN));
         model.addAttribute("metals", quoteService.getMetals());
         model.addAttribute("dividendHistory", dividendHistoryService.getLast12Months());
+        model.addAttribute("tickers", newsService.getTickerBySymbol());
         return "dashboard"; // resolves to templates/dashboard.html
     }
 

@@ -22,6 +22,7 @@ import org.springframework.web.servlet.view.InternalResourceViewResolver;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -80,5 +81,13 @@ class DashboardControllerTest {
 
         mockMvc.perform(get("/"))
                 .andExpect(model().attribute("dividendHistory", history));
+    }
+
+    @Test
+    void thePage_getsTheT212TickerOfEachSymbol_forTheLogosOfTheNews() throws Exception {
+        when(newsService.getTickerBySymbol()).thenReturn(Map.of("NVDA", "NVDA_US_EQ"));
+
+        mockMvc.perform(get("/"))
+                .andExpect(model().attribute("tickers", Map.of("NVDA", "NVDA_US_EQ")));
     }
 }
