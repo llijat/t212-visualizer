@@ -6,6 +6,8 @@ import java.time.Instant;
 import com.llijat.t212visualizer.dto.CalendarDay;
 import com.llijat.t212visualizer.dto.CalendarDividend;
 import com.llijat.t212visualizer.dto.CalendarMonth;
+import com.llijat.t212visualizer.dto.CalendarSubscription;
+import com.llijat.t212visualizer.dto.Subscription;
 import com.llijat.t212visualizer.dto.UpcomingDividend;
 import com.llijat.t212visualizer.dto.UpcomingEarnings;
 import com.llijat.t212visualizer.model.DividendEvent;
@@ -56,11 +58,15 @@ class CalendarServiceTest {
     @Mock
     private DividendEventRepository dividendRepository;
 
+    // Without stubbing, no subscriptions
+    @Mock
+    private CardExpenseSummaryService cardExpenseSummaryService;
+
     private CalendarService service;
 
     @BeforeEach
     void setUp() {
-        service = new CalendarService(repository, positionService, companyProfileService, dividendRepository, CLOCK);
+        service = new CalendarService(repository, positionService, companyProfileService, dividendRepository, CLOCK, cardExpenseSummaryService);
     }
 
     private static Position position(String ticker) {
@@ -416,5 +422,55 @@ class CalendarServiceTest {
         comingUpHolds(announced("ORCL_US_EQ", today.plusDays(2), "0.50"), announced("MU_US_EQ", today.plusDays(9), "0.115"));
 
         assertEquals(List.of("ORCL", "MU"), service.getComingUpDividends().stream().map(UpcomingDividend::symbol).toList());
+    }
+
+    // ===== Subscriptions: the last real payment, and the ones expected every month after it =====
+
+    private void theSubscriptionIs(String lastPayment, String nextPayment) {
+        when(cardExpenseSummaryService.getSubscriptions(LocalDate.of(2026, 11, 15))).thenReturn(List.of(
+                new Subscription("Globo Gym", new BigDecimal("29.90"), new BigDecimal("29.90"), LocalDate.parse(lastPayment), LocalDate.parse(nextPayment))));
+    }
+
+    private static List<CalendarSubscription> subscriptionsOn(CalendarMonth calendar, String date) {
+        return calendar.days().stream().filter(day -> day.date().equals(LocalDate.parse(date))).findFirst().orElseThrow().subscriptions();
+    }
+
+    @Test
+    void theLastPayment_isPaid_andTheNextOne_isExpected() {
+        theSubscriptionIs("2026-10-26", "2026-11-26");
+
+        CalendarMonth november = service.getMonth(YearMonth.of(2026, 11));   // its grid starts on Monday 26 October
+
+        assertEquals(List.of(new CalendarSubscription("Globo Gym", new BigDecimal("29.90"), false)), subscriptionsOn(november, "2026-10-26"));
+        assertEquals(List.of(new CalendarSubscription("Globo Gym", new BigDecimal("29.90"), true)), subscriptionsOn(november, "2026-11-26"));
+        assertEquals(2, november.days().stream().mapToInt(day -> day.subscriptions().size()).sum());
+    }
+
+    @Test
+    void aLaterMonth_expectsItOnTheSameDay() {
+        theSubscriptionIs("2026-10-26", "2026-11-26");
+
+        CalendarMonth march = service.getMonth(YearMonth.of(2027, 3));
+
+        assertTrue(subscriptionsOn(march, "2027-03-26").get(0).expected());
+        assertEquals(1, march.days().stream().mapToInt(day -> day.subscriptions().size()).sum());
+    }
+
+    @Test
+    void onThe31st_aShortMonthGetsItsLastDay_andTheNextLongOneThe31stAgain() {
+        theSubscriptionIs("2026-12-31", "2027-01-31");
+
+        assertEquals(1, subscriptionsOn(service.getMonth(YearMonth.of(2027, 2)), "2027-02-28").size());
+        assertEquals(1, subscriptionsOn(service.getMonth(YearMonth.of(2027, 3)), "2027-03-31").size());   // not the 28th: counted from January
+    }
+
+    @Test
+    void aMonthBeforeTheNextPayment_onlyShowsTheRealOne() {
+        theSubscriptionIs("2026-10-26", "2026-11-26");
+
+        CalendarMonth october = service.getMonth(YearMonth.of(2026, 10));   // its grid ends on Sunday 1 November
+
+        assertFalse(subscriptionsOn(october, "2026-10-26").get(0).expected());
+        assertEquals(1, october.days().stream().mapToInt(day -> day.subscriptions().size()).sum());
     }
 }

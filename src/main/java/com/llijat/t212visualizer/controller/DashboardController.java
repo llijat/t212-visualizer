@@ -56,7 +56,9 @@ public class DashboardController {
         model.addAttribute("tickers", newsService.getTickerBySymbol());
         model.addAttribute("todayChange", accountSnapshotService.getTodayChange());
         model.addAttribute("history", accountSnapshotService.getHistory());
-        model.addAttribute("priceSeries", priceHistoryService.getMonthSeries());
+        model.addAttribute("priceSeries", priceHistoryService.getRecentSeries());
+        model.addAttribute("tradingViewSymbols", companyProfileService.currentTradingViewSymbols());
+        model.addAttribute("recentTicks", accountSnapshotService.getRecentTicks());
         return "dashboard"; // resolves to templates/dashboard.html
     }
 

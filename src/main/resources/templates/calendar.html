@@ -12,6 +12,7 @@
             --earnings: var(--accent);
             --earnings-bg: color-mix(in srgb, var(--accent) 14%, var(--panel));
             --dividend-bg: color-mix(in srgb, var(--dividend) 12%, var(--panel));
+            --subscription-bg: color-mix(in srgb, var(--subscription) 12%, var(--panel));
         }
 
         /* ===== Page: the calendar on the left, the side panel on the right ===== */
@@ -154,6 +155,26 @@
             border-left: 3px solid var(--dividend);
         }
         .chip[data-type="dividend"].selected { outline-color: var(--dividend); }
+        /* Subscriptions: the last real payment solid, the expected ones dashed. The merchant's initial instead of a logo */
+        .chip[data-type="subscription"] { border-left-color: var(--subscription); background: var(--subscription-bg); }
+        .chip[data-type="subscription"].upcoming {
+            background: transparent;
+            border: 1px dashed color-mix(in srgb, var(--subscription) 45%, transparent);
+            border-left: 3px solid var(--subscription);
+        }
+        .chip[data-type="subscription"].selected { outline-color: var(--subscription); }
+        .chip[data-type="subscription"] .chip-ticker { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+        .sub-initial {
+            flex: none;
+            display: grid;
+            place-items: center;
+            width: 1.1em;
+            height: 1.1em;
+            border-radius: 50%;
+            background: color-mix(in srgb, var(--subscription) 28%, transparent);
+            color: var(--subscription);
+            font: 600 0.62rem var(--figures);
+        }
         .chip-amount { color: var(--muted); font: 500 0.72rem var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .chip-ticker { font: 600 0.8rem var(--figures); letter-spacing: 0.01em; }
         .chip .logo { font-size: 0.85rem; }
@@ -184,6 +205,7 @@
         /* Filters: a hidden type disappears from the grid */
         .calendar.hide-earnings .chip[data-type="earnings"] { display: none; }
         .calendar.hide-dividend .chip[data-type="dividend"] { display: none; }
+        .calendar.hide-subscription .chip[data-type="subscription"] { display: none; }
 
         .empty-month {
             margin: 0;
@@ -233,6 +255,7 @@
         .tag.beat { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
         .tag.miss { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); }
         .tag.dividend { background: var(--dividend-bg); color: var(--dividend); }
+        .tag.subscription { background: var(--subscription-bg); color: var(--subscription); }
 
         .metric { border-top: 1px solid var(--border); padding-top: 0.9rem; }
         .metric h3 { margin: 0 0 0.6rem; font: 500 0.95rem var(--figures); color: var(--muted); }
@@ -346,14 +369,17 @@
                     <button type="button" class="filter" data-filter="dividend" aria-pressed="true" style="--swatch: var(--dividend)">
                         <span class="swatch"></span>Dividends
                     </button>
+                    <button type="button" class="filter" data-filter="subscription" aria-pressed="true" style="--swatch: var(--subscription)">
+                        <span class="swatch"></span>Subscriptions
+                    </button>
                     <span class="legend-hint" title="Before the US market opens"><svg class="icon session" aria-hidden="true"><use href="#icon-sun"/></svg>Pre-market</span>
                     <span class="legend-hint" title="After the US market closes"><svg class="icon session" aria-hidden="true"><use href="#icon-moon"/></svg>After close</span>
                 </div>
             </div>
 
             <p class="empty-month"
-               th:if="${#lists.isEmpty(calendar.days().?[!earnings().isEmpty() or !dividends().isEmpty()])}">
-                No earnings or dividends this month for the stocks you hold.
+               th:if="${#lists.isEmpty(calendar.days().?[!earnings().isEmpty() or !dividends().isEmpty() or !subscriptions().isEmpty()])}">
+                No earnings, dividends or subscriptions this month.
             </p>
 
             <div class="weekdays" aria-hidden="true">
@@ -362,14 +388,14 @@
 
             <div class="grid">
                 <div class="day" th:each="day : ${calendar.days()}"
-                     th:classappend="${(day.inMonth() ? '' : 'outside ') + (day.today() ? 'today ' : '') + (day.earnings().isEmpty() and day.dividends().isEmpty() ? 'no-events' : '')}"
+                     th:classappend="${(day.inMonth() ? '' : 'outside ') + (day.today() ? 'today ' : '') + (day.earnings().isEmpty() and day.dividends().isEmpty() and day.subscriptions().isEmpty() ? 'no-events' : '')}"
                      th:attr="data-date=${day.date()}">
                     <div class="day-head">
                         <span class="day-number" th:text="${day.date().getDayOfMonth()}">1</span>
                         <span class="day-label" th:text="${#strings.capitalize(#strings.toLowerCase(day.date().getDayOfWeek().name())) + ' ' + day.date().getDayOfMonth() + (day.today() ? ', today' : '')}">Monday 1</span>
                         <!-- The script shows it, with the right number, when the chips do not fit in the day -->
                         <button type="button" class="more hidden"
-                                th:unless="${day.earnings().isEmpty() and day.dividends().isEmpty()}">more</button>
+                                th:unless="${day.earnings().isEmpty() and day.dividends().isEmpty() and day.subscriptions().isEmpty()}">more</button>
                     </div>
 
                     <button type="button" class="chip" data-type="earnings"
@@ -429,6 +455,23 @@
                         <span class="chip-end" th:if="${amount != null}">
                             <span class="chip-amount"
                                   th:text="${(dividend.isReceived() ? '' : '≈ ') + #numbers.formatDecimal(amount, 1, 'COMMA', 2, 'POINT') + ' €'}">0.84 €</span>
+                        </span>
+                    </button>
+
+                    <!-- Subscriptions: the last real payment, and the ones expected on the same day every month (dashed, ≈) -->
+                    <button type="button" class="chip" data-type="subscription"
+                            th:each="s : ${day.subscriptions()}"
+                            th:classappend="${s.expected() ? 'upcoming' : ''}"
+                            th:data-merchant="${s.merchant()}"
+                            th:data-amount="${s.amount()}"
+                            th:data-date="${day.date()}"
+                            th:data-expected="${s.expected()}"
+                            th:title="${s.merchant() + (s.expected() ? ', expected' : ', paid')}">
+                        <span class="sub-initial" aria-hidden="true" th:text="${#strings.toUpperCase(#strings.substring(s.merchant(), 0, 1))}">G</span>
+                        <span class="chip-ticker" th:text="${s.merchant()}">Globo Gym</span>
+                        <span class="chip-end">
+                            <span class="chip-amount"
+                                  th:text="${(s.expected() ? '≈ ' : '') + #numbers.formatDecimal(s.amount(), 1, 'COMMA', 2, 'POINT') + ' €'}">29.90 €</span>
                         </span>
                     </button>
 
@@ -681,8 +724,35 @@
                 openPanel([head, tags, amount, dates]);
             }
 
+            // ----- Details of one subscription payment -----
+            function showSubscription(chip) {
+                const data = chip.dataset;
+                const expected = data.expected === 'true';
+
+                const head = element('div', 'side-head');
+                const titles = element('div');
+                titles.append(element('h2', '', data.merchant), element('p', 'side-sub', 'Subscription, ' + longDate.format(dateOf(data.date))));
+                head.append(titles, closeButton());
+
+                const tags = element('div', 'tags');
+                tags.append(element('span', 'tag subscription', 'Subscription'),
+                            element('span', 'tag ' + (expected ? 'neutral' : 'beat'), expected ? 'Expected' : 'Paid'));
+
+                const amount = element('section', 'metric');
+                amount.append(element('h3', '', expected ? 'You should pay' : 'You paid'),
+                              element('div', 'metric-main', (expected ? '≈ ' : '') + euros(number(data.amount))));
+                if (expected) {
+                    amount.append(element('p', 'note', 'Expected on the same day of the month as the last payment, for the same amount. The card may charge it a day or two later.'));
+                }
+
+                calendar.querySelectorAll('.chip.selected').forEach(other => other.classList.remove('selected'));
+                chip.classList.add('selected');
+                openPanel([head, tags, amount]);
+            }
+
             function showEvent(chip) {
                 if (chip.dataset.type === 'dividend') showDividend(chip);
+                else if (chip.dataset.type === 'subscription') showSubscription(chip);
                 else showEarnings(chip);
             }
 

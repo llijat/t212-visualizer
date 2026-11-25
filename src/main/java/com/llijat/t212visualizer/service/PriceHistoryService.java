@@ -17,7 +17,7 @@ import java.util.Map;
 
 @Service
 public class PriceHistoryService {
-    private static final int DAYS_BACK = 31;
+    private static final int DAYS_BACK = 95;
 
     private final CompanyProfileService companyProfileService;
     private final PositionService positionService;
@@ -31,7 +31,7 @@ public class PriceHistoryService {
         this.clock = clock;
     }
 
-    public Map<String, PriceSeries> getMonthSeries() {
+    public Map<String, PriceSeries> getRecentSeries() {
         LocalDate from = LocalDate.now(clock).minusDays(DAYS_BACK);
         Map<String, List<BigDecimal>> closesBySymbol = new HashMap<>();
         for (PriceClose close : priceCloseRepository.findByIdDayGreaterThanEqualOrderByIdDayAsc(from)) {

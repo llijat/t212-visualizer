@@ -282,8 +282,11 @@
         }
 
         /* ===== Below: categories · payments · budgets, subscriptions and merchants ===== */
-        .board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
-        .stack { display: grid; gap: 1.25rem; }
+        /* The three columns end on the same line: the board is as tall as its longest column, the categories card and the
+           last card on the right grow to it, and the payments list fills its card (contain: size, so its own length never sets the height) */
+        .board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 1.25rem; align-items: stretch; }
+        .stack { display: grid; gap: 1.25rem; grid-template-rows: auto auto 1fr; }
+        .payments-panel { display: flex; flex-direction: column; }
         .panel { background: var(--panel); border-radius: var(--radius); padding: 1.25rem 1.35rem; }
         .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
         .panel-head > span { color: var(--muted); font-size: 0.85rem; }
@@ -322,6 +325,12 @@
         .split i { flex: var(--v); min-width: 3px; border-radius: 3px; background: var(--c); }
         .cat-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.55rem 0.5rem; margin: 0 -0.5rem; border-radius: 10px; }
         .cat-row:hover { background: var(--raised); }
+        /* A category or a merchant shows only its payments: the same row pressed again shows them all */
+        [data-only] { cursor: pointer; }
+        [data-only]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        [data-only][aria-pressed="true"] { background: var(--raised); }
+        .line-row[data-only] { margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; border-radius: 10px; }
+        .line-row[data-only]:hover { background: var(--raised); }
         .row-main { flex: 1; min-width: 0; }
         .row-line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
         .row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -345,7 +354,7 @@
         .payments-day { height: 2.4rem; padding: 0 0.85rem; border-radius: 10px; background: var(--accent-bg); color: var(--accent); white-space: nowrap; }
         .payments-day:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
         .payments-hint { margin: 0 0 0.6rem; color: var(--faint); font-size: 0.8rem; }
-        .payments { max-height: 640px; overflow-y: auto; margin: 0 -0.5rem; padding: 0 0.5rem; }
+        .payments { flex: 1 1 0; min-height: 26rem; contain: size; overflow-y: auto; margin: 0 -0.5rem; padding: 0 0.5rem; }
         .day-head {
             position: sticky;
             top: 0;
@@ -464,13 +473,14 @@
             .month { grid-template-columns: minmax(0, 1fr) auto; }
             .year { grid-column: 1 / -1; }
             .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .board > .stack { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+            .board > .stack { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: none; align-items: stretch; }
         }
         @media (max-width: 900px) {
             .notice { margin: 1rem 1rem 0; }
             .spending { overflow: visible; padding: 1.25rem 1rem 2rem; }
             .month { grid-template-columns: 1fr; gap: 2rem; }
             .board, .board > .stack { grid-template-columns: 1fr; }
+            .payments { flex: none; height: 32rem; min-height: 0; }
             .chart { padding-left: 0; }
             .chart-grid { left: 0; }
             .chart-grid b { display: none; }
@@ -702,7 +712,9 @@
                     <ul class="rows">
                         <li class="cat-row" th:each="c : ${report.categories()}"
                             th:with="name=${categoryNames.of(c.category())},
-                                     share=${c.total() * 100 / report.spent()}">
+                                     share=${c.total() * 100 / report.spent()}"
+                            tabindex="0" role="button" aria-pressed="false" data-only="category"
+                            th:data-value="${c.category()}" th:data-label="${name}" th:title="'Show only the payments in ' + ${name}">
                             <span class="tile tinted" th:classappend="${customNames.contains(c.category()) ? 'custom-' + (customNames.indexOf(c.category()) % 6) : 'cat-' + c.category()}" aria-hidden="true">
                                 <svg class="icon"><use th:href="${knownIcons.contains(c.category()) ? '#cat-' + c.category() : (customNames.contains(c.category()) ? '#cat-CUSTOM' : '#cat-OTHER')}"/></svg>
                             </span>
@@ -723,7 +735,7 @@
 
             <!-- Payments of the month, newest first, grouped by day. A merchant's category can be corrected here:
                  it changes every payment to that merchant, and every figure on the page -->
-            <section class="panel" aria-labelledby="payments-heading"
+            <section class="panel payments-panel" aria-labelledby="payments-heading"
                      th:with="choices=${categoryNames.choices()},
                               total=${report.payments().size()}">
                 <div class="panel-head">
@@ -737,8 +749,9 @@
                     <div class="payments-tools">
                         <input type="search" class="payments-search" id="payment-search" placeholder="Search a merchant or category" aria-label="Search the payments" autocomplete="off">
                         <button type="button" class="payments-day hidden" id="payment-day" aria-label="Show every day again"></button>
+                        <button type="button" class="payments-day hidden" id="payment-only" aria-label="Show every payment again"></button>
                     </div>
-                    <p class="payments-hint">Changing a category changes it for every payment to that merchant.</p>
+                    <p class="payments-hint">Changing a category changes it for every payment to that merchant. "New category…" in the menu makes your own.</p>
 
                     <div class="payments scroll-hints" id="payment-list">
                         <th:block th:each="p, stat : ${report.payments()}"
@@ -751,7 +764,7 @@
                                 <span class="figures" th:text="${#numbers.formatDecimal(report.days()[p.date().getDayOfMonth() - 1].total(), 1, 'COMMA', 2, 'POINT')} + ' €'">102.46 €</span>
                             </div>
 
-                            <div class="pay-row" th:data-date="${p.date()}"
+                            <div class="pay-row" th:data-date="${p.date()}" th:data-category="${p.category()}" th:data-merchant="${merchantName}"
                                  th:data-search="${#strings.toLowerCase(merchantName + ' ' + categoryName)}">
                                 <span class="tile tinted" th:classappend="${customNames.contains(p.category()) ? 'custom-' + (customNames.indexOf(p.category()) % 6) : 'cat-' + p.category()}" aria-hidden="true">
                                     <svg class="icon"><use th:href="${knownIcons.contains(p.category()) ? '#cat-' + p.category() : (customNames.contains(p.category()) ? '#cat-CUSTOM' : '#cat-OTHER')}"/></svg>
@@ -789,7 +802,7 @@
                                 <span class="amount" th:text="${#numbers.formatDecimal(p.amount(), 1, 'COMMA', 2, 'POINT')} + ' €'">64.80 €</span>
                             </div>
                         </th:block>
-                        <p class="empty-month hidden" id="payment-none">No payment matches. Try another word or clear the day.</p>
+                        <p class="empty-month hidden" id="payment-none">No payment matches. Try another word, or clear the filters above.</p>
                     </div>
 
                     <!-- "New category…" in a payment's menu (added by the script, as it needs it): this form opens under that payment,
@@ -869,10 +882,10 @@
                         </form>
                     </details>
 
-                    <!-- Your own categories: made here or from a payment's menu ("New category…") -->
-                    <details class="add">
-                        <summary th:text="${customCategories.isEmpty()} ? 'Create a category' : 'Your categories (' + ${customCategories.size()} + ')'">Your categories (2)</summary>
-                        <ul class="custom-list" th:unless="${customCategories.isEmpty()}">
+                    <!-- Your own categories, to delete them. They are made from a payment's menu ("New category…") -->
+                    <details class="add" th:unless="${customCategories.isEmpty()}">
+                        <summary th:text="'Your categories (' + ${customCategories.size()} + ')'">Your categories (2)</summary>
+                        <ul class="custom-list">
                             <li th:each="k : ${customCategories}" class="tinted" th:classappend="${'custom-' + (kStat.index % 6)}">
                                 <span th:text="${k.name}">Gym</span>
                                 <form class="custom-delete" method="post" th:action="@{/expenses/custom-categories/delete}">
@@ -884,13 +897,7 @@
                                 </form>
                             </li>
                         </ul>
-                        <form class="budget-form" method="post" th:action="@{/expenses/custom-categories}">
-                            <input type="text" name="name" maxlength="100" required autocomplete="off"
-                                   placeholder="Name, like Groceries" aria-label="Name of the new category">
-                            <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
-                            <button type="submit">Create</button>
-                        </form>
-                        <p class="custom-hint">Deleting one gives its merchants back the Trading 212 category and removes its budget.</p>
+                        <p class="custom-hint">To make a new one, choose "New category…" in a payment's menu. Deleting one gives its merchants back the Trading 212 category and removes its budget.</p>
                     </details>
                 </section>
 
@@ -920,7 +927,9 @@
                     </div>
                     <p class="empty-month" th:if="${report.topMerchants().isEmpty()}">No card payments in this month.</p>
                     <div th:unless="${report.topMerchants().isEmpty()}" th:style="'--max:' + ${report.topMerchants()[0].total()}">
-                        <div class="line-row" th:each="merchant : ${report.topMerchants()}" th:style="'--v:' + ${merchant.total()}">
+                        <div class="line-row" th:each="merchant : ${report.topMerchants()}" th:style="'--v:' + ${merchant.total()}"
+                             tabindex="0" role="button" aria-pressed="false" data-only="merchant"
+                             th:data-value="${merchant.name()}" th:data-label="${merchant.name()}" th:title="'Show only the payments to ' + ${merchant.name()}">
                             <span class="avatar" aria-hidden="true" th:text="${#strings.toUpperCase(#strings.substring(merchant.name(), 0, 1))}">A</span>
                             <span class="row-main">
                                 <span class="row-name" th:text="${merchant.name()}" th:title="${merchant.name()}">Acme Market</span>
@@ -998,18 +1007,22 @@
         const paymentList = document.getElementById('payment-list');         // only exists with payments this month
         const paymentSearch = document.getElementById('payment-search');
         const paymentDay = document.getElementById('payment-day');
+        const paymentOnly = document.getElementById('payment-only');
         const paymentCount = document.getElementById('payment-count');
         const paymentNone = document.getElementById('payment-none');
         const paymentRows = paymentList ? [...paymentList.querySelectorAll('.pay-row')] : [];
         const dayHeads = paymentList ? [...paymentList.querySelectorAll('.day-head')] : [];
         let chosenDate = null;
+        let only = null;   // the category or merchant row pressed: { key: 'category' | 'merchant', value, row }
 
         function filterPayments() {
             const words = paymentSearch.value.trim().toLowerCase();
             let shown = 0;
             const visibleDates = new Set();
             paymentRows.forEach(row => {
-                const visible = (chosenDate === null || row.dataset.date === chosenDate) && row.dataset.search.includes(words);
+                const visible = (chosenDate === null || row.dataset.date === chosenDate)
+                    && (only === null || row.dataset[only.key] === only.value)
+                    && row.dataset.search.includes(words);
                 row.classList.toggle('hidden', !visible);
                 if (visible) {
                     shown++;
@@ -1063,7 +1076,31 @@
             });
         }
 
+        // A category (Categories) or a merchant (Top merchants): only its payments. Pressed again, or its ✕, shows them all
+        function chooseOnly(row) {
+            if (only) only.row.setAttribute('aria-pressed', 'false');
+            only = (row && only?.row !== row) ? { key: row.dataset.only, value: row.dataset.value, row } : null;
+            if (only) {
+                row.setAttribute('aria-pressed', 'true');
+                paymentOnly.textContent = 'Only ' + row.dataset.label + '  ✕';
+            }
+            paymentOnly.classList.toggle('hidden', !only);
+            filterPayments();
+        }
+
         if (paymentList) {
+            document.querySelectorAll('[data-only]').forEach(row => {
+                row.addEventListener('click', () => {
+                    chooseOnly(row);
+                    if (only) paymentList.closest('.panel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                });
+                row.addEventListener('keydown', event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    row.click();
+                });
+            });
+            paymentOnly.addEventListener('click', () => chooseOnly(null));
             paymentSearch.addEventListener('input', filterPayments);
             paymentDay.addEventListener('click', () => {
                 clearDay();

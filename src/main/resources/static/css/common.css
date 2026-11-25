@@ -15,6 +15,7 @@
     --green: #6fd3a0;       /* up, beat, less spending */
     --red: #f58b8b;         /* down, missed, more spending */
     --dividend: #f2c25a;    /* dividends, in the calendar and the portfolio */
+    --subscription: #a996d4; /* subscriptions in the calendar: a muted purple, quieter than the money coming in (6.2:1 on the cards) */
     --radius: 14px;         /* cards */
     --radius-small: 9px;    /* buttons, fields, menus */
 

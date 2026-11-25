@@ -113,4 +113,10 @@ public class CompanyProfileService {
                 .filter(profile -> profile.getSymbol() != null)
                 .collect(Collectors.toMap(CompanyProfile::getTicker, CompanyProfile::getSymbol));
     }
+
+    public Map<String, String> currentTradingViewSymbols() {
+        return companyProfileRepository.findAll().stream()
+                .filter(profile -> profile.getSymbol() != null)
+                .collect(Collectors.toMap(CompanyProfile::getTicker, profile -> TradingViewSymbol.of(profile.getExchange(), profile.getSymbol())));
+    }
 }

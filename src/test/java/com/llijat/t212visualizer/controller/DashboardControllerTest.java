@@ -109,10 +109,20 @@ class DashboardControllerTest {
     void thePage_getsTheLastMonthOfEachStock_forTheMiniLines() throws Exception {
         Map<String, PriceSeries> series = Map.of("AAPL_US_EQ",
                 new PriceSeries(List.of(new BigDecimal("100"), new BigDecimal("103")), new BigDecimal("3.00")));
-        when(priceHistoryService.getMonthSeries()).thenReturn(series);
+        when(priceHistoryService.getRecentSeries()).thenReturn(series);
 
         mockMvc.perform(get("/"))
                 .andExpect(model().attribute("priceSeries", series));
+    }
+
+    @Test
+    void thePage_getsTheTradingViewSymbols_andTheRecentTicks() throws Exception {
+        when(companyProfileService.currentTradingViewSymbols()).thenReturn(Map.of("AAPL_US_EQ", "NASDAQ:AAPL"));
+        when(accountSnapshotService.getRecentTicks()).thenReturn(List.of());
+
+        mockMvc.perform(get("/"))
+                .andExpect(model().attribute("tradingViewSymbols", Map.of("AAPL_US_EQ", "NASDAQ:AAPL")))
+                .andExpect(model().attribute("recentTicks", List.of()));
     }
 
     @Test

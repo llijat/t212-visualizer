@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 class PriceHistoryServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-15T11:00:00Z"), ZoneId.of("Europe/Madrid"));
-    private static final LocalDate A_MONTH_AGO = LocalDate.of(2026, 10, 15);
+    private static final LocalDate FROM = LocalDate.of(2026, 8, 12);   // 95 days back: 3 months of sessions, for the 1W, 1M and 3M mini charts
 
     @Mock
     private CompanyProfileService companyProfileService;
@@ -57,7 +57,7 @@ class PriceHistoryServiceTest {
             closes.add(new PriceClose(new PriceDay((String) symbolDayClose[i], LocalDate.of(2026, 11, (int) symbolDayClose[i + 1])),
                     new BigDecimal((String) symbolDayClose[i + 2])));
         }
-        when(priceCloseRepository.findByIdDayGreaterThanEqualOrderByIdDayAsc(A_MONTH_AGO)).thenReturn(closes);
+        when(priceCloseRepository.findByIdDayGreaterThanEqualOrderByIdDayAsc(FROM)).thenReturn(closes);
     }
 
     private void thePortfolioIs(Position... positions) {
@@ -73,7 +73,7 @@ class PriceHistoryServiceTest {
                 "AAPL", 11, "210", "MSFT", 11, "380",
                 "AAPL", 12, "220");
 
-        Map<String, PriceSeries> series = service.getMonthSeries();
+        Map<String, PriceSeries> series = service.getRecentSeries();
 
         assertEquals(List.of(new BigDecimal("200"), new BigDecimal("210"), new BigDecimal("220")), series.get("AAPL_US_EQ").closes());
         assertEquals(List.of(new BigDecimal("400"), new BigDecimal("380")), series.get("MSFT_US_EQ").closes());
@@ -87,7 +87,7 @@ class PriceHistoryServiceTest {
                 "AAPL", 11, "250", "MSFT", 11, "290",
                 "AAPL", 12, "220", "MSFT", 12, "299");
 
-        Map<String, PriceSeries> series = service.getMonthSeries();
+        Map<String, PriceSeries> series = service.getRecentSeries();
 
         assertEquals(new BigDecimal("10.00"), series.get("AAPL_US_EQ").changePercent());   // the 250 in the middle does not count
         assertEquals(new BigDecimal("-0.33"), series.get("MSFT_US_EQ").changePercent());   // -1 of 300 = -0.333...
@@ -98,7 +98,7 @@ class PriceHistoryServiceTest {
         thePortfolioIs(position("AAPL_US_EQ"));
         theSavedClosesAre("AAPL", 12, "220");
 
-        assertFalse(service.getMonthSeries().containsKey("AAPL_US_EQ"));
+        assertFalse(service.getRecentSeries().containsKey("AAPL_US_EQ"));
     }
 
     @Test
@@ -106,7 +106,7 @@ class PriceHistoryServiceTest {
         thePortfolioIs(position("VUSAl_EQ"));
         theSavedClosesAre("AAPL", 10, "200", "AAPL", 11, "210");   // closes of a stock that was sold
 
-        assertEquals(Map.of(), service.getMonthSeries());
+        assertEquals(Map.of(), service.getRecentSeries());
     }
 
     @Test
@@ -115,7 +115,7 @@ class PriceHistoryServiceTest {
         when(companyProfileService.currentSymbols()).thenReturn(Map.of("FB_US_EQ", "META"));
         theSavedClosesAre("META", 10, "600", "META", 11, "612");
 
-        assertEquals(new BigDecimal("2.00"), service.getMonthSeries().get("FB_US_EQ").changePercent());
+        assertEquals(new BigDecimal("2.00"), service.getRecentSeries().get("FB_US_EQ").changePercent());
     }
 
     @Test
@@ -123,6 +123,6 @@ class PriceHistoryServiceTest {
         thePortfolioIs(position("AAPL_US_EQ"));
         theSavedClosesAre("AAPL", 10, "0", "AAPL", 11, "5");
 
-        assertEquals(BigDecimal.ZERO, service.getMonthSeries().get("AAPL_US_EQ").changePercent());
+        assertEquals(BigDecimal.ZERO, service.getRecentSeries().get("AAPL_US_EQ").changePercent());
     }
 }

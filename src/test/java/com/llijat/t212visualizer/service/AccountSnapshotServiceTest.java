@@ -3,6 +3,7 @@ package com.llijat.t212visualizer.service;
 import java.time.Clock;
 
 import com.llijat.t212visualizer.dto.AccountPoint;
+import com.llijat.t212visualizer.dto.AccountTickPoint;
 import com.llijat.t212visualizer.dto.DailyChange;
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
 import com.llijat.t212visualizer.model.AccountSnapshot;
@@ -17,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -280,5 +282,33 @@ class AccountSnapshotServiceTest {
     @Test
     void withoutSnapshots_thereIsNoHistory() {
         assertEquals(List.of(), historyOf());
+    }
+
+    // ===== The ticks of the last days, for 1D and 1W =====
+
+    private static AccountTick tickAt(String time, String value, String netDeposits) {
+        return new AccountTick(Instant.parse(time), new BigDecimal(value), new BigDecimal(netDeposits));
+    }
+
+    @Test
+    void theRecentTicks_areTheLast8Days_soAWeekStartsAtAClose() {
+        when(tickRepository.findByTakenAtGreaterThanEqualOrderByTakenAtAsc(CLOCK.instant().minus(Duration.ofDays(8)))).thenReturn(List.of());
+
+        assertEquals(List.of(), service.getRecentTicks());
+    }
+
+    @Test
+    void theTicks_chainTheirGrowth_withoutCountingMoneyPutInAsAGain() {
+        when(tickRepository.findByTakenAtGreaterThanEqualOrderByTakenAtAsc(any())).thenReturn(List.of(
+                tickAt("2026-11-15T09:00:00Z", "1000", "1000"),
+                tickAt("2026-11-15T09:15:00Z", "1010", "1000"),     // +1 %
+                tickAt("2026-11-15T09:30:00Z", "1515", "1500")));   // 500 put in: 1515 of 1510 is +0.33 %
+
+        List<AccountTickPoint> points = service.getRecentTicks();
+
+        assertEquals(Instant.parse("2026-11-15T09:15:00Z"), points.get(1).takenAt());
+        assertEquals(new BigDecimal("1010"), points.get(1).value());
+        assertEquals(0, new BigDecimal("1.01").compareTo(points.get(1).growth()));
+        assertEquals(0, new BigDecimal("1.0133443709").compareTo(points.get(2).growth()), "growth was " + points.get(2).growth());
     }
 }

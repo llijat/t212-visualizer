@@ -27,13 +27,15 @@ public class CalendarService {
     private final PositionService positionService;
     private final CompanyProfileService companyProfileService;
     private final DividendEventRepository dividendEventRepository;
+    private final CardExpenseSummaryService cardExpenseSummaryService;
 
-    public CalendarService(EarningsEventRepository earningsEventRepository, PositionService positionService, CompanyProfileService companyProfileService, DividendEventRepository dividendEventRepository, Clock clock) {
+    public CalendarService(EarningsEventRepository earningsEventRepository, PositionService positionService, CompanyProfileService companyProfileService, DividendEventRepository dividendEventRepository, Clock clock, CardExpenseSummaryService cardExpenseSummaryService) {
         this.earningsEventRepository = earningsEventRepository;
         this.positionService = positionService;
         this.companyProfileService = companyProfileService;
         this.dividendEventRepository = dividendEventRepository;
         this.clock = clock;
+        this.cardExpenseSummaryService = cardExpenseSummaryService;
     }
 
     public CalendarMonth getMonth(YearMonth month) {
@@ -66,8 +68,9 @@ public class CalendarService {
                 .map(dividend -> toCalendarDividend(dividend, lastReceivedByTicker.get(dividend.getTicker()), sharesByTicker.get(dividend.getTicker())))
                 .collect(Collectors.groupingBy(CalendarDividend::paymentDate));
 
+        Map<LocalDate, List<CalendarSubscription>> subscriptionsByDate = subscriptionsByDate(gridStart, gridEnd, today);
         for (LocalDate date = gridStart; !date.isAfter(gridEnd); date = date.plusDays(1)) {
-            dayList.add(new CalendarDay(date, YearMonth.from(date).equals(month), date.equals(today), byDate.getOrDefault(date, List.of()), dividendsByDate.getOrDefault(date, List.of())));
+            dayList.add(new CalendarDay(date, YearMonth.from(date).equals(month), date.equals(today), byDate.getOrDefault(date, List.of()), dividendsByDate.getOrDefault(date, List.of()), subscriptionsByDate.getOrDefault(date, List.of())));
         }
         return new CalendarMonth(month,dayList);
     }
@@ -130,5 +133,24 @@ public class CalendarService {
             lastReceived.putIfAbsent(received.getTicker(), received);
         }
         return lastReceived;
+    }
+
+    private Map<LocalDate, List<CalendarSubscription>> subscriptionsByDate(LocalDate gridStart, LocalDate gridEnd, LocalDate today) {
+        Map<LocalDate, List<CalendarSubscription>> byDate = new HashMap<>();
+        for (Subscription subscription : cardExpenseSummaryService.getSubscriptions(today)) {
+            LocalDate last = subscription.lastPayment();
+            if (!last.isBefore(gridStart) && !last.isAfter(gridEnd)) {
+                byDate.computeIfAbsent(last, day -> new ArrayList<>())
+                        .add(new CalendarSubscription(subscription.merchant(), subscription.amount(), false));
+            }
+            for (int months = 0; ; months++) {
+                LocalDate expected = subscription.nextPayment().plusMonths(months);
+                if (expected.isAfter(gridEnd)) break;
+                if (expected.isBefore(gridStart)) continue;
+                byDate.computeIfAbsent(expected, day -> new ArrayList<>())
+                        .add(new CalendarSubscription(subscription.merchant(), subscription.amount(), true));
+            }
+        }
+        return byDate;
     }
 }

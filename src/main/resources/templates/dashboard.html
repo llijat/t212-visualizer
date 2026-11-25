@@ -52,6 +52,20 @@
         }
         .positions-table th, .positions-table td { padding-left: 0.32rem; padding-right: 0.32rem; }   /* 8 columns with P/L in euros: every pixel counts */
         tbody tr:hover { background: var(--raised); }
+
+        /* ===== A position's TradingView chart, over the whole screen ===== */
+        .position-row { cursor: pointer; }
+        .position-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+        .tv-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: var(--bg); color: var(--text); }
+        .tv-dialog[open] { display: flex; flex-direction: column; }
+        .tv-dialog::backdrop { background: var(--bg); }
+        .tv-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.5rem 0.75rem 0.5rem 1rem; border-bottom: 1px solid var(--border); }
+        .tv-head h2 { margin: 0; font: 500 1rem var(--figures); }
+        .tv-head h2 span { margin-left: 0.5rem; color: var(--muted); font: 0.82rem var(--text-font); }
+        .tv-close { height: 2rem; padding: 0 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-small); background: none; color: var(--text); font: inherit; font-size: 0.85rem; cursor: pointer; }
+        .tv-close:hover { background: var(--raised); }
+        .tv-frame { flex: 1; display: block; width: 100%; min-height: 0; border: 0; background: var(--bg); }
+        .tv-note { margin: auto; max-width: 24rem; padding: 1rem 1.25rem; border: 1px dashed var(--border); border-radius: var(--radius-small); color: var(--muted); font-size: 0.9rem; text-align: center; }
         tbody tr:last-child td { border-bottom: none; }
         .num {
             text-align: right;                  /* numbers aligned right, as in any finance app */
@@ -163,7 +177,6 @@
         .split { margin-top: 0.85rem; }
         .ledger { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin: 0; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
         .ledger b { margin-left: 0.45rem; font-size: 1.1rem; }
-        .ledger-op { color: var(--faint); font: 300 1.15rem var(--figures); }
         /* The bar measures the longer of the two: what you put in when you lost (the red part is the loss, in proportion),
            what it is worth when you earned (the green line under it is the gain). The gain goes under it, not inside:
            it is part of what the account is worth, and inside it would hide part of the cash. */
@@ -287,6 +300,14 @@
         .trend .up { color: var(--green); }
         .trend .down { color: var(--red); }
         .trend-change { min-width: 3rem; font: 500 0.82rem var(--figures); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+        /* The column's header: the period of the mini charts, and the arrow to sort by their move (its own button, so picking a period does not sort) */
+        .trend-head { display: inline-flex; align-items: center; gap: 0.25rem; }
+        .trend-periods { display: inline-flex; gap: 1px; }
+        .trend-periods button { height: 1.3rem; padding: 0 0.3rem; border-radius: 4px; background: none; color: var(--faint); font: inherit; cursor: pointer; }
+        .trend-periods button:hover { color: var(--text); }
+        .trend-periods button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+        .trend-sort { min-width: 0.9rem; height: 1.3rem; }
+        .trend-sort::after { position: static; }
         .trend-weight { grid-column: 1 / -1; color: var(--muted); font-size: 0.72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
         /* ===== Positions: count, filters and sorting ===== */
@@ -294,6 +315,7 @@
         .positions-head h2 { display: flex; align-items: baseline; gap: 0.6rem; }
         .positions-head .count, .count-total { font-family: var(--text-font); font-weight: 400; }
         .count-total { font: 500 0.88rem var(--figures); font-variant-numeric: tabular-nums; }
+        .count-label { margin-right: 0.3rem; color: var(--muted); font: 400 0.78rem var(--text-font); }
         .positions-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
         .positions-search {
             width: 11.5rem;
@@ -305,6 +327,7 @@
             color: var(--text);
             font-size: 0.85rem;
         }
+        @media (max-width: 1440px) { .positions-search { width: 9.5rem; } }   /* room for the count, the open P/L and the tools on one line */
         .positions-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
         /* Three buttons in one rail: the pressed one is lifted */
         .segmented { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-small); background: var(--bg); }
@@ -445,8 +468,7 @@
             <div class="split" th:if="${hasDeposits}" th:with="invested=${value - cash}">
                 <p class="ledger">
                     <span>Put in<b class="money" th:text="${#numbers.formatDecimal(netDeposits, 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">10,112.00 €</b></span>
-                    <span class="ledger-op" aria-hidden="true" th:text="${gained} ? '+' : '−'">−</span>
-                    <span><th:block th:text="${gained} ? 'Earned' : 'Lost'">Lost</th:block><b class="money" th:classappend="${gained} ? 'is-up' : 'is-down'"
+                    <span title="All-time: the account's value minus the money put in. It counts what you already sold, dividends, interest and fees, so it is not the P/L of the open positions."><th:block th:text="${gained} ? 'Earned' : 'Lost'">Lost</th:block><b class="money" th:classappend="${gained} ? 'is-up' : 'is-down'"
                           th:text="${#numbers.formatDecimal(totalReturn.abs(), 1, 'COMMA', 2, 'POINT')} + ' ' + ${cur}">1,081.14 €</b></span>
                 </p>
                 <div class="split-track" role="img"
@@ -474,6 +496,8 @@
             <p class="summary-label chart-head">
                 <span>Performance</span>
                 <span class="chart-ranges" role="group" aria-label="Period" th:if="${history.size() >= 2}">
+                    <button type="button" data-range="1d" title="Today, every 15 minutes, from yesterday's last value">1D</button>
+                    <button type="button" data-range="1w" title="The last 7 days, every hour">1W</button>
                     <button type="button" data-range="1">1M</button>
                     <button type="button" data-range="3">3M</button>
                     <button type="button" data-range="12">1Y</button>
@@ -494,7 +518,11 @@
                      th:data-values="${#strings.listJoin(history.![value], ',')}"
                      th:data-deposits="${#strings.listJoin(history.![netDeposits], ',')}"
                      th:data-growth="${#strings.listJoin(history.![growth], ',')}"
-                     aria-label="Account value over time. Use the left and right arrows to read each day.">
+                     th:data-tick-times="${recentTicks == null ? '' : #strings.listJoin(recentTicks.![takenAt.toEpochMilli()], ',')}"
+                     th:data-tick-values="${recentTicks == null ? '' : #strings.listJoin(recentTicks.![value], ',')}"
+                     th:data-tick-deposits="${recentTicks == null ? '' : #strings.listJoin(recentTicks.![netDeposits], ',')}"
+                     th:data-tick-growth="${recentTicks == null ? '' : #strings.listJoin(recentTicks.![growth], ',')}"
+                     aria-label="Account value over time. Use the left and right arrows to read each point.">
                     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
                         <path class="chart-area" id="chart-area"/>
                         <path class="chart-deposits" id="chart-deposits"/>
@@ -549,7 +577,8 @@
             <div class="card-header positions-head">
                 <h2 id="positions-title">Positions
                     <span class="count" id="positions-count" th:text="${positions.size()} + ' holdings'">0 holdings</span>
-                    <span class="count-total money" id="positions-total" hidden></span>
+                    <!-- Only the open positions shown: the "Earned/Lost" above is all-time, with sales, dividends, interest and fees -->
+                    <span class="count-total" id="positions-total-box" hidden><span class="count-label">open</span><span class="money" id="positions-total"></span></span>
                 </h2>
                 <div class="positions-tools" th:unless="${positions.isEmpty()}">
                     <input type="search" class="positions-search" id="position-search" placeholder="Filter ticker or name"
@@ -574,11 +603,20 @@
                 <div class="allocation-legend" id="allocation-legend"></div>
             </div>
             <div class="scroll">
-                <table class="positions-table" id="positions-table">
+                <table class="positions-table" id="positions-table" th:data-zone="${zone}">
                     <thead>
                     <tr>
                         <th><button type="button" class="sort" data-sort="symbol">Holding</button></th>
-                        <th class="num" title="How the price moved in the last month, with your share of the account under it. Stocks without a price history show only their share, with a bar that compares it with your largest position."><button type="button" class="sort" data-sort="month">Month</button></th>
+                        <th class="num" title="How the price moved in the last week, month or 3 months, with your share of the account under it. Stocks without a price history show only their share, with a bar that compares it with your largest position.">
+                            <span class="trend-head">
+                                <span class="trend-periods" role="group" aria-label="Period of the mini charts">
+                                    <button type="button" data-trend="5" aria-pressed="false">1W</button>
+                                    <button type="button" data-trend="21" aria-pressed="true">1M</button>
+                                    <button type="button" data-trend="63" aria-pressed="false">3M</button>
+                                </span>
+                                <button type="button" class="sort trend-sort" data-sort="month" aria-label="Sort by the move in the period"></button>
+                            </span>
+                        </th>
                         <th class="num"><button type="button" class="sort" data-sort="quantity">Quantity</button></th>
                         <th class="num"><button type="button" class="sort" data-sort="avg">Avg. price</button></th>
                         <th class="num" title="Current price"><button type="button" class="sort" data-sort="price">Price</button></th>
@@ -596,7 +634,9 @@
                                  pre=${p.currencyType == 'USD' ? '$' : (p.currencyType == 'GBP' ? '£' : '')},
                                  post=${p.currencyType == 'EUR' ? ' €' : (p.currencyType == 'GBX' ? 'p' : (p.currencyType == null or pre != '' ? '' : ' ' + p.currencyType))},
                                  plEur=${p.unrealizedProfitLoss},
-                                 series=${priceSeries != null ? priceSeries.get(p.ticker) : null}"
+                                 series=${priceSeries != null ? priceSeries.get(p.ticker) : null},
+                                 tv=${tradingViewSymbols != null and tradingViewSymbols.get(p.ticker) != null ? tradingViewSymbols.get(p.ticker) : symbol}"
+                        tabindex="0" aria-haspopup="dialog" th:data-tv="${tv}"
                         th:data-symbol="${symbol}" th:data-search="${#strings.toLowerCase(symbol + ' ' + p.name + ' ' + p.ticker)}"
                         th:data-value="${p.currentValue}" th:data-quantity="${p.quantity}" th:data-avg="${p.averagePricePaid}"
                         th:data-price="${p.currentPrice}" th:data-pl="${p.unrealizedPlPercent}" th:data-pl-eur="${plEur}"
@@ -823,65 +863,109 @@
             showMonth(latest);
         })();
 
-        // ===== Performance: the value over time, for 1, 3 or 12 months or all of it =====
+        // ===== Performance: the value over time. 1D and 1W from the ticks of every 15 minutes; 1M, 3M, 1Y and All from the daily snapshots =====
         (function () {
             const plot = document.getElementById('chart-plot');
             if (!plot) return;
             const chart = document.getElementById('account-chart');
-            const split = key => plot.dataset[key].split(',');
-            const all = split('dates').map((date, i) => ({
-                date: new Date(date + 'T12:00:00'),   // midday: no time zone can move it to another day
-                value: Number(split('values')[i]),
-                deposits: Number(split('deposits')[i]),
-                growth: Number(split('growth')[i])
-            }));
+            // One point per entry of four lists in data-* attributes: when, value, what was put in, and the chained growth
+            const series = (keys, toDate) => {
+                const [at, values, deposits, growth] = keys.map(key => (plot.dataset[key] || '').split(',').filter(Boolean));
+                return at.map((a, i) => ({ date: toDate(a), value: Number(values[i]), deposits: Number(deposits[i]), growth: Number(growth[i]) }));
+            };
+            // Days at midday: no time zone can move them to another day. Ticks are milliseconds since 1970
+            const days = series(['dates', 'values', 'deposits', 'growth'], date => new Date(date + 'T12:00:00'));
+            const ticks = series(['tickTimes', 'tickValues', 'tickDeposits', 'tickGrowth'], time => new Date(Number(time)));
             const buttons = [...chart.querySelectorAll('[data-range]')];
             const euros = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const shortDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
             const longDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            const clock = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+            const dayAndClock = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
             const el = id => document.getElementById(id);
-            let points = all;
+            const HOUR = 60 * 60 * 1000;
+            let points = days;
+            let timed = false;   // ticks, read with their time; days, with their date
             let x = () => 0, y = () => 0;
 
-            function draw(months) {
-                const last = all[all.length - 1].date;
-                const from = new Date(last); from.setMonth(from.getMonth() - months);
-                points = months ? all.filter(p => p.date >= from) : all;
-                if (points.length < 2) points = all.slice(-2);   // a period shorter than the history: at least a line
+            // From the last tick before "since", so the line starts where the period starts (1D: yesterday's last value, like "today")
+            function ticksSince(since) {
+                const before = ticks.filter(p => p.date < since).pop();
+                return (before ? [before] : []).concat(ticks.filter(p => p.date >= since));
+            }
+
+            // The points of a range, and whether they reach back to its start (if not, the period reads "since ...")
+            function pointsFor(range) {
+                if (range === '1d') {
+                    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+                    const list = ticksSince(midnight);
+                    return { list, whole: list.length > 0 && list[0].date < midnight };
+                }
+                if (range === '1w') {
+                    const weekAgo = new Date(Date.now() - 7 * 24 * HOUR);
+                    // One point an hour: the last tick of each hour, and the first one so the period starts at its start
+                    const list = ticksSince(weekAgo).filter((p, i, all) => i === 0 || i === all.length - 1
+                        || Math.floor(p.date / HOUR) !== Math.floor(all[i + 1].date / HOUR));
+                    return { list, whole: list.length > 0 && list[0].date < weekAgo };
+                }
+                const months = Number(range);
+                const from = new Date(days[days.length - 1].date); from.setMonth(from.getMonth() - months);
+                let list = months ? days.filter(p => p.date >= from) : days;
+                if (list.length < 2) list = days.slice(-2);   // a period shorter than the history: at least a line
+                return { list, whole: months > 0 && list[0] !== days[0] };
+            }
+
+            const isTicks = range => range === '1d' || range === '1w';
+            // 1D and 1W need two ticks; until there are, their buttons cannot be pressed
+            buttons.forEach(b => {
+                if (isTicks(b.dataset.range) && pointsFor(b.dataset.range).list.length < 2) {
+                    b.disabled = true;
+                    b.title = 'Fills in while the app is on: the account is saved every 15 minutes';
+                }
+            });
+
+            function draw(range) {
+                if (isTicks(range) && pointsFor(range).list.length < 2) range = '3';
+                const found = pointsFor(range);
+                points = found.list;
+                timed = isTicks(range);
 
                 // Both lines share the scale, with a little air above and below
                 const figures = points.flatMap(p => [p.value, p.deposits]);
                 const low = Math.min(...figures), high = Math.max(...figures);
                 const pad = (high - low) * 0.12 || 1;
-                const first = points[0].date.getTime(), span = points[points.length - 1].date.getTime() - first;
+                const first = points[0].date.getTime(), span = points[points.length - 1].date.getTime() - first || 1;
                 x = p => (p.date.getTime() - first) / span * 1000;
                 y = v => 100 - (v - low + pad) / (high - low + 2 * pad) * 100;
 
                 const line = points.map((p, i) => (i ? 'L' : 'M') + x(p).toFixed(1) + ' ' + y(p.value).toFixed(2)).join(' ');
                 el('chart-value').setAttribute('d', line);
                 el('chart-area').setAttribute('d', line + ' L1000 100 L0 100 Z');
-                // What was put in only changes on the day of a deposit: a step, not a slope
+                // What was put in only changes when money comes in: a step, not a slope
                 el('chart-deposits').setAttribute('d', points.map((p, i) => i ? 'H' + x(p).toFixed(1) + ' V' + y(p.deposits).toFixed(2) : 'M0 ' + y(p.deposits).toFixed(2)).join(' '));
 
-                // Time-weighted return of the period: the growth of its last day against its first
+                // Time-weighted return of the period: the growth of its last point against its first
                 const twr = (points[points.length - 1].growth / points[0].growth - 1) * 100;
                 const up = twr >= 0;
                 chart.classList.toggle('is-down', !up);
-                el('chart-return').textContent = (up ? '+' : '−') + Math.abs(twr).toFixed(1) + ' %';
+                el('chart-return').textContent = (up ? '+' : '−') + Math.abs(twr).toFixed(isTicks(range) ? 2 : 1) + ' %';
                 el('chart-return').className = up ? 'is-up' : 'is-down';
-                el('chart-period').textContent = months && points[0] !== all[0] ? 'in ' + (months === 12 ? 'a year' : months === 1 ? 'a month' : months + ' months') : 'since ' + longDate.format(all[0].date);
-                el('chart-from').textContent = shortDate.format(points[0].date);
-                el('chart-to').textContent = shortDate.format(points[points.length - 1].date);
-                buttons.forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.range) === months)));
+                const names = { '1d': 'today', '1w': 'in a week', '1': 'in a month', '3': 'in 3 months', '12': 'in a year' };
+                const start = isTicks(range) ? dayAndClock.format(points[0].date) : longDate.format(points[0].date);
+                el('chart-period').textContent = found.whole ? names[range] : 'since ' + start;
+                const edge = range === '1d' ? clock : shortDate;
+                el('chart-from').textContent = edge.format(points[0].date);
+                el('chart-to').textContent = edge.format(points[points.length - 1].date);
+                buttons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.range === range)));
                 read(points.length - 1, false);
             }
 
-            // One day in the line above the chart; with "mark", also the cursor on the chart
+            // One point in the line above the chart; with "mark", also the cursor on the chart
             let reading = 0;
             function read(i, mark) {
                 reading = i;
                 const p = points[i];
-                el('chart-readout-date').textContent = longDate.format(p.date);
+                el('chart-readout-date').textContent = (timed ? dayAndClock : longDate).format(p.date);
                 el('chart-readout-value').textContent = euros.format(p.value) + ' €';
                 el('chart-readout-deposits').textContent = 'with ' + euros.format(p.deposits) + ' € put in';
                 el('chart-cursor').style.display = el('chart-dot').style.display = mark ? '' : 'none';   // display and not hidden: an SVG line ignores hidden
@@ -908,11 +992,46 @@
             });
             buttons.forEach(b => b.addEventListener('click', () => {
                 stored.set('t212-chart-range', b.dataset.range);
-                draw(Number(b.dataset.range));
+                draw(b.dataset.range);
             }));
 
-            const remembered = stored.get('t212-chart-range');
-            draw(remembered === null ? 3 : Number(remembered));
+            draw(stored.get('t212-chart-range') || '3');
+        })();
+
+        // ===== Mini charts: the last week, month or 3 months of each stock, with its move. Before the positions script, which sorts by that move =====
+        (function () {
+            const buttons = [...document.querySelectorAll('[data-trend]')];
+            const table = document.getElementById('positions-table');
+            const names = { 5: '1W', 21: '1M', 63: '3M' };
+
+            // "sessions" market days back: the last sessions + 1 closes, so the move starts at the close before them
+            function draw(sessions) {
+                document.querySelectorAll('.trend').forEach(trend => {
+                    const box = trend.querySelector('.trend-line');
+                    const closes = box.dataset.closes.split(',').map(Number).slice(-(sessions + 1));
+                    // Each line on its own scale, from its lowest close to its highest
+                    const low = Math.min(...closes), high = Math.max(...closes);
+                    const y = close => high === low ? 15 : 28 - (close - low) / (high - low) * 26;
+                    const points = closes.map((close, i) => (i / (closes.length - 1) * 100).toFixed(2) + ',' + y(close).toFixed(2)).join(' ');
+                    box.innerHTML = '<svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="' + points + '"/></svg>';
+
+                    const move = closes[0] ? (closes[closes.length - 1] / closes[0] - 1) * 100 : 0;
+                    const dir = move < 0 ? 'down' : 'up';
+                    trend.querySelectorAll('.trend-line, .trend-change').forEach(part => { part.classList.remove('up', 'down'); part.classList.add(dir); });
+                    trend.querySelector('.trend-change').textContent = (move < 0 ? '−' : '+') + Math.abs(move).toFixed(2) + '%';
+                    trend.title = 'The last ' + closes.length + ' closes';
+                    trend.closest('.position-row').dataset.month = move.toFixed(2);   // what "sort by this column" uses
+                });
+                buttons.forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.trend) === sessions)));
+            }
+
+            buttons.forEach(b => b.addEventListener('click', () => {
+                stored.set('t212-trend', b.dataset.trend);
+                draw(Number(b.dataset.trend));
+                table?.dispatchEvent(new Event('resort'));   // sorted by the move: the order follows the new period
+            }));
+            const remembered = Number(stored.get('t212-trend'));
+            draw(names[remembered] ? remembered : 21);
         })();
 
         // ===== Positions: filter by text, gainers or losers, sort by any column, and the P/L in euros =====
@@ -925,6 +1044,7 @@
             const original = rows.slice();
             const count = document.getElementById('positions-count');
             const total = document.getElementById('positions-total');
+            const totalBox = document.getElementById('positions-total-box');
             const none = document.getElementById('positions-none');
             const showButtons = [...document.querySelectorAll('[data-show]')];
             const eurButton = document.getElementById('pl-eur-toggle');
@@ -948,10 +1068,11 @@
                     if (fits) { shown++; sum += Number(row.dataset.plEur) || 0; }
                 });
                 count.textContent = shown === rows.length ? rows.length + ' holdings' : shown + ' of ' + rows.length;
-                total.hidden = !eur || shown === 0;
+                totalBox.hidden = !eur || shown === 0;
                 total.textContent = (sum < 0 ? '−' : '+') + euros.format(Math.abs(sum)) + ' €';
-                total.className = 'count-total money ' + (sum < 0 ? 'negative' : 'positive');
-                total.title = 'Profit or loss of the ' + shown + ' positions shown';
+                total.className = 'money ' + (sum < 0 ? 'negative' : 'positive');
+                totalBox.title = 'Profit or loss of the ' + shown + ' open positions shown, still unsold. '
+                    + 'The "Earned" or "Lost" of the account also counts what you already sold, dividends, interest and fees.';
                 none.hidden = shown > 0;
                 showClear();
             }
@@ -977,6 +1098,8 @@
                 });
                 showClear();
             }
+
+            table.addEventListener('resort', sort);
 
             function showEur() {
                 table.classList.toggle('show-eur', eur);
@@ -1021,21 +1144,70 @@
             sort();
             filter();
         })();
+
+        // ===== TradingView: a click on a position (or Enter on it) opens its chart over the whole screen; Esc or "Close" shuts it =====
+        // TradingView's own page in an iframe, isolated from this one. It is the only thing the app loads from a third party:
+        // TradingView sees from this IP which stock is opened, so in privacy mode nothing is loaded
+        (function () {
+            const table = document.getElementById('positions-table');
+            if (!table) return;
+
+            const dialog = document.createElement('dialog');
+            dialog.className = 'tv-dialog';
+            dialog.setAttribute('aria-labelledby', 'tv-title');
+            dialog.innerHTML = '<div class="tv-head"><h2 id="tv-title"></h2><button type="button" class="tv-close">Close</button></div>';
+            document.body.append(dialog);
+            const title = dialog.querySelector('#tv-title');
+            // Closing removes the chart, so TradingView stops working in the background.
+            // Removed right away ("cancel" is Esc) and not only on "close", which the browser fires a moment later, if at all in a hidden tab
+            const clear = () => dialog.querySelectorAll('.tv-frame, .tv-note').forEach(old => old.remove());
+            dialog.querySelector('.tv-close').addEventListener('click', () => { clear(); dialog.close(); });
+            dialog.addEventListener('cancel', clear);
+            dialog.addEventListener('close', clear);
+
+            function open(row) {
+                clear();
+                title.textContent = row.dataset.symbol;
+                const company = document.createElement('span');
+                company.textContent = row.querySelector('.company')?.textContent || '';
+                title.append(company);
+
+                let content;
+                if (document.documentElement.classList.contains('privacy')) {
+                    content = document.createElement('p');
+                    content.className = 'tv-note';
+                    content.textContent = 'The chart is not loaded in privacy mode: TradingView would see which stock you open.';
+                } else {
+                    const params = new URLSearchParams({
+                        symbol: row.dataset.tv, interval: 'D', theme: 'dark', style: '1', locale: 'en',
+                        timezone: table.dataset.zone || 'Etc/UTC', saveimage: '0', withdateranges: '1'
+                    });
+                    content = document.createElement('iframe');
+                    content.className = 'tv-frame';
+                    content.title = 'TradingView chart of ' + row.dataset.symbol;
+                    content.src = 'https://s.tradingview.com/widgetembed/?' + params;
+                    content.referrerPolicy = 'no-referrer';
+                    content.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+                }
+                dialog.append(content);
+                dialog.showModal();   // Esc closes it, and the focus goes back to the row
+            }
+
+            table.addEventListener('click', event => {
+                const row = event.target.closest('.position-row');
+                if (row && !event.target.closest('a, button')) open(row);
+            });
+            table.addEventListener('keydown', event => {
+                const row = event.target.closest('.position-row');
+                if (row && event.target === row && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open(row); }
+            });
+        })();
     </script>
 
     <script>
         // ===== Allocation bar and weight bars, from the rows of the positions table =====
         (function () {
             const rows = [...document.querySelectorAll('.position-row')];
-
-            // The mini lines of the last month: each one on its own scale, from its lowest close to its highest
-            document.querySelectorAll('.trend-line').forEach(box => {
-                const closes = box.dataset.closes.split(',').map(Number);
-                const low = Math.min(...closes), high = Math.max(...closes);
-                const y = close => high === low ? 15 : 28 - (close - low) / (high - low) * 26;
-                const points = closes.map((close, i) => (i / (closes.length - 1) * 100).toFixed(2) + ',' + y(close).toFixed(2)).join(' ');
-                box.innerHTML = '<svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="' + points + '"/></svg>';
-            });
 
             // The weight bars are relative to the biggest position, so the differences can be seen
             const fills = [...document.querySelectorAll('.weight-fill')];

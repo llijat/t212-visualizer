@@ -1,6 +1,7 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.AccountPoint;
+import com.llijat.t212visualizer.dto.AccountTickPoint;
 import com.llijat.t212visualizer.dto.DailyChange;
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
 import com.llijat.t212visualizer.model.AccountSnapshot;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -24,6 +26,7 @@ import java.util.List;
 public class AccountSnapshotService {
     private static final Logger log = LoggerFactory.getLogger(AccountSnapshotService.class);
     private final Clock clock;
+    private static final Duration RECENT = Duration.ofDays(8);   // a week, plus a day so 1W starts at a close
 
     private final AccountService accountService;
     private final TransactionService transactionService;
@@ -72,6 +75,24 @@ public class AccountSnapshotService {
         return points;
     }
 
+    /** The ticks of the last days, for the 1D and 1W charts, with the growth chained tick after tick (TWR). */
+    public List<AccountTickPoint> getRecentTicks() {
+        List<AccountTickPoint> points = new ArrayList<>();
+        BigDecimal growth = BigDecimal.ONE;
+        AccountTick previous = null;
+
+        for (AccountTick tick : accountTickRepository.findByTakenAtGreaterThanEqualOrderByTakenAtAsc(Instant.now(clock).minus(RECENT))) {
+            if (previous != null) {
+                BigDecimal deposited = tick.getNetDeposits().subtract(previous.getNetDeposits());
+                BigDecimal start = previous.getTotalValue().add(deposited);
+                if (start.signum() > 0) growth = growth.multiply(tick.getTotalValue()).divide(start, 10, RoundingMode.HALF_UP);
+            }
+            points.add(new AccountTickPoint(tick.getTakenAt(), tick.getTotalValue(), tick.getNetDeposits(), growth));
+            previous = tick;
+        }
+        return points;
+    }
+
 
     @Scheduled(fixedRate = 15*60*1000, initialDelay = 10*60*1000)
     public void takeSnapshot() {
@@ -95,4 +116,6 @@ public class AccountSnapshotService {
             log.warn("Could not save the account snapshot: {}", e.getMessage());
         }
     }
+
+
 }

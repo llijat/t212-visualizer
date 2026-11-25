@@ -4,7 +4,9 @@ import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
 import com.llijat.t212visualizer.dto.T212TransactionDto;
 import com.llijat.t212visualizer.dto.T212TransactionPageDto;
 import com.llijat.t212visualizer.model.AccountSnapshot;
+import com.llijat.t212visualizer.model.AccountTick;
 import com.llijat.t212visualizer.repository.AccountSnapshotRepository;
+import com.llijat.t212visualizer.repository.AccountTickRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -36,12 +39,14 @@ class DemoAccountSnapshotSeederTest {
     private T212Client t212Client;
     @Mock
     private AccountSnapshotRepository repository;
+    @Mock
+    private AccountTickRepository tickRepository;
 
     private DemoAccountSnapshotSeeder seeder;
 
     @BeforeEach
     void setUp() {
-        seeder = new DemoAccountSnapshotSeeder(t212Client, repository, CLOCK);
+        seeder = new DemoAccountSnapshotSeeder(t212Client, repository, tickRepository, CLOCK);
     }
 
     private static T212TransactionDto movement(String type, String amount, String day) {
@@ -97,6 +102,41 @@ class DemoAccountSnapshotSeederTest {
         seeder.run(null);
 
         verify(repository, never()).saveAll(anyList());
+        verify(tickRepository, never()).saveAll(anyList());
+    }
+
+    // ===== Ticks every 15 minutes, for the 1D and 1W charts =====
+
+    private static final Instant NOW = Instant.parse("2026-11-15T16:07:00Z");   // 17:07 in Madrid, a Sunday: no matter for the demo
+
+    private List<AccountTick> aWeekOfTicks() {
+        theDemoAccountHas("1100", movement("DEPOSIT", "1000", "2026-10-16"));
+        return seeder.buildTicks(seeder.buildSnapshots(TODAY), NOW);
+    }
+
+    @Test
+    void theTicks_areEvery15Minutes_forAWeek_upToTheLastQuarterBeforeNow() {
+        List<AccountTick> ticks = aWeekOfTicks();
+
+        assertEquals(7 * 24 * 4, ticks.size());
+        assertEquals(Instant.parse("2026-11-15T16:00:00Z").minus(Duration.ofMinutes(15)), ticks.get(ticks.size() - 1).getTakenAt());
+        assertEquals(Duration.ofMinutes(15), Duration.between(ticks.get(0).getTakenAt(), ticks.get(1).getTakenAt()));
+    }
+
+    @Test
+    void beforeTheUsMarketOpens_theValueIsStill_atYesterdaysClose() {
+        theDemoAccountHas("1100", movement("DEPOSIT", "1000", "2026-10-16"));
+        BigDecimal yesterdaysClose = seeder.buildSnapshots(TODAY).get(29).getTotalValue();
+
+        List<AccountTick> ticks = seeder.buildTicks(seeder.buildSnapshots(TODAY), NOW);
+
+        AccountTick morning = ticks.stream().filter(t -> t.getTakenAt().equals(Instant.parse("2026-11-15T09:00:00Z"))).findFirst().orElseThrow();
+        assertEquals(yesterdaysClose, morning.getTotalValue());
+    }
+
+    @Test
+    void withoutSnapshots_thereAreNoTicks() {
+        assertEquals(List.of(), seeder.buildTicks(List.of(), NOW));
     }
 
     private static BigDecimal depositsOn(List<AccountSnapshot> snapshots, String day) {

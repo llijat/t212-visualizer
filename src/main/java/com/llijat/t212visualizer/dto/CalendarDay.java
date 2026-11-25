@@ -10,5 +10,6 @@ public record CalendarDay (
         boolean inMonth,
         boolean today,
         List<EarningsEvent> earnings,
-        List<CalendarDividend> dividends
+        List<CalendarDividend> dividends,
+        List<CalendarSubscription> subscriptions
 ) {}

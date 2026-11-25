@@ -308,4 +308,16 @@ class CompanyProfileServiceTest {
         assertFalse(symbols.containsKey("MU_US_EQ"));
         assertEquals("MU", symbols.getOrDefault("MU_US_EQ", "MU"));
     }
+
+    @Test
+    void currentTradingViewSymbols_putTheExchangeInFront_asTradingViewNamesIt() {
+        CompanyProfile meta = new CompanyProfile("FB_US_EQ");
+        meta.updateListing("META", "UW");
+        CompanyProfile rwe = new CompanyProfile("RWEd_EQ");
+        rwe.updateListing("RWE", "GY");
+        CompanyProfile mu = new CompanyProfile("MU_US_EQ");   // not resolved: the page falls back to its own symbol
+        when(repository.findAll()).thenReturn(List.of(meta, rwe, mu));
+
+        assertEquals(Map.of("FB_US_EQ", "NASDAQ:META", "RWEd_EQ", "XETR:RWE"), service.currentTradingViewSymbols());
+    }
 }
