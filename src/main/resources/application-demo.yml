@@ -6,3 +6,7 @@ spring:
     url: jdbc:postgresql://localhost:5433/t212_demo
     username: demo
     password: demo
+
+# The made-up Alpha Vantage has no limits: no need to wait 13 seconds between stocks
+alpha-vantage:
+  request-delay-ms: 0

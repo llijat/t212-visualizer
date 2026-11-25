@@ -4,7 +4,9 @@ import com.llijat.t212visualizer.dto.AccountPoint;
 import com.llijat.t212visualizer.dto.DailyChange;
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
 import com.llijat.t212visualizer.model.AccountSnapshot;
+import com.llijat.t212visualizer.model.AccountTick;
 import com.llijat.t212visualizer.repository.AccountSnapshotRepository;
+import com.llijat.t212visualizer.repository.AccountTickRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -26,12 +28,14 @@ public class AccountSnapshotService {
     private final AccountService accountService;
     private final TransactionService transactionService;
     private final AccountSnapshotRepository accountSnapshotRepository;
+    private final AccountTickRepository accountTickRepository;
 
-    public AccountSnapshotService(AccountService accountService, TransactionService transactionService, AccountSnapshotRepository accountSnapshotRepository, Clock clock) {
+    public AccountSnapshotService(AccountService accountService, TransactionService transactionService, AccountSnapshotRepository accountSnapshotRepository, Clock clock, AccountTickRepository accountTickRepository) {
         this.accountService = accountService;
         this.transactionService = transactionService;
         this.accountSnapshotRepository = accountSnapshotRepository;
         this.clock = clock;
+        this.accountTickRepository = accountTickRepository;
     }
 
     /** What the account made today, without the money put in or taken out today. Null until there is an earlier day to compare with. */
@@ -68,8 +72,10 @@ public class AccountSnapshotService {
         return points;
     }
 
-    @Scheduled(fixedRate = 60*60*1000, initialDelay = 10*60*1000)
+
+    @Scheduled(fixedRate = 15*60*1000, initialDelay = 10*60*1000)
     public void takeSnapshot() {
+        Instant now = Instant.now(clock);
         T212AccountSummaryDto summary = accountService.getSummary();
         if (summary == null || !transactionService.isFirstSyncDone()) {
             log.info("Account snapshot skipped: the account or its movements are not loaded yet.");
@@ -78,7 +84,11 @@ public class AccountSnapshotService {
 
         try {
             LocalDate today = LocalDate.now(clock);
-            accountSnapshotRepository.save(new AccountSnapshot(today, summary.totalValue(),transactionService.getNetDeposits(),Instant.now()));
+            BigDecimal value = summary.totalValue();
+            BigDecimal netDeposits = transactionService.getNetDeposits();
+
+            accountSnapshotRepository.save(new AccountSnapshot(today, value, netDeposits, now));
+            accountTickRepository.save(new AccountTick(now, value, netDeposits));
             log.info("Saved the account snapshot of {}.", today);
         }
         catch (RuntimeException e) {

@@ -4,6 +4,9 @@ import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.model.Position;
+import com.llijat.t212visualizer.model.PriceClose;
+import com.llijat.t212visualizer.model.PriceDay;
+import com.llijat.t212visualizer.repository.PriceCloseRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -14,6 +17,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -22,19 +26,22 @@ public class QuoteService {
     private static final BigDecimal HUNDRED = new BigDecimal("100");
     private final Clock clock;
     private static final List<String> METAL_ETFS = List.of("GLD","SLV");
+    private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
 
     private final FinnhubClient finnhubClient;
     private final PositionService positionService;
+    private final PriceCloseRepository priceCloseRepository;
     private final CompanyProfileService companyProfileService;
     private volatile Map<String, FinnhubQuoteDto> quoteByTicker = Map.of();
     private volatile Map<String, FinnhubQuoteDto> quoteByMetalEtf = Map.of();
 
 
-    public QuoteService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService, Clock clock) {
+    public QuoteService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService, Clock clock, PriceCloseRepository priceCloseRepository) {
         this.finnhubClient = finnhubClient;
         this.positionService = positionService;
         this.companyProfileService = companyProfileService;
         this.clock = clock;
+        this.priceCloseRepository = priceCloseRepository;
     }
 
     public List<HoldingMove> getMoves() {
@@ -86,7 +93,11 @@ public class QuoteService {
             try {
                 String symbol = symbols.getOrDefault(position.getTicker(), position.getSymbol());
                 FinnhubQuoteDto quote = finnhubClient.fetchQuote(symbol);
-                if (quote != null && quote.isKnown()) quotes.put(position.getTicker(), quote);
+                if (quote != null && quote.isKnown() && quote.price() != null) {
+                    quotes.put(position.getTicker(), quote);
+                    LocalDate day = LocalDate.ofInstant(Instant.ofEpochSecond(quote.time()), NEW_YORK);
+                    priceCloseRepository.save(new PriceClose(new PriceDay(symbol, day), quote.price()));
+                }
             } catch (Exception e) {
                 log.warn("Could not load the quote of {}: {}", position.getTicker(), e.getMessage());
             }

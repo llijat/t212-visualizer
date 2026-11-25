@@ -7,9 +7,13 @@ import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.model.Position;
+import com.llijat.t212visualizer.model.PriceClose;
+import com.llijat.t212visualizer.model.PriceDay;
+import com.llijat.t212visualizer.repository.PriceCloseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,6 +26,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,11 +46,14 @@ class QuoteServiceTest {
     @Mock
     private CompanyProfileService companyProfileService;
 
+    @Mock
+    private PriceCloseRepository priceCloseRepository;
+
     private QuoteService quoteService;
 
     @BeforeEach
     void setUp() {
-        quoteService = new QuoteService(finnhubClient, positionService, companyProfileService, CLOCK);
+        quoteService = new QuoteService(finnhubClient, positionService, companyProfileService, CLOCK, priceCloseRepository);
     }
 
     // A real Position (not a mock): only the ticker and what it is worth today matter here
@@ -121,6 +129,73 @@ class QuoteServiceTest {
         quoteService.refreshQuotes();
 
         assertEquals(List.of("AAPL"), quoteService.getMoves().stream().map(HoldingMove::symbol).toList());
+    }
+
+    // ===== The daily close, for the mini charts =====
+
+    private PriceClose theSavedClose() {
+        ArgumentCaptor<PriceClose> saved = ArgumentCaptor.forClass(PriceClose.class);
+        verify(priceCloseRepository).save(saved.capture());
+        return saved.getValue();
+    }
+
+    @Test
+    void eachRefresh_savesTheClose_underTheMarketSymbol() {
+        when(positionService.getAllPositions()).thenReturn(List.of(position("FB_US_EQ", "1000")));
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of("FB_US_EQ", "META"));
+        long friday = Instant.parse("2026-11-13T18:00:00Z").getEpochSecond();
+        when(finnhubClient.fetchQuote("META")).thenReturn(new FinnhubQuoteDto(new BigDecimal("612.3400"), new BigDecimal("1"), friday));
+
+        quoteService.refreshQuotes();
+
+        PriceClose close = theSavedClose();
+        assertEquals(new PriceDay("META", LocalDate.of(2026, 11, 13)), close.getId());   // the symbol Alpha Vantage and TradingView use, not the T212 ticker
+        assertEquals(new BigDecimal("612.3400"), close.getClose());
+    }
+
+    @Test
+    void theDay_isTheNewYorkSession_notTheDayInSpain() {
+        // 21:30 in New York on Friday is already 03:30 on Saturday in Madrid: it is still Friday's close
+        thePortfolioIs(position("AAPL_US_EQ", "1500"));
+        long fridayNightInNewYork = Instant.parse("2026-11-14T02:30:00Z").getEpochSecond();
+        when(finnhubClient.fetchQuote("AAPL")).thenReturn(new FinnhubQuoteDto(new BigDecimal("230"), new BigDecimal("1"), fridayNightInNewYork));
+
+        quoteService.refreshQuotes();
+
+        assertEquals(LocalDate.of(2026, 11, 13), theSavedClose().getId().day());
+    }
+
+    @Test
+    void aQuoteThatIsNotKnown_orHasNoPrice_isNotSaved() {
+        thePortfolioIs(position("DSVSF_US_EQ", "300"), position("AAPL_US_EQ", "1500"));
+        when(finnhubClient.fetchQuote("DSVSF")).thenReturn(new FinnhubQuoteDto(BigDecimal.ZERO, null, 0L));
+        when(finnhubClient.fetchQuote("AAPL")).thenReturn(new FinnhubQuoteDto(null, new BigDecimal("1"), 1794862800L));
+
+        quoteService.refreshQuotes();
+
+        verify(priceCloseRepository, never()).save(any());
+    }
+
+    @Test
+    void ifTheDatabaseFails_theMoveIsStillShown() {
+        thePortfolioIs(position("AAPL_US_EQ", "1500"));
+        when(finnhubClient.fetchQuote("AAPL")).thenReturn(moved("-4"));
+        when(priceCloseRepository.save(any())).thenThrow(new RuntimeException("database is down"));
+
+        quoteService.refreshQuotes();
+
+        assertEquals(List.of("AAPL"), quoteService.getMoves().stream().map(HoldingMove::symbol).toList());
+    }
+
+    @Test
+    void theMetals_areNotSaved_becauseTheyAreNotPositions() {
+        thePortfolioIs();
+        when(finnhubClient.fetchQuote("GLD")).thenReturn(moved("1.2"));
+        when(finnhubClient.fetchQuote("SLV")).thenReturn(moved("-0.5"));
+
+        quoteService.refreshQuotes();
+
+        verify(priceCloseRepository, never()).save(any());
     }
 
     // ===== The moves, with their weight =====

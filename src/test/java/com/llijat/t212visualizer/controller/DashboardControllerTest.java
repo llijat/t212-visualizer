@@ -5,12 +5,14 @@ import java.time.ZoneId;
 import java.time.Instant;
 
 import com.llijat.t212visualizer.dto.DailyChange;
+import com.llijat.t212visualizer.dto.PriceSeries;
 import com.llijat.t212visualizer.dto.DividendHistory;
 import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.service.AccountService;
 import com.llijat.t212visualizer.service.AccountSnapshotService;
 import com.llijat.t212visualizer.service.CalendarService;
+import com.llijat.t212visualizer.service.PriceHistoryService;
 import com.llijat.t212visualizer.service.CompanyProfileService;
 import com.llijat.t212visualizer.service.DividendHistoryService;
 import com.llijat.t212visualizer.service.NewsService;
@@ -52,6 +54,7 @@ class DashboardControllerTest {
     @Mock private CalendarService calendarService;
     @Mock private DividendHistoryService dividendHistoryService;
     @Mock private AccountSnapshotService accountSnapshotService;
+    @Mock private PriceHistoryService priceHistoryService;
 
     private MockMvc mockMvc;
 
@@ -59,7 +62,7 @@ class DashboardControllerTest {
     void setUp() {
         // The same trick as in NewsControllerTest: the view name becomes a file name, so "/" is not looked up again
         DashboardController controller = new DashboardController(positionService, newsService, accountService,
-                transactionService, companyProfileService, quoteService, calendarService, dividendHistoryService, accountSnapshotService, CLOCK);
+                transactionService, companyProfileService, quoteService, calendarService, dividendHistoryService, accountSnapshotService, CLOCK, priceHistoryService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setViewResolvers(new InternalResourceViewResolver("/templates/", ".html"))
                 .build();
@@ -100,6 +103,16 @@ class DashboardControllerTest {
 
         mockMvc.perform(get("/"))
                 .andExpect(model().attribute("todayChange", today));
+    }
+
+    @Test
+    void thePage_getsTheLastMonthOfEachStock_forTheMiniLines() throws Exception {
+        Map<String, PriceSeries> series = Map.of("AAPL_US_EQ",
+                new PriceSeries(List.of(new BigDecimal("100"), new BigDecimal("103")), new BigDecimal("3.00")));
+        when(priceHistoryService.getMonthSeries()).thenReturn(series);
+
+        mockMvc.perform(get("/"))
+                .andExpect(model().attribute("priceSeries", series));
     }
 
     @Test

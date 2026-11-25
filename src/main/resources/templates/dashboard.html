@@ -274,6 +274,17 @@
         .weight-track { width: 3.2rem; height: 5px; border-radius: 3px; background: var(--raised); overflow: hidden; }
         .weight-fill { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
 
+        /* ===== The last month of each US stock: a mini line, its move, and the weight kept small under them =====
+           The line is drawn by JS from data-closes; its own scale, so even a quiet month shows its shape */
+        .trend { display: inline-grid; grid-template-columns: 4.5rem auto; align-items: center; justify-items: end; column-gap: 0.5rem; }
+        .trend-line { display: block; width: 4.5rem; height: 1.35rem; }
+        .trend-line svg { display: block; width: 100%; height: 100%; overflow: visible; }
+        .trend-line polyline { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+        .trend .up { color: var(--green); }
+        .trend .down { color: var(--red); }
+        .trend-change { min-width: 3.7rem; font: 500 0.82rem var(--figures); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+        .trend-weight { grid-column: 1 / -1; color: var(--muted); font-size: 0.72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
         /* ===== Positions: count, filters and sorting ===== */
         .positions-head { flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; }
         .positions-head h2 { display: flex; align-items: baseline; gap: 0.6rem; }
@@ -563,7 +574,7 @@
                     <thead>
                     <tr>
                         <th><button type="button" class="sort" data-sort="symbol">Holding</button></th>
-                        <th class="num" title="Share of your account value. The bar compares each position with your largest one."><button type="button" class="sort" data-sort="value">Weight</button></th>
+                        <th class="num" title="How the price moved in the last month, with your share of the account under it. Stocks without a price history show only their share, with a bar that compares it with your largest position."><button type="button" class="sort" data-sort="month">Month</button></th>
                         <th class="num"><button type="button" class="sort" data-sort="quantity">Quantity</button></th>
                         <th class="num"><button type="button" class="sort" data-sort="avg">Avg. price</button></th>
                         <th class="num"><button type="button" class="sort" data-sort="price">Current price</button></th>
@@ -580,10 +591,12 @@
                                  weight=${summary != null and summary.totalValue() > 0 ? p.currentValue * 100 / summary.totalValue() : null},
                                  pre=${p.currencyType == 'USD' ? '$' : (p.currencyType == 'GBP' ? '£' : '')},
                                  post=${p.currencyType == 'EUR' ? ' €' : (p.currencyType == 'GBX' ? 'p' : (p.currencyType == null or pre != '' ? '' : ' ' + p.currencyType))},
-                                 plEur=${p.unrealizedProfitLoss}"
+                                 plEur=${p.unrealizedProfitLoss},
+                                 series=${priceSeries != null ? priceSeries.get(p.ticker) : null}"
                         th:data-symbol="${symbol}" th:data-search="${#strings.toLowerCase(symbol + ' ' + p.name + ' ' + p.ticker)}"
                         th:data-value="${p.currentValue}" th:data-quantity="${p.quantity}" th:data-avg="${p.averagePricePaid}"
-                        th:data-price="${p.currentPrice}" th:data-pl="${p.unrealizedPlPercent}" th:data-pl-eur="${plEur}">
+                        th:data-price="${p.currentPrice}" th:data-pl="${p.unrealizedPlPercent}" th:data-pl-eur="${plEur}"
+                        th:data-month="${series != null ? series.changePercent() : null}">
                         <td>
                             <div class="holding">
                                 <span class="logo" aria-hidden="true">
@@ -602,7 +615,18 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="num">
+                        <td class="num" th:if="${series != null}">
+                            <span class="trend" th:with="dir=${series.changePercent().signum() < 0 ? 'down' : 'up'}"
+                                  th:title="'The last ' + ${series.closes().size()} + ' closes'">
+                                <span class="trend-line" th:classappend="${dir}" aria-hidden="true"
+                                      th:data-closes="${#strings.listJoin(series.closes(), ',')}"></span>
+                                <span class="trend-change" th:classappend="${dir}"
+                                      th:text="${series.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(series.changePercent().abs(), 1, 'COMMA', 2, 'POINT')} + '%'">+0.00%</span>
+                                <span class="trend-weight" th:if="${weight != null}"
+                                      th:text="${#numbers.formatDecimal(weight, 1, 1, 'POINT')} + '% of the account'">0.0% of the account</span>
+                            </span>
+                        </td>
+                        <td class="num" th:unless="${series != null}">
                             <span class="weight" th:if="${weight != null}">
                                 <span class="weight-track"><span class="weight-fill" th:style="'width:' + ${weight} + '%'"></span></span>
                                 <span th:text="${#numbers.formatDecimal(weight, 1, 1, 'POINT')} + '%'">0.0%</span>
@@ -936,7 +960,10 @@
             function sort() {
                 const order = !sortKey ? original : rows.slice().sort((a, b) => {
                     if (sortKey === 'symbol') return a.dataset.symbol.localeCompare(b.dataset.symbol) * sortDirection;
-                    return (Number(a.dataset[sortKey]) - Number(b.dataset[sortKey])) * sortDirection;
+                    // A row without the figure (a stock with no price history, for "month") always goes last
+                    const x = parseFloat(a.dataset[sortKey]), y = parseFloat(b.dataset[sortKey]);
+                    if (Number.isNaN(x) || Number.isNaN(y)) return Number.isNaN(x) - Number.isNaN(y);
+                    return (x - y) * sortDirection;
                 });
                 order.forEach(row => body.append(row));
                 table.querySelectorAll('th').forEach(th => {
@@ -996,6 +1023,15 @@
         // ===== Allocation bar and weight bars, from the rows of the positions table =====
         (function () {
             const rows = [...document.querySelectorAll('.position-row')];
+
+            // The mini lines of the last month: each one on its own scale, from its lowest close to its highest
+            document.querySelectorAll('.trend-line').forEach(box => {
+                const closes = box.dataset.closes.split(',').map(Number);
+                const low = Math.min(...closes), high = Math.max(...closes);
+                const y = close => high === low ? 15 : 28 - (close - low) / (high - low) * 26;
+                const points = closes.map((close, i) => (i / (closes.length - 1) * 100).toFixed(2) + ',' + y(close).toFixed(2)).join(' ');
+                box.innerHTML = '<svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="' + points + '"/></svg>';
+            });
 
             // The weight bars are relative to the biggest position, so the differences can be seen
             const fills = [...document.querySelectorAll('.weight-fill')];

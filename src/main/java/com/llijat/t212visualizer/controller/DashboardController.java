@@ -23,9 +23,10 @@ public class DashboardController {
     private final CalendarService calendarService;
     private final DividendHistoryService dividendHistoryService;
     private final AccountSnapshotService accountSnapshotService;
+    private final PriceHistoryService priceHistoryService;
 
 
-    public DashboardController(PositionService positionService, NewsService newsService, AccountService accountService, TransactionService transactionService, CompanyProfileService companyProfileService, QuoteService quoteService, CalendarService calendarService, DividendHistoryService dividendHistoryService, AccountSnapshotService accountSnapshotService, Clock clock) {
+    public DashboardController(PositionService positionService, NewsService newsService, AccountService accountService, TransactionService transactionService, CompanyProfileService companyProfileService, QuoteService quoteService, CalendarService calendarService, DividendHistoryService dividendHistoryService, AccountSnapshotService accountSnapshotService, Clock clock, PriceHistoryService priceHistoryService) {
         this.positionService = positionService;
         this.newsService = newsService;
         this.accountService = accountService;
@@ -36,6 +37,7 @@ public class DashboardController {
         this.dividendHistoryService = dividendHistoryService;
         this.accountSnapshotService = accountSnapshotService;
         this.clock = clock;
+        this.priceHistoryService = priceHistoryService;
     }
 
     @GetMapping("/")
@@ -54,6 +56,7 @@ public class DashboardController {
         model.addAttribute("tickers", newsService.getTickerBySymbol());
         model.addAttribute("todayChange", accountSnapshotService.getTodayChange());
         model.addAttribute("history", accountSnapshotService.getHistory());
+        model.addAttribute("priceSeries", priceHistoryService.getMonthSeries());
         return "dashboard"; // resolves to templates/dashboard.html
     }
 

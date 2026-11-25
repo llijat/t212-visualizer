@@ -6,7 +6,9 @@ import com.llijat.t212visualizer.dto.AccountPoint;
 import com.llijat.t212visualizer.dto.DailyChange;
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
 import com.llijat.t212visualizer.model.AccountSnapshot;
+import com.llijat.t212visualizer.model.AccountTick;
 import com.llijat.t212visualizer.repository.AccountSnapshotRepository;
+import com.llijat.t212visualizer.repository.AccountTickRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +25,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -42,12 +43,14 @@ class AccountSnapshotServiceTest {
     private TransactionService transactionService;
     @Mock
     private AccountSnapshotRepository repository;
+    @Mock
+    private AccountTickRepository tickRepository;
 
     private AccountSnapshotService service;
 
     @BeforeEach
     void setUp() {
-        service = new AccountSnapshotService(accountService, transactionService, repository, CLOCK);
+        service = new AccountSnapshotService(accountService, transactionService, repository, CLOCK, tickRepository);
     }
 
     // Only the total value matters for the snapshot
@@ -87,7 +90,32 @@ class AccountSnapshotServiceTest {
         assertEquals(LocalDate.now(CLOCK), saved.getValue().getSnapshotDate());
         assertEquals(new BigDecimal("9000.50"), saved.getValue().getTotalValue());
         assertEquals(new BigDecimal("8500"), saved.getValue().getNetDeposits());
-        assertNotNull(saved.getValue().getTakenAt());
+        assertEquals(CLOCK.instant(), saved.getValue().getTakenAt());
+    }
+
+    @Test
+    void everySnapshot_alsoSavesATick_withTheSameMomentValueAndDeposits() {
+        when(accountService.getSummary()).thenReturn(accountWorth("9000.50"));
+        when(transactionService.isFirstSyncDone()).thenReturn(true);
+        when(transactionService.getNetDeposits()).thenReturn(new BigDecimal("8500"));
+
+        service.takeSnapshot();
+
+        // The day's snapshot is overwritten every 15 minutes; the ticks pile up, for the charts within a day
+        ArgumentCaptor<AccountTick> tick = ArgumentCaptor.forClass(AccountTick.class);
+        verify(tickRepository).save(tick.capture());
+        assertEquals(CLOCK.instant(), tick.getValue().getTakenAt());
+        assertEquals(new BigDecimal("9000.50"), tick.getValue().getTotalValue());
+        assertEquals(new BigDecimal("8500"), tick.getValue().getNetDeposits());
+    }
+
+    @Test
+    void whenTheSnapshotIsSkipped_thereIsNoTickEither() {
+        when(accountService.getSummary()).thenReturn(null);
+
+        service.takeSnapshot();
+
+        verify(tickRepository, never()).save(any());
     }
 
     @Test

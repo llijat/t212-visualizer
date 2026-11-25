@@ -62,10 +62,12 @@ finnhub:
   base-url: https://finnhub.io/api/v1
   api-key: ${FINNHUB_API_KEY:}
 
-# Announced dividends. The free plan allows 25 requests a day and 5 a minute:
-# each day the import asks for at most 20 stocks, 13 seconds apart, the ones checked longest ago first.
+# Announced dividends and past closing prices. The free plan allows 25 requests a day and 5 a minute, 13 seconds apart.
+# The closes go first (backfill-per-day), but only for stocks without a month of them: once filled, they cost nothing.
+# The dividends get the rest (stocks-per-day), the stocks checked longest ago first.
 alpha-vantage:
   base-url: https://www.alphavantage.co
   api-key: ${ALPHA_VANTAGE_API_KEY:}
-  stocks-per-day: 20
+  backfill-per-day: 15
+  stocks-per-day: 10
   request-delay-ms: 13000

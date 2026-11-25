@@ -11,6 +11,7 @@ import org.springframework.web.client.RestClient;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -73,6 +74,40 @@ class LiveAlphaVantageClientTest {
                 .andRespond(withSuccess("{\"Information\": \"Our standard API rate limit is 25 requests per day.\"}", MediaType.APPLICATION_JSON));
 
         IllegalStateException error = assertThrows(IllegalStateException.class, () -> client.fetchDividends("MU"));
+        assertTrue(error.getMessage().contains("MU"));
+    }
+
+    // ===== Daily closes =====
+
+    @Test
+    void fetchDailyCloses_readsTheCloseOfEachDay() {
+        // The real shape: one object per day, keyed by the date, with the numbers as text
+        String json = """
+                {"Meta Data": {"2. Symbol": "MU"},
+                 "Time Series (Daily)": {
+                   "2026-11-13": {"1. open": "101.00", "2. high": "104.10", "3. low": "100.50", "4. close": "103.2500", "5. volume": "1200"},
+                   "2026-11-12": {"1. open": "99.00", "2. high": "101.30", "3. low": "98.70", "4. close": "100.9000", "5. volume": "900"}
+                 }}
+                """;
+        server.expect(requestTo(BASE_URL + "/query?function=TIME_SERIES_DAILY&symbol=MU&outputsize=compact"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+        Map<LocalDate, BigDecimal> closes = client.fetchDailyCloses("MU");
+
+        server.verify();
+        assertEquals(2, closes.size());
+        assertEquals(new BigDecimal("103.2500"), closes.get(LocalDate.of(2026, 11, 13)));   // the close, not the open or the high
+        assertEquals(new BigDecimal("100.9000"), closes.get(LocalDate.of(2026, 11, 12)));
+    }
+
+    @Test
+    void overTheDailyLimit_theClosesFail_insteadOfBeingEmpty() {
+        // An empty answer would look like a stock with no history; failing lets the next day try again
+        server.expect(requestTo(BASE_URL + "/query?function=TIME_SERIES_DAILY&symbol=MU&outputsize=compact"))
+                .andRespond(withSuccess("{\"Information\": \"Our standard API rate limit is 25 requests per day.\"}", MediaType.APPLICATION_JSON));
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> client.fetchDailyCloses("MU"));
         assertTrue(error.getMessage().contains("MU"));
     }
 }
