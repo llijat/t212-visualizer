@@ -14,7 +14,7 @@
             flex: 1;                    /* takes all the height the bar leaves */
             min-height: 0;              /* required for the inner scroll to work */
             display: grid;
-            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);   /* positions 60 %, today 40 % */
+            grid-template-columns: minmax(0, 1fr) minmax(21rem, clamp(25rem, 100vw - 50rem, 30rem));   /* the positions take the room; the column beside them grows from 400 px (up to a 1200 px screen) to 480 px (from 1280) */
             gap: 1.25rem;
             padding: 1.25rem 2rem 1.5rem;
         }
@@ -73,6 +73,9 @@
             white-space: nowrap;
         }
         td.num { font-family: var(--figures); font-size: var(--fs-md); }
+        /* A figure with a smaller one under it: the price and what you paid, the value and how many shares */
+        .cell-main, .cell-sub { display: block; }
+        .cell-sub { margin-top: 0.1rem; color: var(--faint); font-size: var(--fs-2xs); }
         .holding { display: flex; align-items: center; gap: 0.6rem; font-size: 1.45rem; }
         .holding > div { flex: 1; min-width: 0; font-size: var(--fs-sm); white-space: nowrap; }   /* nowrap: the FX badge stays next to the symbol */
         .symbol { font: 600 var(--fs-md) var(--figures); letter-spacing: 0.01em; }
@@ -219,11 +222,17 @@
            The figure above it is the time-weighted return of the period chosen; pointing at the chart reads one day in the line above it */
         .summary-chart { grid-area: chart; min-width: 0; }
         .chart-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-        .chart-return { margin: 0 0 0.35rem; color: var(--muted); font-size: var(--fs-xs); }
+        /* The return and the reading of a point share one line: pointing at the chart swaps one for the other,
+           so the line itself gets that room (5.5rem, within the height the account already takes) */
+        .chart-line { display: grid; margin: 0.15rem 0 0.45rem; }
+        .chart-line > * { grid-area: 1 / 1; align-self: baseline; }
+        .chart-return { margin: 0; color: var(--muted); font-size: var(--fs-xs); white-space: nowrap; }
         .chart-return b { font-size: var(--fs-lg); margin-right: 0.35rem; }
-        .chart-readout { display: flex; justify-content: space-between; gap: 1rem; margin: 0 0 0.45rem; color: var(--muted); font-size: var(--fs-xs); white-space: nowrap; }
+        .chart-readout { display: flex; justify-content: space-between; gap: 1rem; margin: 0; color: var(--muted); font-size: var(--fs-xs); white-space: nowrap; visibility: hidden; }
         .chart-readout b { font-size: var(--fs-sm); }
-        .chart-plot { position: relative; height: 3.4rem; border-radius: var(--radius-xs); outline-offset: 3px; cursor: crosshair; }
+        .summary-chart.reading .chart-readout { visibility: visible; }
+        .summary-chart.reading .chart-return { visibility: hidden; }
+        .chart-plot { position: relative; height: 5.5rem; border-radius: var(--radius-xs); outline-offset: 3px; cursor: crosshair; }
         .chart-plot:focus-visible { outline: 2px solid var(--accent); }
         .chart-plot svg { display: block; width: 100%; height: 100%; overflow: visible; }
         .chart-plot path, .chart-plot line { vector-effect: non-scaling-stroke; fill: none; }   /* the lines keep their width however the chart is stretched */
@@ -237,6 +246,9 @@
         .chart-dates { display: flex; justify-content: space-between; margin-top: 0.25rem; color: var(--faint); font: var(--fs-2xs) var(--figures); }
         .chart-empty { margin: 0.3rem 0 0; color: var(--faint); font-size: var(--fs-xs); }
 
+        /* No dividends yet (a new account, the demo): the chart takes their room instead of leaving a hole */
+        .summary:not(:has(.summary-dividends)) { grid-template-columns: minmax(22rem, 30rem) minmax(0, 1fr); grid-template-areas: "account chart"; }
+
         /* Less room: the three stay side by side, closer */
         @media (max-width: 1300px) {
             .summary { grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr) minmax(15rem, 20rem); column-gap: 2.5rem; }
@@ -244,6 +256,7 @@
         /* Not enough room for three: the account and the dividends side by side, the chart in its own row under them */
         @media (max-width: 1100px) {
             .summary { grid-template-columns: minmax(0, 1fr) minmax(15rem, 20rem); grid-template-areas: "account dividends" "chart chart"; }
+            .summary:not(:has(.summary-dividends)) { grid-template-columns: minmax(0, 1fr); grid-template-areas: "account" "chart"; }
         }
 
         /* Coloured pills for gains and losses: colour + sign, so they do not depend on colour alone */
@@ -289,8 +302,8 @@
 
         /* ===== The last month of each US stock: a mini line, its move, and the weight kept small under them =====
            The line is drawn by JS from data-closes; its own scale, so even a quiet month shows its shape */
-        .trend { display: inline-grid; grid-template-columns: 3.75rem auto; align-items: center; justify-items: end; column-gap: 0.4rem; }
-        .trend-line { display: block; width: 3.75rem; height: 1.35rem; }
+        .trend { display: inline-grid; grid-template-columns: 5rem auto; align-items: center; justify-items: end; column-gap: 0.4rem; }
+        .trend-line { display: block; width: 5rem; height: 1.35rem; }
         .trend-line svg { display: block; width: 100%; height: 100%; overflow: visible; }
         .trend-line polyline { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
         .trend .up { color: var(--green); }
@@ -491,13 +504,15 @@
             </p>
             <p class="chart-empty" th:if="${history.size() < 2}">The chart fills in from here: the account's value is saved once a day, and the line starts with the second day.</p>
             <th:block th:if="${history.size() >= 2}">
-                <p class="chart-return" title="Time-weighted return: how the investments did, whenever the money came in or out">
-                    <b id="chart-return">+0.0 %</b><span id="chart-period">in the period</span>
-                </p>
-                <p class="chart-readout" aria-hidden="true">
-                    <span id="chart-readout-date">—</span>
-                    <span><b class="money" id="chart-readout-value"></b> <span id="chart-readout-deposits" class="money"></span></span>
-                </p>
+                <div class="chart-line">
+                    <p class="chart-return" title="Time-weighted return: how the investments did, whenever the money came in or out">
+                        <b id="chart-return">+0.0 %</b><span id="chart-period">in the period</span>
+                    </p>
+                    <p class="chart-readout" aria-hidden="true">
+                        <span id="chart-readout-date">—</span>
+                        <span><b class="money" id="chart-readout-value"></b> <span id="chart-readout-deposits" class="money"></span></span>
+                    </p>
+                </div>
                 <div class="chart-plot" id="chart-plot" tabindex="0" role="img"
                      th:data-dates="${#strings.listJoin(history.![date.toString()], ',')}"
                      th:data-values="${#strings.listJoin(history.![value], ',')}"
@@ -602,10 +617,8 @@
                                 <button type="button" class="sort trend-sort" data-sort="month" aria-label="Sort by the move in the period"></button>
                             </span>
                         </th>
-                        <th class="num"><button type="button" class="sort" data-sort="quantity">Quantity</button></th>
-                        <th class="num"><button type="button" class="sort" data-sort="avg">Avg. price</button></th>
-                        <th class="num" title="Current price"><button type="button" class="sort" data-sort="price">Price</button></th>
-                        <th class="num"><button type="button" class="sort" data-sort="value">Total value</button></th>
+                        <th class="num" title="Current price, with the average price you paid under it"><button type="button" class="sort" data-sort="price">Price</button></th>
+                        <th class="num" title="What the position is worth, with how many shares under it"><button type="button" class="sort" data-sort="value">Value</button></th>
                         <th class="num pl-eur" title="Unrealized profit or loss in euros, exchange rate included"><button type="button" class="sort" data-sort="plEur">P/L €</button></th>
                         <th class="num" title="Unrealized profit or loss since you bought it, as a % of what you paid"><button type="button" class="sort" data-sort="pl">P/L %</button></th>
                     </tr>
@@ -662,10 +675,14 @@
                             </span>
                             <span th:unless="${weight != null}">—</span>
                         </td>
-                        <td class="num money" th:text="${#numbers.formatDecimal(p.quantity, 1, 'COMMA', 4, 'POINT')}">0</td>
-                        <td class="num" th:text="${pre} + ${#numbers.formatDecimal(p.averagePricePaid, 1, 'COMMA', 2, 'POINT')} + ${post}">$0.00</td>
-                        <td class="num" th:text="${pre} + ${#numbers.formatDecimal(p.currentPrice, 1, 'COMMA', 2, 'POINT')} + ${post}">$0.00</td>
-                        <td class="num money" th:text="${#numbers.formatDecimal(p.currentValue, 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</td>
+                        <td class="num">
+                            <span class="cell-main" th:text="${pre} + ${#numbers.formatDecimal(p.currentPrice, 1, 'COMMA', 2, 'POINT')} + ${post}">$0.00</span>
+                            <span class="cell-sub" th:text="'avg ' + ${pre} + ${#numbers.formatDecimal(p.averagePricePaid, 1, 'COMMA', 2, 'POINT')} + ${post}">avg $0.00</span>
+                        </td>
+                        <td class="num">
+                            <span class="cell-main money" th:text="${#numbers.formatDecimal(p.currentValue, 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
+                            <span class="cell-sub money" th:text="${#numbers.formatDecimal(p.quantity, 1, 'COMMA', 4, 'POINT')} + ' shares'">0 shares</span>
+                        </td>
                         <td class="num pl-eur money" th:classappend="${plEur.signum() < 0} ? 'negative' : 'positive'"
                             th:text="${plEur.signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(plEur.abs(), 1, 'COMMA', 2, 'POINT')} + ' €'">+0.00 €</td>
                         <td class="num">
@@ -685,7 +702,7 @@
         <!-- ===== Right column: today in short. Moving today, the next results and the latest headlines; the rest is in News ===== -->
         <section class="card" aria-labelledby="today-title">
             <div class="card-header">
-                <h2 id="today-title">Today</h2>
+                <h2 id="today-title">What's happening</h2>
                 <a class="today-more" href="/news">All news</a>
             </div>
 
@@ -953,6 +970,7 @@
                 el('chart-readout-date').textContent = (timed ? dayAndClock : longDate).format(p.date);
                 el('chart-readout-value').textContent = euros.format(p.value) + ' €';
                 el('chart-readout-deposits').textContent = 'with ' + euros.format(p.deposits) + ' € put in';
+                chart.classList.toggle('reading', mark);   // the reading takes the return's place while the chart is pointed at
                 el('chart-cursor').style.display = el('chart-dot').style.display = mark ? '' : 'none';   // display and not hidden: an SVG line ignores hidden
                 if (!mark) return;
                 el('chart-cursor').setAttribute('x1', x(p)); el('chart-cursor').setAttribute('x2', x(p));
@@ -1040,6 +1058,8 @@
             let eur = stored.get('t212-positions-eur') === 'on';
             let [sortKey, sortDirection] = (stored.get('t212-positions-sort') || ':').split(':');
             sortDirection = Number(sortDirection) || 1;
+            // A column that no longer exists (Quantity and Avg. price are now under Price and Value): back to the usual order
+            if (sortKey && !table.querySelector('.sort[data-sort="' + sortKey + '"]')) sortKey = '';
 
             function filter() {
                 const words = search.value.trim().toLowerCase();

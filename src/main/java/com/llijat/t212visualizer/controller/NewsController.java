@@ -2,6 +2,7 @@ package com.llijat.t212visualizer.controller;
 
 import com.llijat.t212visualizer.service.CalendarService;
 import com.llijat.t212visualizer.service.NewsService;
+import com.llijat.t212visualizer.service.PriceHistoryService;
 import com.llijat.t212visualizer.service.QuoteService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -20,12 +21,14 @@ public class NewsController {
     private final NewsService newsService;
     private final QuoteService quoteService;
     private final CalendarService calendarService;
+    private final PriceHistoryService priceHistoryService;
 
-    public NewsController(NewsService newsService, QuoteService quoteService, CalendarService calendarService, Clock clock) {
+    public NewsController(NewsService newsService, QuoteService quoteService, CalendarService calendarService, Clock clock, PriceHistoryService priceHistoryService) {
         this.newsService = newsService;
         this.quoteService = quoteService;
         this.calendarService = calendarService;
         this.clock = clock;
+        this.priceHistoryService = priceHistoryService;
     }
 
     @GetMapping("/news")
@@ -43,6 +46,7 @@ public class NewsController {
         model.addAttribute("comingUpDividends", calendarService.getComingUpDividends());
         model.addAttribute("metals", quoteService.getMetals());
         model.addAttribute("metalDays", newsService.getMetalNewsByDay());
+        model.addAttribute("priceSeries", priceHistoryService.getRecentSeries());
         return "news";
     }
 

@@ -26,18 +26,23 @@
     th:data-symbol="${n.related()}"
     th:data-search="${#strings.toLowerCase(n.headline() + ' ' + n.summary() + ' ' + n.source() + ' ' + n.related())}">
     <time class="story-time" th:datetime="${n.publishedAt(zone)}" th:text="${#temporals.format(n.publishedAt(zone), 'HH:mm')}">14:05</time>
+    <!-- Its place on the day's line: the holding's logo, or a dot for a story about several or none -->
+    <span class="story-mark" aria-hidden="true"
+          th:with="single=${!#strings.isEmpty(n.related()) and !#strings.contains(n.related(), ',')},
+                   ticker=${single ? tickers.get(n.related()) : null}">
+        <span class="logo" th:if="${single}">
+            <span class="logo-initial" th:text="${#strings.substring(n.related(), 0, 1)}">A</span>
+            <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
+        </span>
+        <span class="story-dot" th:unless="${single}"></span>
+    </span>
     <div>
         <!-- Opens the publisher's page in a new tab; it gets no hint of where the click came from -->
         <a class="story-headline" th:href="${n.url()}" th:text="${n.headline()}" target="_blank" rel="noopener noreferrer">Headline</a>
         <p class="story-summary" th:if="${!#strings.isEmpty(n.summary()) and n.summary() != n.headline()}" th:text="${n.summary()}">Summary</p>
         <div class="story-meta">
             <button type="button" class="story-symbol" th:if="${!#strings.isEmpty(n.related()) and !#strings.contains(n.related(), ',')}"
-                    th:data-symbol="${n.related()}" th:aria-label="'Only ' + ${n.related()} + ' news'"
-                    th:with="ticker=${tickers.get(n.related())}">
-                <span class="logo" aria-hidden="true">
-                    <span class="logo-initial" th:text="${#strings.substring(n.related(), 0, 1)}">A</span>
-                    <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
-                </span>
+                    th:data-symbol="${n.related()}" th:aria-label="'Only ' + ${n.related()} + ' news'">
                 <th:block th:text="${n.related()}">AAPL</th:block>
             </button>
             <span th:unless="${#strings.isEmpty(n.source())}" th:text="${n.source()}">Reuters</span>

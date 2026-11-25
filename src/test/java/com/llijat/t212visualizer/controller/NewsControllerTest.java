@@ -6,10 +6,12 @@ import java.time.Instant;
 import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.MetalMove;
 import com.llijat.t212visualizer.dto.NewsDay;
+import com.llijat.t212visualizer.dto.PriceSeries;
 import com.llijat.t212visualizer.dto.UpcomingDividend;
 import com.llijat.t212visualizer.dto.UpcomingEarnings;
 import com.llijat.t212visualizer.service.CalendarService;
 import com.llijat.t212visualizer.service.NewsService;
+import com.llijat.t212visualizer.service.PriceHistoryService;
 import com.llijat.t212visualizer.service.QuoteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,13 +56,16 @@ class NewsControllerTest {
     @Mock
     private CalendarService calendarService;
 
+    @Mock
+    private PriceHistoryService priceHistoryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         // Without Thymeleaf, the view "news" would be looked for at the URL /news, which is this same page.
         // This resolver turns it into a file name instead, as Thymeleaf does in the real app.
-        mockMvc = MockMvcBuilders.standaloneSetup(new NewsController(newsService, quoteService, calendarService, CLOCK))
+        mockMvc = MockMvcBuilders.standaloneSetup(new NewsController(newsService, quoteService, calendarService, CLOCK, priceHistoryService))
                 .setViewResolvers(new InternalResourceViewResolver("/templates/", ".html"))
                 .build();
     }
@@ -81,6 +86,16 @@ class NewsControllerTest {
                 .andExpect(model().attribute("marketDays", market))
                 .andExpect(model().attribute("newsCount", Map.of("AAPL", 3L)))
                 .andExpect(model().attribute("tickers", Map.of("AAPL", "AAPL_US_EQ")));
+    }
+
+    @Test
+    void theHoldings_getTheirPriceSeries_forTheLinesNextToTheirNames() throws Exception {
+        Map<String, PriceSeries> series = Map.of("AAPL_US_EQ",
+                new PriceSeries(List.of(new BigDecimal("230"), new BigDecimal("232")), new BigDecimal("0.87")));
+        when(priceHistoryService.getRecentSeries()).thenReturn(series);
+
+        mockMvc.perform(get("/news"))
+                .andExpect(model().attribute("priceSeries", series));
     }
 
     @Test

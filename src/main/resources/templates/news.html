@@ -12,7 +12,7 @@
             flex: 1;
             min-height: 0;
             display: grid;
-            grid-template-columns: 270px minmax(0, 1fr);
+            grid-template-columns: 300px minmax(0, 1fr);
         }
 
         /* ===== Left: where the stories come from ===== */
@@ -41,7 +41,15 @@
         .source[aria-pressed="true"] { background: var(--raised); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
         .source .logo { font-size: 1.35rem; }
         .source-symbol { flex: 1; min-width: 0; font: 500 var(--fs-md) var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .source-count { color: var(--faint); font: var(--fs-xs) var(--figures); font-variant-numeric: tabular-nums; }
+        .source-count { min-width: 1.1rem; color: var(--faint); font: var(--fs-xs) var(--figures); font-variant-numeric: tabular-nums; text-align: right; }
+        /* Each holding as a small watchlist: its last week as a line, how the last session went, and how many stories.
+           The script draws the line from data-closes; each on its own scale, so a quiet week still shows its shape */
+        .source-trend { flex: none; width: 2.6rem; height: 1.1rem; }
+        .source-trend svg { display: block; width: 100%; height: 100%; overflow: visible; }
+        .source-trend polyline { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+        .source-move { flex: none; width: 3.5rem; font: 500 var(--fs-xs) var(--figures); font-variant-numeric: tabular-nums; text-align: right; }
+        .source .up { color: var(--green); }
+        .source .down { color: var(--red); }
         .source[aria-pressed="true"] .source-count { color: var(--accent); }
         .source-icon { width: 1.35rem; display: grid; place-items: center; color: var(--muted); }
         .sources-note { margin: 0; padding-left: 0.6rem; color: var(--faint); font-size: var(--fs-xs); line-height: 1.5; max-width: 26ch; }
@@ -59,7 +67,7 @@
         /* Wide screens: a third column of its own, which scrolls on its own like the sources and the stories.
            The script moves the column there from above the stories (see placeRail). */
         @media (min-width: 1400px) {
-            .news-page { grid-template-columns: 270px minmax(0, 1fr) 360px; }
+            .news-page { grid-template-columns: 300px minmax(0, 1fr) 360px; }
             .stories-layout { margin-inline: auto; }
             .news-page > .rail {
                 min-height: 0;
@@ -107,22 +115,30 @@
         .day-head span { color: var(--faint); font-size: var(--fs-xs); }
         .day-list { list-style: none; margin: 0; padding: 0; }
 
-        /* One story: the time, then the headline, two lines of summary and where it comes from */
+        /* One story on the day's timeline: the time, its holding's logo on a thin line, then the headline, two lines of summary
+           and where it comes from. The eye runs down the logos and knows whose news it is before reading it */
         .story {
             display: grid;
-            grid-template-columns: 3.4rem minmax(0, 1fr);
-            gap: 0.9rem;
-            padding: 0.9rem 0.75rem;
+            grid-template-columns: 2.9rem 1.7rem minmax(0, 1fr);
+            column-gap: 0.75rem;
+            padding: 0.85rem 0.75rem;
             margin: 0 -0.75rem;
             border-radius: var(--radius-md);
         }
         .story:hover { background: var(--panel); }
-        .story-time { padding-top: 0.15rem; color: var(--faint); font: var(--fs-sm) var(--figures); font-variant-numeric: tabular-nums; }
+        .story-time { padding-top: 0.2rem; color: var(--faint); font: var(--fs-sm) var(--figures); font-variant-numeric: tabular-nums; }
+        .story-mark { position: relative; display: flex; justify-content: center; align-items: flex-start; }
+        .story-mark::before { content: ""; position: absolute; left: 50%; top: -0.85rem; bottom: -0.85rem; width: 1px; background: var(--border); }
+        .story:first-child .story-mark::before { top: 0.75rem; }                      /* the line starts at the day's first story */
+        .story:last-child .story-mark::before { bottom: calc(100% - 0.75rem); }       /* and ends at its last */
+        .story-mark .logo { position: relative; font-size: var(--fs-lg); box-shadow: 0 0 0 3px var(--bg); }
+        .story-dot { position: relative; width: 0.55rem; height: 0.55rem; margin-top: 0.5rem; border-radius: 50%; background: var(--faint); box-shadow: 0 0 0 3px var(--bg); }
+        .story:hover .story-mark .logo, .story:hover .story-dot { box-shadow: 0 0 0 3px var(--panel); }
         .story-headline {
             color: var(--text);
-            font-size: var(--fs-md);
+            font-size: var(--fs-lg);
             font-weight: 500;
-            line-height: 1.4;
+            line-height: 1.35;
             text-decoration: none;
             text-wrap: pretty;
         }
@@ -150,7 +166,13 @@
             font: 500 var(--fs-xs) var(--figures);
         }
         .story-symbol:hover { background: var(--accent-bg); color: var(--accent); }
-        .story-symbol .logo { font-size: var(--fs-lg); }
+        .story-symbol { padding-left: 0.55rem; }
+
+        /* Several stories in a row from the same holding: the first shows, the rest wait behind "N more from …" */
+        .story-fold { margin: 0 -0.75rem; padding: 0 0.75rem 0.4rem calc(2.9rem + 1.7rem + 1.5rem + 0.75rem); list-style: none; position: relative; }
+        .story-fold::before { content: ""; position: absolute; left: calc(0.75rem + 2.9rem + 0.75rem + 0.85rem); top: 0; bottom: 0; width: 1px; background: var(--border); }
+        .story-fold button { height: var(--control-h-sm); padding: 0 0.6rem; border-radius: var(--radius-pill); background: var(--raised); color: var(--muted); font-size: var(--fs-xs); }
+        .story-fold button:hover { background: var(--accent-bg); color: var(--accent); }
 
         /* The star: faint until it is pressed, then filled with the colour of what is selected */
         .star-form { margin: 0 0 0 auto; }
@@ -238,9 +260,15 @@
             .source-group li { flex: none; }
             .source-group-name, .sources-note { display: none; }
             .source { width: auto; height: 2.5rem; background: var(--panel); }
+            .source-trend, .source-move { display: none; }
             .stories { overflow: visible; padding: 0.5rem 1rem 2rem; }
             .day-head { top: 0; }
-            .story { grid-template-columns: 1fr; gap: 0.2rem; }
+            .story { grid-template-columns: 1.7rem minmax(0, 1fr); row-gap: 0.15rem; }
+            .story-time { grid-column: 2; grid-row: 1; padding-top: 0; }
+            .story-mark { grid-column: 1; grid-row: 1 / span 2; }
+            .story > div { grid-column: 2; }
+            .story-fold { padding-left: calc(1.7rem + 1.5rem); }
+            .story-fold::before { left: calc(0.75rem + 0.85rem); }
         }
     </style>
 </head>
@@ -304,14 +332,20 @@
                     </button>
                 </li>
                 <!-- One button per holding with news: its logo (through its T212 ticker), its symbol and how many stories -->
-                <li th:each="entry : ${newsCount}" th:with="ticker=${tickers.get(entry.key)}">
+                <li th:each="entry : ${newsCount}"
+                    th:with="ticker=${tickers.get(entry.key)},
+                             series=${priceSeries != null and ticker != null ? priceSeries.get(ticker) : null}">
                     <button type="button" class="source" data-show="portfolio" th:data-symbol="${entry.key}" aria-pressed="false">
                         <span class="logo" aria-hidden="true">
                             <span class="logo-initial" th:text="${#strings.substring(entry.key, 0, 1)}">A</span>
                             <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
                         </span>
                         <span class="source-symbol" th:text="${entry.key}">AAPL</span>
-                        <span class="source-count" th:text="${entry.value}">12</span>
+                        <th:block th:if="${series != null}">
+                            <span class="source-trend" aria-hidden="true" th:data-closes="${#strings.listJoin(series.closes(), ',')}"></span>
+                            <span class="source-move" title="The last session, against the close before it"></span>
+                        </th:block>
+                        <span class="source-count" th:text="${entry.value}" th:title="${entry.value} + ' stories this week'">12</span>
                     </button>
                 </li>
             </ul>
@@ -504,19 +538,64 @@
         let showing = 'portfolio';
         let symbol = null;
 
+        // ----- The holdings as a watchlist: the last week as a line (5 sessions and the close before them) and the last session's move
+        document.querySelectorAll('.source-trend').forEach(box => {
+            const closes = box.dataset.closes.split(',').map(Number).slice(-6);
+            const low = Math.min(...closes), high = Math.max(...closes);
+            const y = close => high === low ? 15 : 28 - (close - low) / (high - low) * 26;
+            const points = closes.map((close, i) => (i / (closes.length - 1) * 100).toFixed(2) + ',' + y(close).toFixed(2)).join(' ');
+            box.innerHTML = '<svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="' + points + '"/></svg>';
+            const last = closes[closes.length - 1], before = closes[closes.length - 2];
+            const move = before ? (last / before - 1) * 100 : 0;
+            const label = box.nextElementSibling;
+            label.textContent = (move < 0 ? '−' : '+') + Math.abs(move).toFixed(2) + '%';
+            box.classList.add(closes[closes.length - 1] < closes[0] ? 'down' : 'up');   // the line: how the week went
+            label.classList.add(move < 0 ? 'down' : 'up');                              // the figure: how the last session went
+        });
+
+        // ----- Three or more stories in a row from one holding: the first shows, the rest fold behind "N more from …"
+        // A holding chosen or a search shows them all: then you are looking for them
+        const opened = new Set();
+        let runs = 0;
+        document.querySelectorAll('.day-list').forEach(list => {
+            const stories = [...list.querySelectorAll('.story')];
+            for (let start = 0; start < stories.length;) {
+                const owner = stories[start].dataset.symbol;
+                let end = start + 1;
+                while (owner && !owner.includes(',') && end < stories.length && stories[end].dataset.symbol === owner) end++;
+                if (end - start >= 3) {
+                    const run = String(++runs);
+                    stories.slice(start + 1, end).forEach(story => { story.dataset.run = run; });
+                    const fold = document.createElement('li');
+                    fold.className = 'story-fold';
+                    fold.dataset.run = run;
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.textContent = (end - start - 1) + ' more from ' + owner;
+                    button.addEventListener('click', () => { opened.add(run); filter(); });
+                    fold.append(button);
+                    stories[start].after(fold);
+                }
+                start = end;
+            }
+        });
+
         function filter() {
             const words = search.value.trim().toLowerCase();
             const feed = feeds[showing];
             let shown = 0;
             let total = 0;
+            const focused = symbol !== null || words !== '';
             feed.querySelectorAll('.day').forEach(day => {
                 let inDay = 0;
                 day.querySelectorAll('.story').forEach(story => {
                     total++;
-                    const visible = (symbol === null || story.dataset.symbol === symbol) && story.dataset.search.includes(words);
-                    story.classList.toggle('hidden', !visible);
-                    if (visible) inDay++;
+                    const matches = (symbol === null || story.dataset.symbol === symbol) && story.dataset.search.includes(words);
+                    const folded = Boolean(story.dataset.run) && !focused && !opened.has(story.dataset.run);   // a boolean: toggle() with undefined would flip it
+                    story.classList.toggle('hidden', !matches || folded);
+                    if (matches) inDay++;   // a folded story still counts: it is there, one click away
                 });
+                day.querySelectorAll('.story-fold').forEach(fold => fold.classList.toggle('hidden', focused || opened.has(fold.dataset.run)));
                 // A day stays only while one of its stories does
                 day.classList.toggle('hidden', inDay === 0);
                 day.querySelector('.day-total').textContent = inDay + (inDay === 1 ? ' story' : ' stories');
