@@ -50,6 +50,7 @@
             z-index: 1;                 /* above the rows, so the logos slide under it */
             background: var(--panel);
         }
+        .positions-table th, .positions-table td { padding-left: 0.32rem; padding-right: 0.32rem; }   /* 8 columns with P/L in euros: every pixel counts */
         tbody tr:hover { background: var(--raised); }
         tbody tr:last-child td { border-bottom: none; }
         .num {
@@ -59,13 +60,16 @@
         }
         td.num { font-family: var(--figures); font-size: 0.95rem; }
         .holding { display: flex; align-items: center; gap: 0.6rem; font-size: 1.45rem; }
-        .holding > div { font-size: 0.875rem; min-width: 0; }
+        .holding > div { flex: 1; min-width: 0; font-size: 0.875rem; white-space: nowrap; }   /* nowrap: the FX badge stays next to the symbol */
         .symbol { font: 600 0.95rem var(--figures); letter-spacing: 0.01em; }
         .company {
             display: block;
             color: var(--muted);
             font-size: 0.72rem;
-            max-width: 220px;
+            /* width 0 + min-width 100%: the name fills the room the column has, but never makes it wider.
+               A fixed width kept the column wide and pushed the table past its card, with a horizontal scrollbar */
+            width: 0;
+            min-width: 100%;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;    /* long names end in "…" */
@@ -276,13 +280,13 @@
 
         /* ===== The last month of each US stock: a mini line, its move, and the weight kept small under them =====
            The line is drawn by JS from data-closes; its own scale, so even a quiet month shows its shape */
-        .trend { display: inline-grid; grid-template-columns: 4.5rem auto; align-items: center; justify-items: end; column-gap: 0.5rem; }
-        .trend-line { display: block; width: 4.5rem; height: 1.35rem; }
+        .trend { display: inline-grid; grid-template-columns: 3.75rem auto; align-items: center; justify-items: end; column-gap: 0.4rem; }
+        .trend-line { display: block; width: 3.75rem; height: 1.35rem; }
         .trend-line svg { display: block; width: 100%; height: 100%; overflow: visible; }
         .trend-line polyline { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
         .trend .up { color: var(--green); }
         .trend .down { color: var(--red); }
-        .trend-change { min-width: 3.7rem; font: 500 0.82rem var(--figures); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+        .trend-change { min-width: 3rem; font: 500 0.82rem var(--figures); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
         .trend-weight { grid-column: 1 / -1; color: var(--muted); font-size: 0.72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
         /* ===== Positions: count, filters and sorting ===== */
@@ -577,7 +581,7 @@
                         <th class="num" title="How the price moved in the last month, with your share of the account under it. Stocks without a price history show only their share, with a bar that compares it with your largest position."><button type="button" class="sort" data-sort="month">Month</button></th>
                         <th class="num"><button type="button" class="sort" data-sort="quantity">Quantity</button></th>
                         <th class="num"><button type="button" class="sort" data-sort="avg">Avg. price</button></th>
-                        <th class="num"><button type="button" class="sort" data-sort="price">Current price</button></th>
+                        <th class="num" title="Current price"><button type="button" class="sort" data-sort="price">Price</button></th>
                         <th class="num"><button type="button" class="sort" data-sort="value">Total value</button></th>
                         <th class="num pl-eur" title="Unrealized profit or loss in euros, exchange rate included"><button type="button" class="sort" data-sort="plEur">P/L €</button></th>
                         <th class="num" title="Unrealized profit or loss since you bought it, as a % of what you paid"><button type="button" class="sort" data-sort="pl">P/L %</button></th>
