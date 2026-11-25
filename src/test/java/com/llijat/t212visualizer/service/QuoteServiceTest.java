@@ -53,7 +53,7 @@ class QuoteServiceTest {
 
     @BeforeEach
     void setUp() {
-        quoteService = new QuoteService(finnhubClient, positionService, companyProfileService, CLOCK, priceCloseRepository);
+        quoteService = new QuoteService(finnhubClient, positionService, companyProfileService, CLOCK, priceCloseRepository, 0);
     }
 
     // A real Position (not a mock): only the ticker and what it is worth today matter here
@@ -349,5 +349,71 @@ class QuoteServiceTest {
     @Test
     void beforeTheFirstRefresh_thereAreNoMetals() {
         assertTrue(quoteService.getMetals().isEmpty());
+    }
+
+    // ===== Sector ETFs (one per subsector of the Sectors page) =====
+
+    @Test
+    void everySectorEtf_isAskedForInEveryRefresh_evenWithoutUsPositions() {
+        thePortfolioIs();
+
+        quoteService.refreshQuotes();
+
+        SectorCatalog.all().forEach(subsector -> verify(finnhubClient).fetchQuote(subsector.etf()));
+    }
+
+    @Test
+    void theSectorEtfMoves_areTheDailyChangeOfEachEtf() {
+        thePortfolioIs();
+        when(finnhubClient.fetchQuote("SMH")).thenReturn(moved("2.10"));
+        when(finnhubClient.fetchQuote("XLE")).thenReturn(moved("-1.30"));
+
+        quoteService.refreshQuotes();
+
+        assertEquals(Map.of("SMH", new BigDecimal("2.10"), "XLE", new BigDecimal("-1.30")), quoteService.getSectorEtfMoves());
+    }
+
+    @Test
+    void theSectorEtfCloses_areSaved_soTheLongerRangesFillUpOnTheirOwn() {
+        thePortfolioIs();
+        long friday = Instant.parse("2026-11-13T18:00:00Z").getEpochSecond();
+        when(finnhubClient.fetchQuote("SMH")).thenReturn(new FinnhubQuoteDto(new BigDecimal("268.5000"), new BigDecimal("1"), friday));
+
+        quoteService.refreshQuotes();
+
+        PriceClose close = theSavedClose();
+        assertEquals(new PriceDay("SMH", LocalDate.of(2026, 11, 13)), close.getId());
+        assertEquals(new BigDecimal("268.5000"), close.getClose());
+    }
+
+    @Test
+    void ifOneSectorEtfFails_orHasNoData_theOthersStillArrive() {
+        thePortfolioIs();
+        when(finnhubClient.fetchQuote("SMH")).thenThrow(new RuntimeException("429 Too Many Requests"));
+        when(finnhubClient.fetchQuote("IGV")).thenReturn(new FinnhubQuoteDto(BigDecimal.ZERO, null, 0L));
+        when(finnhubClient.fetchQuote("XLK")).thenReturn(moved("0.80"));
+
+        quoteService.refreshQuotes();
+
+        assertEquals(Map.of("XLK", new BigDecimal("0.80")), quoteService.getSectorEtfMoves());
+    }
+
+    @Test
+    void beforeTheFirstRefresh_thereAreNoSectorEtfMoves() {
+        assertTrue(quoteService.getSectorEtfMoves().isEmpty());
+    }
+
+    @Test
+    void ifTheRefreshIsInterrupted_itStopsAsking_andKeepsTheInterruption() {
+        // With a real pause, the sleep notices the interruption (for example, the app shutting down)
+        QuoteService paced = new QuoteService(finnhubClient, positionService, companyProfileService, CLOCK, priceCloseRepository, 1);
+        thePortfolioIs(position("AAPL_US_EQ", "1500"));
+        Thread.currentThread().interrupt();
+
+        paced.refreshQuotes();
+
+        assertTrue(Thread.interrupted());   // still marked (and cleared here, so the next tests run normally)
+        verify(finnhubClient, never()).fetchQuote(anyString());
+        assertTrue(paced.getMoves().isEmpty());
     }
 }

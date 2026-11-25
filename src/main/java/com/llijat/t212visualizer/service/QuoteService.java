@@ -3,12 +3,14 @@ package com.llijat.t212visualizer.service;
 import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.HoldingMove;
 import com.llijat.t212visualizer.dto.MetalMove;
+import com.llijat.t212visualizer.dto.Subsector;
 import com.llijat.t212visualizer.model.Position;
 import com.llijat.t212visualizer.model.PriceClose;
 import com.llijat.t212visualizer.model.PriceDay;
 import com.llijat.t212visualizer.repository.PriceCloseRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -34,14 +36,23 @@ public class QuoteService {
     private final CompanyProfileService companyProfileService;
     private volatile Map<String, FinnhubQuoteDto> quoteByTicker = Map.of();
     private volatile Map<String, FinnhubQuoteDto> quoteByMetalEtf = Map.of();
+    private volatile Map<String, FinnhubQuoteDto> quoteBySectorEtf = Map.of();
+    private final long requestDelayMs;
 
 
-    public QuoteService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService, Clock clock, PriceCloseRepository priceCloseRepository) {
+    public QuoteService(FinnhubClient finnhubClient, PositionService positionService, CompanyProfileService companyProfileService, Clock clock, PriceCloseRepository priceCloseRepository, @Value("${finnhub.request-delay-ms}") long requestDelayMs) {
         this.finnhubClient = finnhubClient;
         this.positionService = positionService;
         this.companyProfileService = companyProfileService;
         this.clock = clock;
         this.priceCloseRepository = priceCloseRepository;
+        this.requestDelayMs = requestDelayMs;
+    }
+
+    public Map<String, BigDecimal> getSectorEtfMoves() {
+        Map<String, BigDecimal> moves = new HashMap<>();
+        quoteBySectorEtf.forEach((etf, quote) -> moves.put(etf, quote.changePercent()));
+        return moves;
     }
 
     public List<HoldingMove> getMoves() {
@@ -92,12 +103,14 @@ public class QuoteService {
             if (!position.getTicker().contains("_US_")) continue;
             try {
                 String symbol = symbols.getOrDefault(position.getTicker(), position.getSymbol());
-                FinnhubQuoteDto quote = finnhubClient.fetchQuote(symbol);
+                FinnhubQuoteDto quote = fetchQuote(symbol);
                 if (quote != null && quote.isKnown() && quote.price() != null) {
                     quotes.put(position.getTicker(), quote);
-                    LocalDate day = LocalDate.ofInstant(Instant.ofEpochSecond(quote.time()), NEW_YORK);
-                    priceCloseRepository.save(new PriceClose(new PriceDay(symbol, day), quote.price()));
+                    saveClose(symbol, quote);
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
             } catch (Exception e) {
                 log.warn("Could not load the quote of {}: {}", position.getTicker(), e.getMessage());
             }
@@ -105,20 +118,54 @@ public class QuoteService {
 
         quoteByTicker = quotes;
         quoteByMetalEtf = fetchMetals();
-        log.info("Refreshed {} quotes.", quotes.size());
+        quoteBySectorEtf = fetchSectorEtfs();
+        log.info("Refreshed {} quotes and {} sector ETFs.", quotes.size(), quoteBySectorEtf.size());
     }
 
     private Map<String, FinnhubQuoteDto> fetchMetals() {
         Map<String, FinnhubQuoteDto> quotes = new HashMap<>();
-        for (String etf: METAL_ETFS) {
+        for (String etf : METAL_ETFS) {
             try {
-                FinnhubQuoteDto quote = finnhubClient.fetchQuote(etf);
+                FinnhubQuoteDto quote = fetchQuote(etf);
                 if (quote != null && quote.isKnown()) quotes.put(etf, quote);
-            }
-            catch (Exception e) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
                 log.warn("Could not load the quote of {}: {}", etf, e.getMessage());
             }
         }
         return quotes;
     }
+
+    private Map<String, FinnhubQuoteDto> fetchSectorEtfs() {
+        Map<String, FinnhubQuoteDto> quotes = new HashMap<>();
+        for (Subsector subsector : SectorCatalog.all()) {
+            String etf = subsector.etf();
+            try {
+                FinnhubQuoteDto quote = fetchQuote(etf);
+                if (quote != null && quote.isKnown() && quote.price() != null) {
+                    quotes.put(etf, quote);
+                    saveClose(etf, quote);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                log.warn("Could not load the quote of {}: {}", etf, e.getMessage());
+            }
+        }
+        return quotes;
+    }
+
+    private FinnhubQuoteDto fetchQuote(String symbol) throws InterruptedException {
+        Thread.sleep(requestDelayMs);   // waits before each request: at most 60 a minute, even if one fails
+        return finnhubClient.fetchQuote(symbol);
+    }
+
+    private void saveClose(String symbol, FinnhubQuoteDto quote) {
+        LocalDate day = LocalDate.ofInstant(Instant.ofEpochSecond(quote.time()), NEW_YORK);
+        priceCloseRepository.save(new PriceClose(new PriceDay(symbol, day), quote.price()));
+    }
+
 }

@@ -17,6 +17,7 @@ public class CompanyProfile {
     private Instant fetchedAt;
     private String symbol;
     private String exchange;
+    private String industry;
 
     protected CompanyProfile() {
         //required by JPA
@@ -26,11 +27,12 @@ public class CompanyProfile {
         this.ticker = ticker;
     }
 
-    public void updateProfile(String name, byte[] logo, String logoContentType, Instant fetchedAt) {
+    public void updateProfile(String name, byte[] logo, String logoContentType, Instant fetchedAt, String industry) {
         this.name = name;
         this.logo = logo;
         this.logoContentType = logoContentType;
         this.fetchedAt = fetchedAt;
+        this.industry = industry;
     }
 
     public void updateListing(String symbol, String exchange) {
@@ -49,6 +51,5 @@ public class CompanyProfile {
     public Instant getFetchedAt() {return fetchedAt;}
     public String getSymbol() {return symbol;}
     public String getExchange() {return exchange;}
-
-
+    public String getIndustry() {return industry;}
 }

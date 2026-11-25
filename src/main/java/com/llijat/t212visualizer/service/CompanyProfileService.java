@@ -89,7 +89,7 @@ public class CompanyProfileService {
 
         // Fuera de EE. UU., Finnhub no tiene nada: se guarda y se acaba aquí
         if (!position.getTicker().contains("_US_")) {
-            profile.updateProfile(null, null, null, now);
+            profile.updateProfile(null, null, null, now, null);
             companyProfileRepository.save(profile);
             return;
         }
@@ -100,11 +100,12 @@ public class CompanyProfileService {
         String name = dto == null ? null : dto.name();
         String logoUrl = dto == null ? null : dto.logo();
         Optional<LogoImage> logo = (logoUrl == null || logoUrl.isBlank()) ? Optional.empty() : finnhubClient.downloadLogo(logoUrl);
+        String industry = dto == null ? null : dto.finnhubIndustry();
 
         profile.updateProfile(name,
                 logo.map(LogoImage::bytes).orElse(null),
                 logo.map(LogoImage::contentType).orElse(null),
-                now);
+                now, industry);
         companyProfileRepository.save(profile);
     }
 
@@ -118,5 +119,11 @@ public class CompanyProfileService {
         return companyProfileRepository.findAll().stream()
                 .filter(profile -> profile.getSymbol() != null)
                 .collect(Collectors.toMap(CompanyProfile::getTicker, profile -> TradingViewSymbol.of(profile.getExchange(), profile.getSymbol())));
+    }
+
+    public Map<String, String> currentIndustries() {
+        return companyProfileRepository.findAll().stream()
+                .filter(profile -> profile.getIndustry() != null)
+                .collect(Collectors.toMap(CompanyProfile::getTicker, CompanyProfile::getIndustry));
     }
 }

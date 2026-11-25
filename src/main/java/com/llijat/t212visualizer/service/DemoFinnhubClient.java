@@ -62,7 +62,15 @@ public class DemoFinnhubClient implements FinnhubClient {
 
     @Override
     public FinnhubCompanyProfileDto fetchCompanyProfile(String symbol) {
-        return new FinnhubCompanyProfileDto(null, null);
+        // Only the industry: the demo companies have no real name or logo. Each falls in a different subsector of the Sectors page
+        String industry = switch (symbol) {
+            case "ACME" -> "Technology";
+            case "GLBX" -> "Semiconductors";
+            case "INIT" -> "Banking";
+            case "HOOL" -> "Media";
+            default -> null;
+        };
+        return new FinnhubCompanyProfileDto(null, null, industry);
     }
 
     @Override

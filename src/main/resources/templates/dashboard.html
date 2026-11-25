@@ -1060,6 +1060,9 @@
             sortDirection = Number(sortDirection) || 1;
             // A column that no longer exists (Quantity and Avg. price are now under Price and Value): back to the usual order
             if (sortKey && !table.querySelector('.sort[data-sort="' + sortKey + '"]')) sortKey = '';
+            // Coming from another page with a stock in mind (Sectors links to /?filter=NVDA): the table starts filtered by it
+            const asked = new URLSearchParams(location.search).get('filter');
+            if (asked) search.value = asked;
 
             function filter() {
                 const words = search.value.trim().toLowerCase();

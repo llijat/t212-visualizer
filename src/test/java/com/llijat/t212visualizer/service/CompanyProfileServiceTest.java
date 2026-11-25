@@ -83,7 +83,7 @@ class CompanyProfileServiceTest {
 
     private static CompanyProfile profileFetched(String ticker, Duration ago) {
         CompanyProfile profile = new CompanyProfile(ticker);
-        profile.updateProfile("Old name", null, null, Instant.now().minus(ago));
+        profile.updateProfile("Old name", null, null, Instant.now().minus(ago), null);
         return profile;
     }
 
@@ -91,7 +91,7 @@ class CompanyProfileServiceTest {
     void aNewUsCompany_getsItsNameAndLogo_andNonUsStocksAreNotAskedToFinnhub() {
         when(positionService.getAllPositions()).thenReturn(List.of(position("MU_US_EQ"), position("RWEd_EQ", RWE_ISIN)));
         when(repository.findById(anyString())).thenReturn(Optional.empty());
-        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", LOGO_URL));
+        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", LOGO_URL, "Semiconductors"));
         when(finnhubClient.downloadLogo(LOGO_URL)).thenReturn(Optional.of(new LogoImage(PNG, "image/png")));
         Instant before = Instant.now();
 
@@ -104,14 +104,16 @@ class CompanyProfileServiceTest {
         assertEquals("Micron Technology, Inc.", saved.getName());
         assertArrayEquals(PNG, saved.getLogo());
         assertEquals("image/png", saved.getLogoContentType());
+        assertEquals("Semiconductors", saved.getIndustry());
         assertFalse(saved.getFetchedAt().isBefore(before));
+        assertNull(savedCaptor.getAllValues().get(1).getIndustry());   // RWE: not asked, so no industry
     }
 
     @Test
     void aCompanyWithoutLogoLink_isSavedWithoutLogo_andNothingIsDownloaded() {
         when(positionService.getAllPositions()).thenReturn(List.of(position("XYZ_US_EQ")));
         when(repository.findById("XYZ_US_EQ")).thenReturn(Optional.empty());
-        when(finnhubClient.fetchCompanyProfile("XYZ")).thenReturn(new FinnhubCompanyProfileDto("Xyz Corp", ""));
+        when(finnhubClient.fetchCompanyProfile("XYZ")).thenReturn(new FinnhubCompanyProfileDto("Xyz Corp", "", null));
 
         service.refreshProfiles();
 
@@ -126,7 +128,7 @@ class CompanyProfileServiceTest {
     void anImageThatIsRejected_savesTheProfileWithoutLogo() {
         when(positionService.getAllPositions()).thenReturn(List.of(position("MU_US_EQ")));
         when(repository.findById("MU_US_EQ")).thenReturn(Optional.empty());
-        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", LOGO_URL));
+        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", LOGO_URL, "Semiconductors"));
         when(finnhubClient.downloadLogo(LOGO_URL)).thenReturn(Optional.empty());
 
         service.refreshProfiles();
@@ -167,7 +169,7 @@ class CompanyProfileServiceTest {
         CompanyProfile old = profileFetched("MU_US_EQ", Duration.ofDays(40));
         when(positionService.getAllPositions()).thenReturn(List.of(position("MU_US_EQ")));
         when(repository.findById("MU_US_EQ")).thenReturn(Optional.of(old));
-        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", LOGO_URL));
+        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", LOGO_URL, "Semiconductors"));
         when(finnhubClient.downloadLogo(LOGO_URL)).thenReturn(Optional.of(new LogoImage(PNG, "image/png")));
 
         service.refreshProfiles();
@@ -182,9 +184,9 @@ class CompanyProfileServiceTest {
     void aFailingCompany_isNotSaved_andDoesNotStopTheOthers() {
         when(positionService.getAllPositions()).thenReturn(List.of(position("MU_US_EQ"), position("NVDA_US_EQ")));
         when(repository.findById(anyString())).thenReturn(Optional.empty());
-        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", LOGO_URL));
+        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", LOGO_URL, "Semiconductors"));
         when(finnhubClient.downloadLogo(LOGO_URL)).thenThrow(new RuntimeException("404 Not Found"));
-        when(finnhubClient.fetchCompanyProfile("NVDA")).thenReturn(new FinnhubCompanyProfileDto("NVIDIA Corp", ""));
+        when(finnhubClient.fetchCompanyProfile("NVDA")).thenReturn(new FinnhubCompanyProfileDto("NVIDIA Corp", "", null));
 
         service.refreshProfiles();
 
@@ -199,7 +201,7 @@ class CompanyProfileServiceTest {
         when(repository.findById("FB_US_EQ")).thenReturn(Optional.empty());
         when(openFigiClient.findListings(List.of(META_ISIN)))
                 .thenReturn(Map.of(META_ISIN, List.of(listing("META", "UN"), listing("META", "UW"), listing("FB2A", "GY"))));
-        when(finnhubClient.fetchCompanyProfile("META")).thenReturn(new FinnhubCompanyProfileDto("Meta Platforms Inc", LOGO_URL));
+        when(finnhubClient.fetchCompanyProfile("META")).thenReturn(new FinnhubCompanyProfileDto("Meta Platforms Inc", LOGO_URL, null));
         when(finnhubClient.downloadLogo(LOGO_URL)).thenReturn(Optional.of(new LogoImage(PNG, "image/png")));
 
         service.refreshProfiles();
@@ -238,7 +240,7 @@ class CompanyProfileServiceTest {
         // What already worked before OpenFIGI must keep working
         when(positionService.getAllPositions()).thenReturn(List.of(position("MU_US_EQ")));
         when(repository.findById("MU_US_EQ")).thenReturn(Optional.empty());
-        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", ""));
+        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", "", null));
 
         service.refreshProfiles();
 
@@ -282,7 +284,7 @@ class CompanyProfileServiceTest {
         // Like a row saved before V7, until the next T212 refresh fills its ISIN
         when(positionService.getAllPositions()).thenReturn(List.of(position("MU_US_EQ", null)));
         when(repository.findById("MU_US_EQ")).thenReturn(Optional.empty());
-        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", ""));
+        when(finnhubClient.fetchCompanyProfile("MU")).thenReturn(new FinnhubCompanyProfileDto("Micron Technology, Inc.", "", null));
 
         service.refreshProfiles();
 
@@ -319,5 +321,22 @@ class CompanyProfileServiceTest {
         when(repository.findAll()).thenReturn(List.of(meta, rwe, mu));
 
         assertEquals(Map.of("FB_US_EQ", "NASDAQ:META", "RWEd_EQ", "XETR:RWE"), service.currentTradingViewSymbols());
+    }
+
+    @Test
+    void currentIndustries_mapsEachT212TickerToItsFinnhubIndustry_leavingOutTheUnknown() {
+        // MU's listing was never resolved, but Finnhub did give its industry: it must be there.
+        // RWE is not asked to Finnhub, so it has no industry: its key must be missing, not null
+        CompanyProfile meta = new CompanyProfile("FB_US_EQ");
+        meta.updateListing("META", "UW");
+        meta.updateProfile("Meta Platforms Inc", null, null, Instant.now(), "Media");
+        CompanyProfile mu = new CompanyProfile("MU_US_EQ");
+        mu.updateProfile("Micron Technology, Inc.", null, null, Instant.now(), "Semiconductors");
+        CompanyProfile rwe = new CompanyProfile("RWEd_EQ");
+        rwe.updateListing("RWE", "GY");
+        rwe.updateProfile(null, null, null, Instant.now(), null);
+        when(repository.findAll()).thenReturn(List.of(meta, mu, rwe));
+
+        assertEquals(Map.of("FB_US_EQ", "Media", "MU_US_EQ", "Semiconductors"), service.currentIndustries());
     }
 }

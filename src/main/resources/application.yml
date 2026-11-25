@@ -61,6 +61,8 @@ t212:
 finnhub:
   base-url: https://finnhub.io/api/v1
   api-key: ${FINNHUB_API_KEY:}
+  # The free plan allows 60 requests a minute: one second between quotes keeps the 15-minute refresh under it
+  request-delay-ms: 1000
 
 # Announced dividends and past closing prices. The free plan allows 25 requests a day and 5 a minute, 13 seconds apart.
 # The closes go first (backfill-per-day), but only for stocks without a month of them: once filled, they cost nothing.

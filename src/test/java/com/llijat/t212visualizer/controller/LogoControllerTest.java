@@ -38,7 +38,7 @@ class LogoControllerTest {
     @Test
     void aCompanyWithLogo_getsTheImage_withItsType_cachedForAWeek_andNoSniffing() throws Exception {
         CompanyProfile profile = new CompanyProfile("MU_US_EQ");
-        profile.updateProfile("Micron Technology, Inc.", PNG, "image/png", Instant.now());
+        profile.updateProfile("Micron Technology, Inc.", PNG, "image/png", Instant.now(), null);
         when(repository.findById("MU_US_EQ")).thenReturn(Optional.of(profile));
 
         mockMvc.perform(get("/logos/MU_US_EQ"))
@@ -52,7 +52,7 @@ class LogoControllerTest {
     @Test
     void aCompanyWithoutLogo_gets404() throws Exception {
         CompanyProfile profile = new CompanyProfile("XYZ_US_EQ");
-        profile.updateProfile("Xyz Corp", null, null, Instant.now());
+        profile.updateProfile("Xyz Corp", null, null, Instant.now(), null);
         when(repository.findById("XYZ_US_EQ")).thenReturn(Optional.of(profile));
 
         mockMvc.perform(get("/logos/XYZ_US_EQ"))

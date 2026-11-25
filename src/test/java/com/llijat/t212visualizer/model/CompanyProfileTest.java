@@ -28,13 +28,14 @@ class CompanyProfileTest {
     }
 
     @Test
-    void updateProfile_copiesTheFourValues() {
+    void updateProfile_copiesTheFiveValues() {
         CompanyProfile profile = new CompanyProfile("MU_US_EQ");
         Instant now = Instant.parse("2026-11-14T10:00:00Z");
 
-        profile.updateProfile("Micron Technology, Inc.", PNG, "image/png", now);
+        profile.updateProfile("Micron Technology, Inc.", PNG, "image/png", now, "Semiconductors");
 
         assertEquals("Micron Technology, Inc.", profile.getName());
+        assertEquals("Semiconductors", profile.getIndustry());
         assertArrayEquals(PNG, profile.getLogo());
         assertEquals("image/png", profile.getLogoContentType());
         assertEquals(now, profile.getFetchedAt());
@@ -46,7 +47,7 @@ class CompanyProfileTest {
         CompanyProfile profile = new CompanyProfile("XYZ_US_EQ");
         Instant now = Instant.parse("2026-11-14T10:00:00Z");
 
-        profile.updateProfile("Xyz Corp", null, null, now);
+        profile.updateProfile("Xyz Corp", null, null, now, null);
 
         assertFalse(profile.hasLogo());
         assertNull(profile.getLogoContentType());
@@ -57,9 +58,9 @@ class CompanyProfileTest {
     @Test
     void aLaterUpdate_canRemoveALogoThatNoLongerExists() {
         CompanyProfile profile = new CompanyProfile("MU_US_EQ");
-        profile.updateProfile("Micron Technology, Inc.", PNG, "image/png", Instant.parse("2026-10-14T10:00:00Z"));
+        profile.updateProfile("Micron Technology, Inc.", PNG, "image/png", Instant.parse("2026-10-14T10:00:00Z"), null);
 
-        profile.updateProfile("Micron Technology, Inc.", null, null, Instant.parse("2026-11-14T10:00:00Z"));
+        profile.updateProfile("Micron Technology, Inc.", null, null, Instant.parse("2026-11-14T10:00:00Z"), null);
 
         assertFalse(profile.hasLogo());
         assertEquals(Instant.parse("2026-11-14T10:00:00Z"), profile.getFetchedAt());
@@ -82,14 +83,14 @@ class CompanyProfileTest {
         // They come from different sources: refreshing one must keep the other
         CompanyProfile profile = new CompanyProfile("FB_US_EQ");
         Instant now = Instant.parse("2026-11-15T10:00:00Z");
-        profile.updateProfile("Meta Platforms Inc", PNG, "image/png", now);
+        profile.updateProfile("Meta Platforms Inc", PNG, "image/png", now, null);
 
         profile.updateListing("META", "UW");
         assertEquals("Meta Platforms Inc", profile.getName());
         assertTrue(profile.hasLogo());
         assertEquals(now, profile.getFetchedAt());
 
-        profile.updateProfile("Meta Platforms, Inc.", null, null, now.plusSeconds(60));
+        profile.updateProfile("Meta Platforms, Inc.", null, null, now.plusSeconds(60), null);
         assertEquals("META", profile.getSymbol());
         assertEquals("UW", profile.getExchange());
     }

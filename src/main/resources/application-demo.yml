@@ -10,3 +10,5 @@ spring:
 # The made-up Alpha Vantage has no limits: no need to wait 13 seconds between stocks
 alpha-vantage:
   request-delay-ms: 0
+finnhub:
+  request-delay-ms: 0
