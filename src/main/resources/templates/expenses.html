@@ -19,44 +19,44 @@
     <style>
         /* ===== One colour per category: its icon, its bar, its share of the month and its menu ===== */
         .tinted { --c: var(--muted); }
-        .cat-RESTAURANTS { --c: #f2a65a; }
-        .cat-RETAIL_STORES { --c: #d9c76c; }
-        .cat-TRANSPORT { --c: #58b4e8; }
-        .cat-ENTERTAINMENT { --c: #c38cf0; }
-        .cat-SERVICE_PROVIDERS { --c: #5fd0c4; }
-        .cat-PERSONAL_SERVICES { --c: #ec8fab; }
-        .cat-CLOTHING_STORES { --c: #f08a6c; }
-        .cat-HOTELS { --c: #9aa8ff; }
-        .cat-AUTOMOBILE { --c: #a3c46a; }
-        .cat-AUTOMOBILE_RENTAL { --c: #c9a27e; }
-        .cat-BUSINESS_SERVICES { --c: #8fb8d8; }
-        .cat-GOVERNMENT_SERVICES { --c: #a9b2c3; }
+        .cat-RESTAURANTS { --c: var(--cat-2); }
+        .cat-RETAIL_STORES { --c: var(--cat-3); }
+        .cat-TRANSPORT { --c: var(--cat-1); }
+        .cat-ENTERTAINMENT { --c: var(--cat-5); }
+        .cat-SERVICE_PROVIDERS { --c: var(--cat-6); }
+        .cat-PERSONAL_SERVICES { --c: var(--cat-4); }
+        .cat-CLOTHING_STORES { --c: var(--cat-7); }
+        .cat-HOTELS { --c: var(--cat-8); }
+        .cat-AUTOMOBILE { --c: var(--cat-9); }
+        .cat-AUTOMOBILE_RENTAL { --c: var(--cat-9); }
+        .cat-BUSINESS_SERVICES { --c: var(--cat-6); }
+        .cat-GOVERNMENT_SERVICES { --c: var(--cat-10); }
         /* Your own categories: a colour by the order they were made in, the same one everywhere on the page */
-        .custom-0 { --c: #7fd8a4; }
-        .custom-1 { --c: #e3a3ea; }
-        .custom-2 { --c: #6fc8f2; }
-        .custom-3 { --c: #ffb199; }
-        .custom-4 { --c: #c5d97a; }
-        .custom-5 { --c: #b8b0ff; }
+        .custom-0 { --c: var(--cat-custom-1); }
+        .custom-1 { --c: var(--cat-custom-2); }
+        .custom-2 { --c: var(--cat-custom-3); }
+        .custom-3 { --c: var(--cat-custom-4); }
+        .custom-4 { --c: var(--cat-custom-5); }
+        .custom-5 { --c: var(--cat-custom-6); }
 
         /* ===== Import result, above the content ===== */
         .notice {
             margin: 1rem 2rem 0;
             padding: 0.75rem 1rem;
-            border-radius: 12px;
+            border-radius: var(--radius-md);
             background: var(--panel);
             display: flex;
             align-items: baseline;
             flex-wrap: wrap;
             gap: 0.25rem 0.9rem;
-            font-size: 0.9rem;
+            font-size: var(--fs-sm);
         }
         .notice strong { font-weight: 600; }
         .notice-success { box-shadow: inset 3px 0 0 var(--green); }
         .notice-success strong { color: var(--green); }
         .notice-error { box-shadow: inset 3px 0 0 var(--red); }
         .notice-error strong { color: var(--red); }
-        .notice details { color: var(--muted); font-size: 0.82rem; }
+        .notice details { color: var(--muted); font-size: var(--fs-xs); }
         .notice summary { cursor: pointer; }
         .notice summary:hover { color: var(--text); }
         .skipped { list-style: none; margin: 0.45rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
@@ -78,7 +78,7 @@
             width: min(440px, 100%);
             aspect-ratio: 85.6 / 54;    /* the real proportions of a bank card */
             border: 1.5px dashed #3a4558;
-            border-radius: 20px;
+            border-radius: var(--radius-lg);
             background: linear-gradient(135deg, #1a2230, var(--panel));
             color: var(--text);
             display: flex;
@@ -98,15 +98,14 @@
             width: 46px;
             height: 34px;
             border: 1.5px solid #5b6372;
-            border-radius: 7px;
+            border-radius: var(--radius-sm);
             background:
                 linear-gradient(#5b6372, #5b6372) 0 50% / 100% 1.5px no-repeat,
                 linear-gradient(#5b6372, #5b6372) 50% 0 / 1.5px 100% no-repeat;
         }
         .card-brand-icon { position: absolute; top: 1.75rem; right: 1.75rem; font-size: 1.5rem; color: var(--accent); }
-        .card-title { font: 500 1.4rem var(--figures); }
-        .card-hint { color: var(--muted); font-size: 0.9rem; }
-        .welcome-note { max-width: 44ch; margin: 0; text-align: center; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+        .card-hint { color: var(--muted); font-size: var(--fs-sm); }
+        .welcome-note { max-width: 44ch; margin: 0; text-align: center; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
 
         /* ===== With data: the month on top, three columns below. This area scrolls; the top bar stays ===== */
         .spending { flex: 1; min-height: 0; overflow-y: auto; padding: 1.75rem 2rem 2.5rem; }
@@ -120,7 +119,7 @@
             padding-bottom: 2rem;
         }
         .month-nav { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.1rem; }
-        .month-name { margin: 0; font: 500 1.35rem var(--figures); letter-spacing: 0.01em; }
+        .month-name { margin: 0; font: 500 var(--fs-xl) var(--figures); letter-spacing: 0.01em; }
         .month-step {
             width: 2rem;
             height: 2rem;
@@ -132,24 +131,24 @@
         }
         .month-step:hover { color: var(--text); border-color: var(--faint); }
         .month-step.is-placeholder { visibility: hidden; }
-        .month-today { color: var(--accent); font-size: 0.85rem; text-decoration: none; }
+        .month-today { color: var(--accent); font-size: var(--fs-sm); text-decoration: none; }
         .month-today:hover { text-decoration: underline; }
 
-        .figure { margin: 0; font: 300 clamp(3.2rem, 5.5vw, 4.8rem)/1 var(--figures); letter-spacing: -0.02em; white-space: nowrap; }
+        .figure { margin: 0; font: 300 clamp(2.6rem, 4vw, var(--fs-display))/1 var(--figures);   /* the same size as the account value on the dashboard */ letter-spacing: -0.02em; white-space: nowrap; }
         .figure small { margin-left: 0.15em; font-size: 0.42em; font-weight: 400; color: var(--muted); letter-spacing: 0; }
-        .verdict { margin: 0.6rem 0 0; max-width: 42ch; color: var(--muted); font-size: 1rem; text-wrap: pretty; }
+        .verdict { margin: 0.6rem 0 0; max-width: 42ch; color: var(--muted); font-size: var(--fs-md); text-wrap: pretty; }
         .verdict b { font-weight: 600; }
         .verdict .is-up { color: var(--red); }      /* spending more */
         .verdict .is-down { color: var(--green); }  /* spending less */
 
         /* Pace: the month so far, against the month before at this point and in full, and where it is heading */
         .pace { margin-top: 1.5rem; max-width: 34rem; }
-        .pace-track { position: relative; height: 10px; border-radius: 5px; background: var(--raised); }
+        .pace-track { position: relative; height: 10px; border-radius: var(--radius-sm); background: var(--raised); }
         .pace-spent {
             position: absolute;
             inset: 0 auto 0 0;
             width: max(4px, var(--spent));
-            border-radius: 5px;
+            border-radius: var(--radius-sm);
             background: linear-gradient(90deg, #4f7fd6, var(--accent));
         }
         .pace-ahead {
@@ -158,25 +157,25 @@
             bottom: 0;
             left: var(--spent);
             width: calc(var(--projected) - var(--spent));
-            border-radius: 0 5px 5px 0;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
             background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--accent) 35%, transparent) 0 4px, transparent 4px 8px);
         }
-        .pace-tick { position: absolute; top: -5px; bottom: -5px; left: var(--at); width: 2px; border-radius: 1px; background: var(--text); }
+        .pace-tick { position: absolute; top: -5px; bottom: -5px; left: var(--at); width: 2px; border-radius: var(--radius-xs); background: var(--text); }
         .pace-tick.is-now { top: -3px; bottom: -3px; background: var(--muted); }
-        .pace-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1.4rem; margin: 0.8rem 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 0.8rem; }
+        .pace-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1.4rem; margin: 0.8rem 0 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--fs-xs); }
         .pace-legend li { display: inline-flex; align-items: center; gap: 0.45rem; }
-        .pace-legend b { color: var(--text); font: 500 0.88rem var(--figures); }
-        .mark { width: 2px; height: 12px; border-radius: 1px; background: var(--text); }
+        .pace-legend b { color: var(--text); font: 500 var(--fs-sm) var(--figures); }
+        .mark { width: 2px; height: 12px; border-radius: var(--radius-xs); background: var(--text); }
         .mark.is-now { height: 9px; background: var(--muted); }
-        .mark.is-ahead { width: 12px; height: 8px; border-radius: 2px; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--accent) 60%, transparent) 0 2px, transparent 2px 4px); }
+        .mark.is-ahead { width: 12px; height: 8px; border-radius: var(--radius-xs); background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--accent) 60%, transparent) 0 2px, transparent 2px 4px); }
 
-        .month-notes { margin-top: 1.1rem; display: flex; flex-wrap: wrap; gap: 0.35rem 1.6rem; color: var(--muted); font-size: 0.85rem; }
+        .month-notes { margin-top: 1.1rem; display: flex; flex-wrap: wrap; gap: 0.35rem 1.6rem; color: var(--muted); font-size: var(--fs-sm); }
         .month-notes b { color: var(--text); font-family: var(--figures); font-weight: 500; }
 
         /* Heat map: one square per day, Monday first. Its colour is a step (data-level) of the day over the month's biggest day */
         .heatmap { align-self: stretch; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.5rem; }
         .heatmap-head, .heatmap-grid { display: grid; grid-template-columns: repeat(7, 30px); gap: 5px; }
-        .heatmap-head { color: var(--faint); font-size: 0.7rem; text-align: center; }
+        .heatmap-head { color: var(--faint); font-size: var(--fs-2xs); text-align: center; }
         .heatmap-grid { list-style: none; margin: 0; padding: 0; }
         .heatmap-grid > :first-child { grid-column-start: var(--start); }
         .heatmap-day {
@@ -184,10 +183,10 @@
             height: 30px;
             display: grid;
             place-items: center;
-            border-radius: 7px;
+            border-radius: var(--radius-sm);
             background: color-mix(in srgb, var(--accent) var(--mix, 0%), #1a212c);
             color: var(--text);
-            font: 500 0.72rem var(--figures);
+            font: 500 var(--fs-2xs) var(--figures);
             font-variant-numeric: tabular-nums;
             transition: transform 0.12s;
         }
@@ -203,7 +202,7 @@
         .heatmap-day.is-future { background: none; border: 1px dashed var(--border); color: var(--faint); }
         .heatmap-day.is-today { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--text); }
         .heatmap-day.is-selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent); }
-        .heatmap-detail { margin: 0; min-height: 1.3em; color: var(--muted); font-size: 0.8rem; }
+        .heatmap-detail { margin: 0; min-height: 1.3em; color: var(--muted); font-size: var(--fs-xs); }
         .heatmap-detail b { color: var(--text); font-family: var(--figures); font-weight: 500; }
 
         /* Bars per month. Each height is its amount (--v) over the top of the chart (--max) */
@@ -220,9 +219,9 @@
         /* Guide lines, drawn by the script at round amounts */
         .chart-grid { position: absolute; inset: 1.4rem 0 2.1rem 2.6rem; pointer-events: none; }
         .chart-grid span { position: absolute; left: 0; right: 0; bottom: var(--at); border-top: 1px dashed var(--border); }
-        .chart-grid b { position: absolute; left: -2.6rem; top: -0.55rem; color: var(--faint); font: 400 0.7rem var(--figures); }
+        .chart-grid b { position: absolute; left: -2.6rem; top: -0.55rem; color: var(--faint); font: 400 var(--fs-2xs) var(--figures); }
         .chart-column { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-        .chart-link { flex: 1; min-height: 0; display: flex; flex-direction: column; border-radius: 5px; color: inherit; text-decoration: none; }
+        .chart-link { flex: 1; min-height: 0; display: flex; flex-direction: column; border-radius: var(--radius-sm); color: inherit; text-decoration: none; }
         .chart-plot { position: relative; flex: 1; min-height: 0; }
         .chart-bar {
             position: absolute;
@@ -230,7 +229,7 @@
             right: 0;
             bottom: 0;
             height: max(2px, calc(var(--v) / var(--max) * 100%));
-            border-radius: 5px 5px 2px 2px;
+            border-radius: var(--radius-sm) var(--radius-sm) var(--radius-xs) var(--radius-xs);
             background: linear-gradient(#3e5f96, #2b4269);
             transition: filter 0.15s;
         }
@@ -245,7 +244,7 @@
             height: calc((var(--p) - var(--v)) / var(--max) * 100%);
             border: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent);
             border-bottom: none;
-            border-radius: 5px 5px 0 0;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
         }
         .chart-tip {
             position: absolute;
@@ -254,10 +253,10 @@
             bottom: calc(max(2px, var(--v) / var(--max) * 100%) + 6px);
             translate: -50% 4px;
             padding: 0.25rem 0.55rem;
-            border-radius: 6px;
+            border-radius: var(--radius-sm);
             background: var(--raised);
             color: var(--text);
-            font: 500 0.75rem var(--figures);
+            font: 500 var(--fs-2xs) var(--figures);
             white-space: nowrap;
             box-shadow: 0 6px 16px rgb(0 0 0 / 0.4);
             opacity: 0;
@@ -270,7 +269,7 @@
         .chart-column:nth-child(-n+3 of .chart-column):hover .chart-tip { translate: 0 0; }
         .chart-column:nth-last-child(-n+3) .chart-tip { left: auto; right: 0; translate: 0 4px; }
         .chart-column:nth-last-child(-n+3):hover .chart-tip { translate: 0 0; }
-        .chart-axis { height: 2.1rem; padding-top: 0.4rem; text-align: center; color: var(--faint); font-size: 0.72rem; line-height: 1.25; }
+        .chart-axis { height: 2.1rem; padding-top: 0.4rem; text-align: center; color: var(--faint); font-size: var(--fs-2xs); line-height: 1.25; }
         .chart-column.is-selected .chart-axis { color: var(--text); font-weight: 600; }
         .chart-year { display: block; color: var(--muted); font-family: var(--figures); }
 
@@ -289,11 +288,11 @@
         .payments-panel { display: flex; flex-direction: column; }
         .panel { background: var(--panel); border-radius: var(--radius); padding: 1.25rem 1.35rem; }
         .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-        .panel-head > span { color: var(--muted); font-size: 0.85rem; }
+        .panel-head > span { color: var(--muted); font-size: var(--fs-sm); }
         .panel-head .figures { color: var(--text); }
-        .empty-month, .panel-empty { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
-        .panel-error { margin: 0 0 0.75rem; color: var(--red); font-size: 0.85rem; }
-        .amount { font: 500 1rem var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .empty-month, .panel-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+        .panel-error { margin: 0 0 0.75rem; color: var(--red); font-size: var(--fs-sm); }
+        .amount { font: 500 var(--fs-md) var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .rows { list-style: none; margin: 0; padding: 0; }
 
         /* Icon tile, tinted with the category's colour */
@@ -303,10 +302,10 @@
             height: 2.2rem;
             display: grid;
             place-items: center;
-            border-radius: 9px;
+            border-radius: var(--radius-md);
             background: color-mix(in srgb, var(--c) 16%, transparent);
             color: var(--c);
-            font-size: 1.1rem;
+            font-size: var(--fs-lg);
         }
         .avatar {
             flex: none;
@@ -317,43 +316,41 @@
             border-radius: 50%;
             background: var(--raised);
             color: var(--muted);
-            font: 600 0.85rem var(--figures);
+            font: 600 var(--fs-sm) var(--figures);
         }
 
         /* Categories: the month split in one bar, then one row each */
         .split { display: flex; height: 12px; gap: 3px; margin-bottom: 1.1rem; }
-        .split i { flex: var(--v); min-width: 3px; border-radius: 3px; background: var(--c); }
-        .cat-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.55rem 0.5rem; margin: 0 -0.5rem; border-radius: 10px; }
+        .split i { flex: var(--v); min-width: 3px; border-radius: var(--radius-xs); background: var(--c); }
+        .cat-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.55rem 0.5rem; margin: 0 -0.5rem; border-radius: var(--radius-md); }
         .cat-row:hover { background: var(--raised); }
         /* A category or a merchant shows only its payments: the same row pressed again shows them all */
         [data-only] { cursor: pointer; }
         [data-only]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         [data-only][aria-pressed="true"] { background: var(--raised); }
-        .line-row[data-only] { margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; border-radius: 10px; }
+        .line-row[data-only] { margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; border-radius: var(--radius-md); }
         .line-row[data-only]:hover { background: var(--raised); }
         .row-main { flex: 1; min-width: 0; }
         .row-line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
         .row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .row-sub { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.1rem; color: var(--muted); font-size: 0.78rem; }
+        .row-sub { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.1rem; color: var(--muted); font-size: var(--fs-xs); }
 
         /* Payments, grouped by day */
         .payments-tools { display: flex; gap: 0.6rem; margin-bottom: 0.6rem; }
         .payments-search {
             flex: 1;
             min-width: 0;
-            height: 2.4rem;
+            height: var(--control-h);
             padding: 0 0.85rem 0 2.2rem;
             border: 1px solid var(--border);
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             background: var(--bg) no-repeat 0.75rem 50% / 1rem;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
-            font-size: 0.9rem;
+            font-size: var(--fs-sm);
         }
         .payments-search::placeholder { color: var(--faint); }
         .payments-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-        .payments-day { height: 2.4rem; padding: 0 0.85rem; border-radius: 10px; background: var(--accent-bg); color: var(--accent); white-space: nowrap; }
-        .payments-day:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
-        .payments-hint { margin: 0 0 0.6rem; color: var(--faint); font-size: 0.8rem; }
+        .payments-hint { margin: 0 0 0.6rem; color: var(--faint); font-size: var(--fs-xs); }
         .payments { flex: 1 1 0; min-height: 26rem; contain: size; overflow-y: auto; margin: 0 -0.5rem; padding: 0 0.5rem; }
         .day-head {
             position: sticky;
@@ -364,50 +361,50 @@
             padding: 0.6rem 0 0.35rem;
             background: var(--panel);
             color: var(--muted);
-            font-size: 0.82rem;
+            font-size: var(--fs-xs);
         }
         .day-head .figures { color: var(--muted); }
         /* What scrolls under the day's head fades out instead of being cut in half (the amount looked crossed out) */
         .day-head::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 0.75rem; background: linear-gradient(var(--panel), transparent); pointer-events: none; }
-        .pay-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.5rem; margin: 0 -0.5rem; border-radius: 10px; }
+        .pay-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.5rem; margin: 0 -0.5rem; border-radius: var(--radius-md); }
         .pay-row:hover { background: var(--raised); }
         .pay-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .pay-fix { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.15rem; min-width: 0; }
         .pay-fix form { margin: 0; min-width: 0; }
-        .pay-plain { color: var(--muted); font-size: 0.78rem; }
+        .pay-plain { color: var(--muted); font-size: var(--fs-xs); }
         /* The category menu: a small pill in the category's colour */
         .pay-category {
             max-width: 100%;
             height: 1.6rem;
             padding: 0 0.55rem;
             border: 1px solid transparent;
-            border-radius: 999px;
+            border-radius: var(--radius-pill);
             background: color-mix(in srgb, var(--c) 12%, transparent);
             color: color-mix(in srgb, var(--c) 75%, var(--text));
-            font-size: 0.76rem;
+            font-size: var(--fs-2xs);
             cursor: pointer;
         }
         .pay-category:hover { border-color: color-mix(in srgb, var(--c) 45%, transparent); }
         .pay-category.is-corrected { box-shadow: inset 0 0 0 1px var(--accent); }
         .pay-category::picker-icon { font-size: 0.7em; color: currentColor; }
-        .pay-reset { padding: 0; background: none; color: var(--muted); font-size: 0.75rem; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+        .pay-reset { padding: 4px 0; margin: -4px 0; background: none; color: var(--muted); font-size: var(--fs-2xs); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
         .pay-reset:hover { color: var(--text); }
 
         /* Budgets: measured against the limit (--p, in %), with a button to remove */
         .budget { position: relative; padding: 0.55rem 3.8rem 0.55rem 0; }
-        .budget-line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font-size: 0.92rem; }
-        .budget-line .figures { color: var(--muted); font-size: 0.9rem; }
+        .budget-line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font-size: var(--fs-md); }
+        .budget-line .figures { color: var(--muted); font-size: var(--fs-sm); }
         .budget-line .figures b { color: var(--text); font-weight: 500; }
-        .meter { height: 6px; margin: 0.45rem 0 0.3rem; border-radius: 3px; background: var(--raised); overflow: hidden; }
-        .meter i { display: block; height: 100%; width: min(calc(var(--p) * 1%), 100%); border-radius: 3px; background: var(--c); }
-        .budget-sub { color: var(--muted); font-size: 0.78rem; }
+        .meter { height: 6px; margin: 0.45rem 0 0.3rem; border-radius: var(--radius-xs); background: var(--raised); overflow: hidden; }
+        .meter i { display: block; height: 100%; width: min(calc(var(--p) * 1%), 100%); border-radius: var(--radius-xs); background: var(--c); }
+        .budget-sub { color: var(--muted); font-size: var(--fs-xs); }
         .budget.is-over .meter i { background: var(--red); }
         .budget.is-over .budget-sub { color: var(--red); }
         .budget-delete { position: absolute; top: 0.45rem; right: 0; margin: 0; }
-        .budget-delete button { width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: 6px; background: none; color: var(--faint); }
+        .budget-delete button { width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: var(--radius-sm); background: none; color: var(--faint); }
         .budget-delete button:hover, .budget-delete button:focus-visible { background: var(--raised); color: var(--red); }
         /* Changing the limit: a pencil next to the cross; the form opens under the budget */
-        .budget-edit summary { position: absolute; top: 0.45rem; right: 1.8rem; width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: 6px; color: var(--faint); cursor: pointer; list-style: none; }
+        .budget-edit summary { position: absolute; top: 0.45rem; right: 1.8rem; width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--faint); cursor: pointer; list-style: none; }
         .budget-edit summary::-webkit-details-marker { display: none; }
         .budget-edit summary:hover, .budget-edit summary:focus-visible, .budget-edit[open] summary { background: var(--raised); color: var(--text); }
         .budget-edit .budget-form { margin: 0.55rem -3.8rem 0 0; }   /* the whole width, under the two buttons too */
@@ -417,15 +414,15 @@
         .new-category { margin: 0 0 0.5rem 3.05rem; }
         /* Your categories: a dot in their colour, and a cross to delete */
         .custom-list { list-style: none; margin: 0.6rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
-        .custom-list li { display: inline-flex; align-items: center; gap: 0.4rem; height: 1.9rem; padding: 0 0.2rem 0 0.65rem; border-radius: 999px; background: color-mix(in srgb, var(--c) 12%, transparent); color: color-mix(in srgb, var(--c) 75%, var(--text)); font-size: 0.82rem; }
+        .custom-list li { display: inline-flex; align-items: center; gap: 0.4rem; height: 1.9rem; padding: 0 0.2rem 0 0.65rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--c) 12%, transparent); color: color-mix(in srgb, var(--c) 75%, var(--text)); font-size: var(--fs-xs); }
         .custom-list li::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--c); }
         .custom-list form { margin: 0; }
         .custom-list button { width: 1.5rem; height: 1.5rem; display: grid; place-items: center; border-radius: 50%; background: none; color: var(--faint); }
         .custom-list button:hover, .custom-list button:focus-visible { background: var(--raised); color: var(--red); }
         .custom-list .icon { width: 0.95em; height: 0.95em; }
-        .custom-hint { margin: 0.6rem 0 0; color: var(--faint); font-size: 0.8rem; }
+        .custom-hint { margin: 0.6rem 0 0; color: var(--faint); font-size: var(--fs-xs); }
         .add { margin-top: 0.75rem; }
-        .add summary { padding: 0.3rem 0; color: var(--accent); font-size: 0.88rem; cursor: pointer; list-style: none; width: fit-content; }   /* padding: at least 24 px tall to tap */
+        .add summary { padding: 0.3rem 0; color: var(--accent); font-size: var(--fs-sm); cursor: pointer; list-style: none; width: fit-content; }   /* padding: at least 24 px tall to tap */
         .add summary::-webkit-details-marker { display: none; }
         .add summary:hover { text-decoration: underline; }
         .add[open] summary { color: var(--muted); }
@@ -437,21 +434,21 @@
             border: 1px solid var(--border);
             border-radius: var(--radius-small);
             background: var(--bg);
-            font-size: 0.85rem;
+            font-size: var(--fs-sm);
         }
         .budget-form select { flex: 1.4; }
         .budget-form input { flex: 1; width: 0; }
         .budget-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-        .budget-form button { height: 2.2rem; padding: 0 1rem; border-radius: var(--radius-small); background: var(--accent); color: var(--bg); font-size: 0.85rem; font-weight: 600; }
+        .budget-form button { height: 2.2rem; padding: 0 1rem; border-radius: var(--radius-small); background: var(--accent); color: var(--bg); font-size: var(--fs-sm); font-weight: 600; }
 
         /* Subscriptions and merchants */
         .line-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.5rem 0; }
-        .line-sub { display: block; color: var(--muted); font-size: 0.78rem; }
-        .badge { margin-left: 0.4rem; padding: 0.05rem 0.45rem; border-radius: 999px; font-size: 0.7rem; white-space: nowrap; }
+        .line-sub { display: block; color: var(--muted); font-size: var(--fs-xs); }
+        .badge { margin-left: 0.4rem; padding: 0.05rem 0.45rem; border-radius: var(--radius-pill); font-size: var(--fs-2xs); white-space: nowrap; }
         .badge.is-up { background: color-mix(in srgb, #f2c25a 16%, transparent); color: #f2c25a; }
         .badge.is-down { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
-        .share { display: block; height: 4px; margin-top: 0.35rem; border-radius: 2px; background: var(--raised); }
-        .share i { display: block; height: 100%; min-width: 3px; width: calc(var(--v) / var(--max) * 100%); border-radius: 2px; background: #3e5f96; }
+        .share { display: block; height: 4px; margin-top: 0.35rem; border-radius: var(--radius-xs); background: var(--raised); }
+        .share i { display: block; height: 100%; min-width: 3px; width: calc(var(--v) / var(--max) * 100%); border-radius: var(--radius-xs); background: #3e5f96; }
 
         /* ===== Dragging a file over the page ===== */
         .drop-overlay {
@@ -463,7 +460,7 @@
             background: color-mix(in srgb, var(--bg) 90%, transparent);
             border: 3px dashed var(--accent);
             color: var(--text);
-            font: 500 1.6rem var(--figures);
+            font: 500 var(--fs-xl) var(--figures);
             pointer-events: none;
         }
         body.is-dragging .drop-overlay { display: grid; }
@@ -484,7 +481,7 @@
             .chart { padding-left: 0; }
             .chart-grid { left: 0; }
             .chart-grid b { display: none; }
-            .chart-axis { font-size: 0.62rem; }
+            .chart-axis { font-size: var(--fs-2xs); }
             .payments { max-height: none; }
             .welcome { padding-block: 2rem; }
         }
@@ -748,8 +745,8 @@
                 <th:block th:if="${total > 0}">
                     <div class="payments-tools">
                         <input type="search" class="payments-search" id="payment-search" placeholder="Search a merchant or category" aria-label="Search the payments" autocomplete="off">
-                        <button type="button" class="payments-day hidden" id="payment-day" aria-label="Show every day again"></button>
-                        <button type="button" class="payments-day hidden" id="payment-only" aria-label="Show every payment again"></button>
+                        <button type="button" class="payments-day filter-chip removable hidden" id="payment-day" aria-label="Show every day again"></button>
+                        <button type="button" class="payments-day filter-chip removable hidden" id="payment-only" aria-label="Show every payment again"></button>
                     </div>
                     <p class="payments-hint">Changing a category changes it for every payment to that merchant. "New category…" in the menu makes your own.</p>
 

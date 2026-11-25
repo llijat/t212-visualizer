@@ -22,29 +22,29 @@
             padding: 1.75rem 1.25rem 2rem 2rem;
             border-right: 1px solid var(--border);
         }
-        .sources h1 { margin: 0 0 1.25rem; font: 500 1.6rem var(--figures); letter-spacing: 0.01em; }
+        .sources h1 { margin: 0 0 1.25rem; font: 500 var(--fs-xl) var(--figures); letter-spacing: 0.01em; }
         .source-group { margin: 0 0 1.5rem; padding: 0; list-style: none; }
-        .source-group-name { margin: 0 0 0.4rem; padding-left: 0.6rem; color: var(--faint); font-size: 0.8rem; }
+        .source-group-name { margin: 0 0 0.4rem; padding-left: 0.6rem; color: var(--faint); font-size: var(--fs-xs); }
         .source {
             width: 100%;
             display: flex;
             align-items: center;
             gap: 0.65rem;
             padding: 0.45rem 0.6rem;
-            border-radius: 9px;
+            border-radius: var(--radius-md);
             background: none;
             color: var(--muted);
-            font-size: 0.92rem;
+            font-size: var(--fs-md);
             text-align: left;
         }
         .source:hover { background: var(--raised); color: var(--text); }
         .source[aria-pressed="true"] { background: var(--raised); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
         .source .logo { font-size: 1.35rem; }
-        .source-symbol { flex: 1; min-width: 0; font: 500 0.92rem var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .source-count { color: var(--faint); font: 0.82rem var(--figures); font-variant-numeric: tabular-nums; }
+        .source-symbol { flex: 1; min-width: 0; font: 500 var(--fs-md) var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .source-count { color: var(--faint); font: var(--fs-xs) var(--figures); font-variant-numeric: tabular-nums; }
         .source[aria-pressed="true"] .source-count { color: var(--accent); }
         .source-icon { width: 1.35rem; display: grid; place-items: center; color: var(--muted); }
-        .sources-note { margin: 0; padding-left: 0.6rem; color: var(--faint); font-size: 0.78rem; line-height: 1.5; max-width: 26ch; }
+        .sources-note { margin: 0; padding-left: 0.6rem; color: var(--faint); font-size: var(--fs-xs); line-height: 1.5; max-width: 26ch; }
 
         /* ===== Right: the stories, a day at a time ===== */
         .stories { min-height: 0; overflow-y: auto; padding: 1.75rem 2rem 3rem; }
@@ -81,14 +81,14 @@
             height: 2.5rem;
             padding: 0 0.9rem 0 2.3rem;
             border: 1px solid var(--border);
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             background: var(--panel) no-repeat 0.8rem 50% / 1rem;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
-            font-size: 0.92rem;
+            font-size: var(--fs-md);
         }
         .stories-search::placeholder { color: var(--faint); }
         .stories-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-        .stories-count { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+        .stories-count { color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }
 
         .day { margin-top: 0.5rem; }
         .day-head {
@@ -103,8 +103,8 @@
         }
         /* What scrolls under the day's head fades out instead of being cut in half */
         .day-head::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 0.75rem; background: linear-gradient(var(--bg), transparent); pointer-events: none; }
-        .day-head h2 { margin: 0; font: 500 1.15rem var(--figures); letter-spacing: 0.01em; }
-        .day-head span { color: var(--faint); font-size: 0.82rem; }
+        .day-head h2 { margin: 0; font: 500 var(--fs-lg) var(--figures); letter-spacing: 0.01em; }
+        .day-head span { color: var(--faint); font-size: var(--fs-xs); }
         .day-list { list-style: none; margin: 0; padding: 0; }
 
         /* One story: the time, then the headline, two lines of summary and where it comes from */
@@ -114,13 +114,13 @@
             gap: 0.9rem;
             padding: 0.9rem 0.75rem;
             margin: 0 -0.75rem;
-            border-radius: 12px;
+            border-radius: var(--radius-md);
         }
         .story:hover { background: var(--panel); }
-        .story-time { padding-top: 0.15rem; color: var(--faint); font: 0.85rem var(--figures); font-variant-numeric: tabular-nums; }
+        .story-time { padding-top: 0.15rem; color: var(--faint); font: var(--fs-sm) var(--figures); font-variant-numeric: tabular-nums; }
         .story-headline {
             color: var(--text);
-            font-size: 1.02rem;
+            font-size: var(--fs-md);
             font-weight: 500;
             line-height: 1.4;
             text-decoration: none;
@@ -130,7 +130,7 @@
         .story-summary {
             margin: 0.3rem 0 0;
             color: var(--muted);
-            font-size: 0.9rem;
+            font-size: var(--fs-sm);
             line-height: 1.5;
             display: -webkit-box;
             -webkit-box-orient: vertical;
@@ -138,19 +138,19 @@
             line-clamp: 2;
             overflow: hidden;
         }
-        .story-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.8rem; margin-top: 0.5rem; color: var(--faint); font-size: 0.8rem; }
+        .story-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.8rem; margin-top: 0.5rem; color: var(--faint); font-size: var(--fs-xs); }
         .story-symbol {
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
             padding: 0.15rem 0.55rem 0.15rem 0.2rem;
-            border-radius: 999px;
+            border-radius: var(--radius-pill);
             background: var(--raised);
             color: var(--text);
-            font: 500 0.8rem var(--figures);
+            font: 500 var(--fs-xs) var(--figures);
         }
         .story-symbol:hover { background: var(--accent-bg); color: var(--accent); }
-        .story-symbol .logo { font-size: 1.15rem; }
+        .story-symbol .logo { font-size: var(--fs-lg); }
 
         /* The star: faint until it is pressed, then filled with the colour of what is selected */
         .star-form { margin: 0 0 0 auto; }
@@ -160,7 +160,7 @@
             margin: -0.45rem -0.45rem -0.45rem 0;
             display: grid;
             place-items: center;
-            border-radius: 8px;
+            border-radius: var(--radius-sm);
             background: none;
             color: var(--faint);
         }
@@ -172,8 +172,8 @@
         /* ===== Moving today: the holdings that move most, before their news ===== */
         .moves { margin: 0; }
         .moves-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.6rem; }
-        .moves-head h2 { margin: 0; font: 500 1.15rem var(--figures); letter-spacing: 0.01em; }
-        .moves-head span { color: var(--faint); font-size: 0.82rem; }
+        .moves-head h2 { margin: 0; font: 500 var(--fs-lg) var(--figures); letter-spacing: 0.01em; }
+        .moves-head span { color: var(--faint); font-size: var(--fs-xs); }
         .moves-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; }
         .move {
             width: 100%;
@@ -183,7 +183,7 @@
             column-gap: 0.65rem;
             row-gap: 0.1rem;
             padding: 0.7rem 0.85rem;
-            border-radius: 12px;
+            border-radius: var(--radius-md);
             background: var(--panel);
             color: var(--text);
             text-align: left;
@@ -191,11 +191,11 @@
         .move:hover:not(:disabled) { background: var(--raised); }
         .move:disabled { cursor: default; }
         .move .logo { grid-row: span 2; font-size: 1.6rem; }
-        .move-symbol { font: 500 0.95rem var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .move-change { font: 500 0.95rem var(--figures); font-variant-numeric: tabular-nums; }
+        .move-symbol { font: 500 var(--fs-md) var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .move-change { font: 500 var(--fs-md) var(--figures); font-variant-numeric: tabular-nums; }
         .move-change.up { color: var(--green); }
         .move-change.down { color: var(--red); }
-        .move-weight { grid-column: 2 / 4; color: var(--faint); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+        .move-weight { grid-column: 2 / 4; color: var(--faint); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 
         /* Gold and silver: the same cards, with a coin of the metal's colour instead of a logo */
         .metal-logo { background: #c9a227; color: #1a1406; }
@@ -211,21 +211,21 @@
             align-items: center;
             gap: 0.65rem;
             padding: 0.5rem 0.75rem;
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             background: none;
             color: var(--text);
             text-align: left;
         }
         .coming-item:hover:not(:disabled) { background: var(--panel); }
         .coming-item:disabled { cursor: default; }
-        .coming-date { color: var(--muted); font: 0.88rem var(--figures); font-variant-numeric: tabular-nums; }
+        .coming-date { color: var(--muted); font: var(--fs-sm) var(--figures); font-variant-numeric: tabular-nums; }
         .coming-date.is-soon { color: var(--accent); }
         .coming-item .logo { font-size: 1.35rem; }
-        .coming-symbol { font: 500 0.95rem var(--figures); letter-spacing: 0.01em; }
-        .coming-hour { color: var(--faint); font-size: 0.82rem; }
-        .coming-group { margin: 0.6rem 0 0.25rem; color: var(--muted); font: 500 0.85rem var(--text-font); }
+        .coming-symbol { font: 500 var(--fs-md) var(--figures); letter-spacing: 0.01em; }
+        .coming-hour { color: var(--faint); font-size: var(--fs-xs); }
+        .coming-group { margin: 0.6rem 0 0.25rem; color: var(--muted); font: 500 var(--fs-sm) var(--text-font); }
         .coming-dividend { text-decoration: none; }
-        .coming-amount { color: var(--dividend); font: 500 0.82rem var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .coming-amount { color: var(--dividend); font: 500 var(--fs-xs) var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
         .empty { margin: 2rem 0; color: var(--muted); line-height: 1.6; }
 
