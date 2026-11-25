@@ -1,7 +1,14 @@
 package com.llijat.t212visualizer.service;
 
+import java.time.ZoneId;
+
 import com.llijat.t212visualizer.model.CardExpense;
+import com.llijat.t212visualizer.model.CardCashback;
+import com.llijat.t212visualizer.model.MerchantCategory;
+import com.llijat.t212visualizer.repository.CardCashbackRepository;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
+import com.llijat.t212visualizer.repository.CustomCategoryRepository;
+import com.llijat.t212visualizer.repository.MerchantCategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,16 +36,27 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class DemoCardExpenseSeederTest {
 
+    private static final ZoneId MADRID = ZoneId.of("Europe/Madrid");
+
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 15);
 
     @Mock
     private CardExpenseRepository repository;
 
+    @Mock
+    private CardCashbackRepository cashbackRepository;
+
+    @Mock
+    private CustomCategoryRepository customCategoryRepository;
+
+    @Mock
+    private MerchantCategoryRepository merchantCategoryRepository;
+
     private DemoCardExpenseSeeder seeder;
 
     @BeforeEach
     void setUp() {
-        seeder = new DemoCardExpenseSeeder(repository);
+        seeder = new DemoCardExpenseSeeder(repository, cashbackRepository, customCategoryRepository, merchantCategoryRepository);
     }
 
     @Test
@@ -96,5 +114,40 @@ class DemoCardExpenseSeederTest {
 
         // Assert
         verify(repository, never()).saveAll(any());
+    }
+
+    @Test
+    void theDemo_hasSubscriptionsToShow_oneOfThemWithAPriceRise() {
+        // Whatever day the demo starts, its fixed-price payments must pass the detector's rules
+        for (LocalDate today = LocalDate.of(2026, 1, 1); today.isBefore(LocalDate.of(2027, 1, 1)); today = today.plusDays(1)) {
+            List<com.llijat.t212visualizer.dto.Subscription> found = SubscriptionDetector.detect(seeder.buildExpenses(today), today, MADRID);
+
+            assertEquals(4, found.size(), "on " + today + " found " + found);
+            assertEquals(1, found.stream().filter(com.llijat.t212visualizer.dto.Subscription::priceChanged).count(), "on " + today);
+        }
+    }
+
+    @Test
+    void theDemoCashback_isASmallPositiveShare_paidTheNightAfter_andNeverInTheFuture() {
+        List<CardExpense> expenses = seeder.buildExpenses(TODAY);
+
+        List<CardCashback> cashback = seeder.buildCashback(expenses, TODAY);
+
+        assertFalse(cashback.isEmpty());
+        for (CardCashback c : cashback) {
+            assertEquals(1, c.getAmount().signum());
+            assertEquals(1, c.getDateTime().atZone(ZoneOffset.UTC).getHour());
+            assertFalse(c.getDateTime().isAfter(Instant.parse("2026-11-15T23:59:59Z")));
+        }
+        assertEquals(cashback.size(), cashback.stream().map(CardCashback::getReference).distinct().count());
+    }
+
+    @Test
+    void theMerchantsMovedToYourCategories_arePaymentsOfTheDemo() {
+        List<String> merchants = seeder.buildExpenses(TODAY).stream().map(CardExpense::getMerchantName).distinct().toList();
+
+        for (MerchantCategory moved : seeder.buildMerchantsMoved()) {
+            assertTrue(merchants.contains(moved.getMerchantName()), moved.getMerchantName() + " has no payments in the demo");
+        }
     }
 }

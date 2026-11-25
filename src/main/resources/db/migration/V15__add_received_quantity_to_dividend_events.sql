@@ -1,0 +1,1 @@
+alter table dividend_events add column received_quantity numeric(19, 6);

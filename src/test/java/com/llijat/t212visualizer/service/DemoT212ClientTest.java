@@ -1,13 +1,17 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
+import com.llijat.t212visualizer.dto.T212DividendDto;
 import com.llijat.t212visualizer.dto.T212TransactionDto;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DemoT212ClientTest {
 
@@ -53,5 +57,41 @@ class DemoT212ClientTest {
     @Test
     void transactions_comeInOnePage() {
         assertNull(client.fetchTransactions("any").nextPagePath());
+    }
+    // ===== Dividends received =====
+
+    @Test
+    void dividends_fallOnTheDaysTheDemoAnnouncementsGive_threeQuartersBack() {
+        List<T212DividendDto> globex = client.fetchDividends("any").items().stream()
+                .filter(payment -> payment.ticker().equals("GLBX_US_EQ")).toList();
+        LocalDate next = DemoAlphaVantageClient.nextPayment("GLBX");
+
+        assertEquals(List.of(next.minusMonths(3), next.minusMonths(6), next.minusMonths(9)),
+                globex.stream().map(T212DividendDto::paidDay).toList());
+    }
+
+    @Test
+    void dividends_areInEuros_afterTheUsWithholding() {
+        // Globex: 0.11 $ a share x 4.2 shares x 0.85 / 1.08 = 0.36 €
+        T212DividendDto globex = client.fetchDividends("any").items().stream()
+                .filter(payment -> payment.ticker().equals("GLBX_US_EQ")).findFirst().orElseThrow();
+
+        assertEquals(new BigDecimal("0.11"), globex.grossAmountPerShare());
+        assertEquals(new BigDecimal("0.36"), globex.amountInEuro());
+        assertEquals(new BigDecimal("4.2"), globex.quantity());
+    }
+
+    @Test
+    void dividends_leaveOutTheCompaniesThatNeverPay_andTheEuropeanOne() {
+        assertTrue(client.fetchDividends("any").items().stream()
+                .noneMatch(payment -> payment.ticker().equals("HOOL_US_EQ") || payment.ticker().equals("WAYN_EU_EQ")));
+    }
+
+    @Test
+    void dividends_comeNewestFirst_inOnePage() {
+        List<LocalDate> days = client.fetchDividends("any").items().stream().map(T212DividendDto::paidDay).toList();
+
+        assertEquals(days.stream().sorted(java.util.Comparator.reverseOrder()).toList(), days);
+        assertNull(client.fetchDividends("any").nextPagePath());
     }
 }

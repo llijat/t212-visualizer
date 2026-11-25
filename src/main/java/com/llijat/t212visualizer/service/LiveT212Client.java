@@ -1,6 +1,7 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
+import com.llijat.t212visualizer.dto.T212DividendPageDto;
 import com.llijat.t212visualizer.dto.T212PositionDto;
 import com.llijat.t212visualizer.dto.T212TransactionPageDto;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -45,5 +46,13 @@ public class LiveT212Client implements T212Client {
                 .uri(path)
                 .retrieve()
                 .body(T212TransactionPageDto.class);
+    }
+
+    @Override
+    public T212DividendPageDto fetchDividends(String path) {
+        return t212RestClient.get()
+                .uri(path)
+                .retrieve()
+                .body(T212DividendPageDto.class);
     }
 }

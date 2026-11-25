@@ -1,7 +1,13 @@
 package com.llijat.t212visualizer.service;
 
+import com.llijat.t212visualizer.model.CardCashback;
 import com.llijat.t212visualizer.model.CardExpense;
+import com.llijat.t212visualizer.model.CustomCategory;
+import com.llijat.t212visualizer.model.MerchantCategory;
+import com.llijat.t212visualizer.repository.CardCashbackRepository;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
+import com.llijat.t212visualizer.repository.CustomCategoryRepository;
+import com.llijat.t212visualizer.repository.MerchantCategoryRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -44,17 +50,70 @@ public class DemoCardExpenseSeeder implements ApplicationRunner {
             new RecurringPayment("Dunder Car Rental", "AUTOMOBILE_RENTAL", "65.00", 21, 6),
             new RecurringPayment("City Hall", "GOVERNMENT_SERVICES", "15.00", 5, 12));
 
-    private final CardExpenseRepository cardExpenseRepository;
+    // Same price every month, so the expenses page can detect them as subscriptions.
+    // The last one costs more in the current month, to show a price rise.
+    private static final List<DemoSubscription> SUBSCRIPTIONS = List.of(
+            new DemoSubscription("Hooli Music", "ENTERTAINMENT", "10.99", 3, "10.99"),
+            new DemoSubscription("Pied Piper Cloud", "SERVICE_PROVIDERS", "2.99", 8, "2.99"),
+            new DemoSubscription("Globo Gym", "PERSONAL_SERVICES", "29.90", 26, "29.90"),
+            new DemoSubscription("Wonka Streaming", "ENTERTAINMENT", "12.99", 1, "13.99"));
 
-    public DemoCardExpenseSeeder(CardExpenseRepository cardExpenseRepository) {
+    // Like the real card: a small share of each payment comes back the following night
+    private static final BigDecimal CASHBACK_RATE = new BigDecimal("0.015");
+
+    // Two categories of your own, each with a merchant moved into it, so the demo shows them too
+    private static final List<String> CUSTOM_CATEGORIES = List.of("Groceries", "Gym & Padel");
+    private static final List<List<String>> MERCHANTS_MOVED = List.of(
+            List.of("Acme Market", "Groceries"),
+            List.of("Globo Gym", "Gym & Padel"));
+
+    private final CardExpenseRepository cardExpenseRepository;
+    private final CardCashbackRepository cardCashbackRepository;
+    private final CustomCategoryRepository customCategoryRepository;
+    private final MerchantCategoryRepository merchantCategoryRepository;
+
+    public DemoCardExpenseSeeder(CardExpenseRepository cardExpenseRepository, CardCashbackRepository cardCashbackRepository,
+                                 CustomCategoryRepository customCategoryRepository, MerchantCategoryRepository merchantCategoryRepository) {
         this.cardExpenseRepository = cardExpenseRepository;
+        this.cardCashbackRepository = cardCashbackRepository;
+        this.customCategoryRepository = customCategoryRepository;
+        this.merchantCategoryRepository = merchantCategoryRepository;
     }
 
     @Override
     public void run(ApplicationArguments args) {
         if (cardExpenseRepository.count() == 0) {
-            cardExpenseRepository.saveAll(buildExpenses(LocalDate.now(ZoneOffset.UTC)));
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            List<CardExpense> expenses = buildExpenses(today);
+            cardExpenseRepository.saveAll(expenses);
+            cardCashbackRepository.saveAll(buildCashback(expenses, today));
+            customCategoryRepository.saveAll(CUSTOM_CATEGORIES.stream().map(CustomCategory::new).toList());
+            merchantCategoryRepository.saveAll(buildMerchantsMoved());
         }
+    }
+
+    List<MerchantCategory> buildMerchantsMoved() {
+        List<MerchantCategory> moved = new ArrayList<>();
+        for (List<String> merchantAndCategory : MERCHANTS_MOVED) {
+            MerchantCategory correction = new MerchantCategory(merchantAndCategory.get(0));
+            correction.changeCategory(merchantAndCategory.get(1));
+            moved.add(correction);
+        }
+        return moved;
+    }
+
+    /** 1.5 % of every payment, paid at 01:10 UTC the next day; nothing that would arrive after today. */
+    List<CardCashback> buildCashback(List<CardExpense> expenses, LocalDate today) {
+        List<CardCashback> cashback = new ArrayList<>();
+        for (CardExpense expense : expenses) {
+            LocalDate paidOn = expense.getDateTime().atZone(ZoneOffset.UTC).toLocalDate().plusDays(1);
+            BigDecimal amount = expense.getAmount().negate().multiply(CASHBACK_RATE).setScale(2, RoundingMode.HALF_UP);
+            if (!paidOn.isAfter(today) && amount.signum() > 0) {
+                cashback.add(new CardCashback("demo-cashback-" + (cashback.size() + 1),
+                        paidOn.atTime(1, 10).toInstant(ZoneOffset.UTC), amount, "EUR"));
+            }
+        }
+        return cashback;
     }
 
     /** The payments of the last 12 months, up to today. The dates depend on today, so the demo never looks old. */
@@ -70,6 +129,15 @@ public class DemoCardExpenseSeeder implements ApplicationRunner {
                     expenses.add(toExpense(payment, date, MONTH_FACTORS.get(i), expenses.size() + 1));
                 }
             }
+            for (DemoSubscription subscription : SUBSCRIPTIONS) {
+                LocalDate date = month.atDay(subscription.dayOfMonth());
+                if (!date.isAfter(today)) {
+                    String amount = i == MONTHS - 1 ? subscription.currentAmount() : subscription.amount();
+                    expenses.add(new CardExpense("demo-expense-" + (expenses.size() + 1), "Card debit",
+                            date.atTime(12, 0).toInstant(ZoneOffset.UTC), new BigDecimal(amount).negate(), "EUR",
+                            subscription.merchant(), subscription.category()));
+                }
+            }
         }
         return expenses;
     }
@@ -81,5 +149,8 @@ public class DemoCardExpenseSeeder implements ApplicationRunner {
     }
 
     private record RecurringPayment(String merchant, String category, String amount, int dayOfMonth, int everyMonths) {
+    }
+
+    private record DemoSubscription(String merchant, String category, String amount, int dayOfMonth, String currentAmount) {
     }
 }

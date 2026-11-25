@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+
+<!-- One day of stories: its name ("Today", "Yesterday" or the date, with the year if it is not this one) and how many -->
+<section class="day" th:fragment="day(day)">
+    <div class="day-head">
+        <h2 th:text="${day.date().equals(today)} ? 'Today'
+                   : (${day.date().equals(today.minusDays(1))} ? 'Yesterday'
+                   : ${#strings.capitalize(#strings.toLowerCase(day.date().getDayOfWeek().name())) + ' ' + day.date().getDayOfMonth() + ' '
+                       + #strings.capitalize(#strings.toLowerCase(day.date().getMonth().name()))
+                       + (day.date().getYear() == today.getYear() ? '' : ' ' + day.date().getYear())})">Today</h2>
+        <span class="day-total" th:text="${day.news().size()} + (${day.news().size() == 1} ? ' story' : ' stories')">12 stories</span>
+    </div>
+    <ol class="day-list">
+        <!-- th:each goes on a block around the include: on the same tag, the include would run first -->
+        <th:block th:each="n : ${day.news()}">
+            <li th:replace="~{fragments/news-story :: story(${n})}"></li>
+        </th:block>
+    </ol>
+</section>
+
+<!-- One story: the time, the headline, two lines of summary, its holding, where it comes from and the star -->
+<li class="story" th:fragment="story(n)"
+    th:with="isStarred=${starredIds.contains(n.id())}"
+    th:data-symbol="${n.related()}"
+    th:data-search="${#strings.toLowerCase(n.headline() + ' ' + n.summary() + ' ' + n.source() + ' ' + n.related())}">
+    <time class="story-time" th:datetime="${n.publishedAt(zone)}" th:text="${#temporals.format(n.publishedAt(zone), 'HH:mm')}">14:05</time>
+    <!-- Its place on the day's line: the holding's logo, or a dot for a story about several or none -->
+    <span class="story-mark" aria-hidden="true"
+          th:with="single=${!#strings.isEmpty(n.related()) and !#strings.contains(n.related(), ',')},
+                   ticker=${single ? tickers.get(n.related()) : null}">
+        <span class="logo" th:if="${single}">
+            <span class="logo-initial" th:text="${#strings.substring(n.related(), 0, 1)}">A</span>
+            <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
+        </span>
+        <span class="story-dot" th:unless="${single}"></span>
+    </span>
+    <div>
+        <!-- Opens the publisher's page in a new tab; it gets no hint of where the click came from -->
+        <a class="story-headline" th:href="${n.url()}" th:text="${n.headline()}" target="_blank" rel="noopener noreferrer">Headline</a>
+        <p class="story-summary" th:if="${!#strings.isEmpty(n.summary()) and n.summary() != n.headline()}" th:text="${n.summary()}">Summary</p>
+        <div class="story-meta">
+            <button type="button" class="story-symbol" th:if="${!#strings.isEmpty(n.related()) and !#strings.contains(n.related(), ',')}"
+                    th:data-symbol="${n.related()}" th:aria-label="'Only ' + ${n.related()} + ' news'">
+                <th:block th:text="${n.related()}">AAPL</th:block>
+            </button>
+            <span th:unless="${#strings.isEmpty(n.source())}" th:text="${n.source()}">Reuters</span>
+            <!-- A real form, so the star also works without JavaScript; it sends the state wanted, never "flip it" -->
+            <form class="star-form" method="post" th:action="@{/news/{id}/starred(id=${n.id()})}" th:data-id="${n.id()}">
+                <input type="hidden" name="starred" th:value="${!isStarred}">
+                <button type="submit" class="star" th:aria-pressed="${isStarred}" th:aria-label="'Star: ' + ${n.headline()}" title="Starred stories are kept for good">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"/></svg>
+                </button>
+            </form>
+        </div>
+    </div>
+</li>
+
+</body>
+</html>

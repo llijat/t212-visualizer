@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+<!-- A day in a "Coming up" list: "Today", "Tomorrow" or "Thu 26 Nov"; today and tomorrow stand out.
+     Needs "today" in the model. -->
+<time th:fragment="coming-date(date)" class="coming-date"
+      th:classappend="${!date.isAfter(today.plusDays(1))} ? 'is-soon'" th:datetime="${date}"
+      th:text="${date.equals(today)} ? 'Today'
+             : (${date.equals(today.plusDays(1))} ? 'Tomorrow'
+             : ${#strings.capitalize(#strings.toLowerCase(#strings.substring(date.getDayOfWeek().name(), 0, 3))) + ' ' + date.getDayOfMonth() + ' '
+                 + #strings.capitalize(#strings.toLowerCase(#strings.substring(date.getMonth().name(), 0, 3)))})">Thu 26 Nov</time>
+</body>
+</html>

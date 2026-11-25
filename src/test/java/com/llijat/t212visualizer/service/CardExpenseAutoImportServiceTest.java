@@ -131,7 +131,7 @@ class CardExpenseAutoImportServiceTest {
                 .thenReturn(List.of(report(REPORT_ID, "Running", null)))
                 .thenReturn(List.of(report(REPORT_ID, "Finished", LINK)));
         when(exportClient.downloadExport(LINK)).thenReturn("the csv");
-        when(importService.importCsv(any())).thenReturn(new CardExpenseImportResult(1, 0, Map.of()));
+        when(importService.importCsv(any())).thenReturn(new CardExpenseImportResult(1, 0, 0, Map.of()));
 
         // Act
         autoImportService.importLatest();
@@ -150,7 +150,7 @@ class CardExpenseAutoImportServiceTest {
                 report(1L, "Finished", "https://downloads.example.test/old.csv"),
                 report(REPORT_ID, "Finished", LINK)));
         when(exportClient.downloadExport(LINK)).thenReturn("the csv");
-        when(importService.importCsv(any())).thenReturn(new CardExpenseImportResult(0, 0, Map.of()));
+        when(importService.importCsv(any())).thenReturn(new CardExpenseImportResult(0, 0, 0, Map.of()));
 
         // Act
         autoImportService.importLatest();

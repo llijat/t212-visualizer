@@ -30,9 +30,15 @@ docker compose -f docker-compose.demo.yml down
 
 - **Positions:** quantity, average price, current value and P/L %, refreshed every 5 minutes or on demand.
 - **Total account return:** account value minus net deposits, so it includes closed positions, dividends, interest and fees, not only open positions.
-- **News:** market news and news about the US companies in your portfolio, with filters by ticker and text search.
+- **Today at a glance:** next to your positions, the holdings that move most today, gold and silver, the next results and the latest headlines about what you hold.
+- **News:** a page with the news of the last week about the US companies in your portfolio and the market, grouped by day and by holding, with text search. Star a story to keep it for good; the others are deleted after 30 days.
+- **Metals:** the daily change of gold and silver, and the market news about them.
 - **Incremental sync:** account movements are stored in PostgreSQL, so after the first load only new ones are requested.
-- **Expenses:** your card spending by month, category and merchant. New payments are imported automatically once a day through the Trading 212 export API, and you can also upload an exported CSV by hand.
+- **Expenses:** your card spending by month, category and merchant, with a heatmap of the days, monthly budgets, detected subscriptions and card cashback. New payments are imported automatically once a day through the Trading 212 export API, and you can also upload an exported CSV by hand.
+- **Calendar:** a month view with the quarterly results of the US companies you hold, before or after the market, and the dividends on their payment day. A side panel shows what comes up in the next two weeks, and the details of any event: revenue and EPS against the estimates, or the dividend you received.
+- **Dividends:** the announced ones, with their ex-dividend date, and the real amount you received in euros. Until a dividend is paid, the app estimates it from your shares and your last payment of that stock, so the estimate already includes tax and the exchange rate.
+- **Company logos:** shown next to each US holding and in the calendar, downloaded once and served by the app itself. Other holdings show their initial.
+- **Current tickers:** Trading 212 keeps some old tickers (FB for Meta, UTX for RTX). The app looks up the current one by ISIN and uses it everywhere, including the requests for news and earnings.
 
 ## Tech stack
 
@@ -66,7 +72,7 @@ The services depend on interfaces, and a Spring profile chooses the implementati
 
 ## Running it with your own account
 
-You need a Trading 212 API key and secret, and a [Finnhub](https://finnhub.io) API key.
+You need a Trading 212 API key and secret, a [Finnhub](https://finnhub.io) API key and an [Alpha Vantage](https://www.alphavantage.co) API key. All three services have a free plan.
 
 > **Security:** use a Trading 212 key **without order permissions**. The app has **no login**, so anyone who can reach it sees your portfolio. The compose file only publishes it on `127.0.0.1`. Do not expose it to the internet.
 
@@ -86,6 +92,21 @@ You need a Trading 212 API key and secret, and a [Finnhub](https://finnhub.io) A
 
 To run it from an IDE instead, copy `src/main/resources/application-local.example.yml` to `application-local.yml` in the same folder, fill it in and start a local PostgreSQL with a `t212_viewdb` database.
 
+## Third-party services and your data
+
+Your browser only talks to your own installation of the app. The app's server is what contacts these services, and this is what each one receives:
+
+| Service | What it receives | What for |
+|---|---|---|
+| [Trading 212](https://www.trading212.com) | Your API key and secret | Positions, account summary, account movements and card payment reports |
+| [Finnhub](https://finnhub.io) | Your API key and the tickers of your US holdings | Market and company news, earnings, company names and logos |
+| [OpenFIGI](https://www.openfigi.com) | The ISINs of all your holdings | The current ticker and exchange of each one, because Trading 212 keeps some old tickers |
+| [Alpha Vantage](https://www.alphavantage.co) | Your API key and the tickers of your US holdings, up to 20 a day | Announced dividends: the payment date, the ex-dividend date and the amount per share |
+
+None of them receives quantities, prices or amounts. A list of tickers or ISINs does reveal **which** companies you hold, so do not use the app if that is a problem for you.
+
+Report downloads go to the storage link that Trading 212 provides, without your credentials. Company logos are downloaded by the server and stored in the database, so viewing a page never sends a request to Finnhub or any other logo service.
+
 ## Tests
 
 ```bash
@@ -101,11 +122,15 @@ The tests use JUnit 5 and Mockito, and need neither a database nor network acces
 - **Expenses:** payments appear once they settle, and the automatic import only runs while the app is on. A reverted payment never appears in the export, so it does not count. How the refund of a settled payment appears has not been checked yet: the import reports the rows it skips, by type.
 - **Percentage:** the return percentage is a simple division over net deposits, not time-weighted like the one in the Trading 212 app.
 - **News:** company news only covers US stocks, because of the Finnhub free plan.
+- **Moving today:** the daily change also comes from the Finnhub free plan, so it only covers US stocks and is refreshed every 15 minutes. It does not include pre-market or after-hours trading: outside the New York session (15:30 to 22:00 in Spain) it shows the last session, and the title says which day. The change is in the stock's own currency, so it can differ from a change in euros, which also includes the exchange rate.
+- **Metals:** gold and silver come through the GLD and SLV funds, also from the Finnhub free plan, with the same hours as Moving today. Only their daily change is shown, because a fund share holds a fraction of an ounce, so its price is not the price of the metal. Their news are the market stories whose headline mentions gold, silver, bullion or precious metals.
+- **Dividends:** announced dividends only cover US stocks, from the Alpha Vantage free plan (25 requests a day), so each stock is checked about every day and a half. Dividends of other holdings appear once they are paid. The estimate assumes the same tax and a similar exchange rate as your last payment of that stock.
 - **Single user:** one account per installation, with no login.
 
 ## Roadmap
 
-- Economic calendar with dividends and earnings
+- Account value history chart
+- Live chart of each stock
 - Sector view
 - Multi-user support with login
 

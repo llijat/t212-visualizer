@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calendar · T212 Visualizer</title>
+    <!-- @{...} adds a fingerprint of the file to its name, so a changed stylesheet is never taken from the cache -->
+    <link rel="stylesheet" th:href="@{/css/common.css}" href="/css/common.css">
+    <style>
+        /* ===== Colours of each type of event ===== */
+        :root {
+            --earnings: var(--accent);
+            --earnings-bg: color-mix(in srgb, var(--accent) 14%, var(--panel));
+            --dividend-bg: color-mix(in srgb, var(--dividend) 12%, var(--panel));
+            --subscription-bg: color-mix(in srgb, var(--subscription) 12%, var(--panel));
+        }
+
+        /* ===== Page: the calendar on the left, the side panel on the right ===== */
+        .calendar-page {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            gap: 1.25rem;
+            padding: 1.5rem 2rem;
+        }
+        .calendar {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        /* ===== Header: month, arrows and legend ===== */
+        .calendar-head {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem 1.25rem;
+        }
+        .calendar-head h1 { margin: 0; font: 500 var(--fs-xl) var(--figures); letter-spacing: 0.01em; min-width: 10.5rem; }
+        .calendar-head h1 span { color: var(--muted); font-weight: 400; }
+        .month-nav { display: flex; align-items: center; gap: 0.4rem; }
+        .month-nav a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2rem;
+            height: 2rem;
+            padding: 0 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-pill);
+            color: var(--muted);
+            text-decoration: none;
+            font-size: var(--fs-sm);
+        }
+        .month-nav a.step { padding: 0; }
+        .month-nav a:hover { color: var(--text); border-color: var(--faint); }
+
+        .legend { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-left: auto; }
+        .legend-hint { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted); font-size: var(--fs-xs); padding: 0 0.3rem; }
+
+        /* ===== The grid: 7 columns, the rows share the height ===== */
+        .weekdays, .grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+        }
+        .weekdays div {
+            padding: 0 0.5rem;
+            color: var(--faint);
+            font-size: var(--fs-xs);
+        }
+        .grid {
+            flex: 1;
+            min-height: 0;
+            grid-auto-rows: minmax(0, 1fr);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--border);
+            gap: 1px;                    /* the 1px gaps show the background: thin lines between days */
+        }
+        .day {
+            background: var(--panel);
+            padding: 0.3rem 0.4rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.18rem;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .day.outside { background: color-mix(in srgb, var(--panel) 55%, var(--bg)); }
+        .day.outside .day-number { opacity: 0.4; }
+        .day.outside .chip { opacity: 0.55; }
+        .day-head { display: flex; align-items: center; gap: 0.4rem; min-height: 1.3rem; }
+        .day-number {
+            font: 500 var(--fs-xs) var(--figures);
+            color: var(--muted);
+            font-variant-numeric: tabular-nums;
+            line-height: 1.4rem;
+            min-width: 1.3rem;
+            text-align: center;
+        }
+        .day.today .day-number {
+            background: var(--accent);
+            color: var(--bg);
+            border-radius: var(--radius-pill);
+            font-weight: 600;
+        }
+        .day-label { display: none; }    /* only shown in the phone list */
+
+        /* ===== Event chips: colour + text, so they do not depend on colour alone ===== */
+        .chip {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            width: 100%;
+            flex: none;
+            padding: 0.08rem 0.4rem;
+            border-radius: var(--radius-sm);
+            border-left: 3px solid var(--earnings);
+            background: var(--earnings-bg);
+            color: var(--text);
+            font-size: var(--fs-2xs);
+            text-align: left;
+            line-height: 1.3;
+        }
+        .chip:hover { filter: brightness(1.25); }
+        .chip.selected { outline: 1px solid var(--earnings); outline-offset: 1px; }
+        .chip.upcoming {                 /* not published yet: dashed outline */
+            background: transparent;
+            border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+            border-left: 3px solid var(--earnings);
+        }
+        /* Dividends: the same chip in their own colour; dashed while they are only announced */
+        .chip[data-type="dividend"] { border-left-color: var(--dividend); background: var(--dividend-bg); }
+        .chip[data-type="dividend"].upcoming {
+            background: transparent;
+            border: 1px dashed color-mix(in srgb, var(--dividend) 45%, transparent);
+            border-left: 3px solid var(--dividend);
+        }
+        .chip[data-type="dividend"].selected { outline-color: var(--dividend); }
+        /* Subscriptions: the last real payment solid, the expected ones dashed. The merchant's initial instead of a logo */
+        .chip[data-type="subscription"] { border-left-color: var(--subscription); background: var(--subscription-bg); }
+        .chip[data-type="subscription"].upcoming {
+            background: transparent;
+            border: 1px dashed color-mix(in srgb, var(--subscription) 45%, transparent);
+            border-left: 3px solid var(--subscription);
+        }
+        .chip[data-type="subscription"].selected { outline-color: var(--subscription); }
+        .chip[data-type="subscription"] .chip-ticker { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+        .sub-initial {
+            flex: none;
+            display: grid;
+            place-items: center;
+            width: 1.1em;
+            height: 1.1em;
+            border-radius: 50%;
+            background: color-mix(in srgb, var(--subscription) 28%, transparent);
+            color: var(--subscription);
+            font: 600 var(--fs-2xs) var(--figures);
+        }
+        .chip-amount { color: var(--muted); font: 500 var(--fs-2xs) var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .chip-ticker { font: 600 var(--fs-xs) var(--figures); letter-spacing: 0.01em; }
+        .chip .logo { font-size: var(--fs-sm); }
+        /* The word "Earnings" only shows when it fits whole; the colour and the panel still tell the type */
+        .day { container-type: inline-size; }
+        @container (max-width: 175px) { .chip-type { display: none; } }
+        @container (max-width: 129px) { .chip-amount { display: none; } }   /* "≈ 12.28 €" with its ticker needs about 128 px */
+        .side-head .logo { font-size: 2.4rem; }
+        .chip-type { color: var(--muted); font-size: var(--fs-2xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chip-end { margin-left: auto; display: inline-flex; align-items: center; gap: 0.3rem; }
+        .session { width: 0.85rem; height: 0.85rem; color: var(--muted); opacity: 0.75; stroke-width: 1.6; }
+        .result-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; flex: none; }
+        .result-dot.beat { background: var(--green); }
+        .result-dot.miss { background: var(--red); }
+        .chip.extra { display: none; }   /* did not fit in the day: reached through "+N more" */
+        .more {                          /* top right of the day, next to its number */
+            margin-left: auto;
+            background: var(--raised);
+            color: var(--muted);
+            font-size: var(--fs-2xs);
+            line-height: 1.2rem;
+            padding: 0 0.45rem;
+            border-radius: var(--radius-pill);
+            white-space: nowrap;
+        }
+        .more:hover { color: var(--text); background: color-mix(in srgb, var(--raised) 70%, var(--faint)); }
+
+        /* Filters: a hidden type disappears from the grid */
+        .calendar.hide-earnings .chip[data-type="earnings"] { display: none; }
+        .calendar.hide-dividend .chip[data-type="dividend"] { display: none; }
+        .calendar.hide-subscription .chip[data-type="subscription"] { display: none; }
+
+        .empty-month {
+            margin: 0;
+            color: var(--muted);
+            font-size: var(--fs-sm);
+        }
+
+        /* ===== Side panel ===== */
+        .side {
+            width: 340px;
+            flex: none;
+            background: var(--panel);
+            border-radius: var(--radius);
+            padding: 1.25rem 1.35rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .side-head { display: flex; align-items: center; gap: 0.75rem; }
+        .side-head h2 { margin: 0; font: 500 var(--fs-lg) var(--figures); }
+        .side-sub { margin: 0.15rem 0 0; color: var(--muted); font-size: var(--fs-xs); }
+        .close {
+            margin-left: auto;
+            background: none;
+            color: var(--muted);
+            width: 2rem;
+            height: 2rem;
+            border-radius: var(--radius-sm);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .close:hover { color: var(--text); background: var(--raised); }
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: var(--radius-pill);
+            font-size: var(--fs-2xs);
+            background: var(--earnings-bg);
+            color: var(--earnings);
+        }
+        .tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .tag.neutral { background: var(--raised); color: var(--muted); }
+        .tag.beat { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
+        .tag.miss { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); }
+        .tag.dividend { background: var(--dividend-bg); color: var(--dividend); }
+        .tag.subscription { background: var(--subscription-bg); color: var(--subscription); }
+
+        .metric { border-top: 1px solid var(--border); padding-top: 0.9rem; }
+        .metric h3 { margin: 0 0 0.6rem; font: 500 var(--fs-md) var(--figures); color: var(--muted); }
+        .metric-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0.2rem 0; font-size: var(--fs-sm); }
+        .metric-row span:first-child { color: var(--muted); }
+        .metric-row b { font: 500 var(--fs-md) var(--figures); font-variant-numeric: tabular-nums; }
+        .metric-main { font: 400 var(--fs-xl) var(--figures); font-variant-numeric: tabular-nums; }
+        .surprise { font-size: var(--fs-sm); font-weight: 600; margin-left: 0.4rem; }
+        .up { color: var(--green); }
+        .down { color: var(--red); }
+        .note { color: var(--muted); font-size: var(--fs-xs); margin: 0; }
+
+        .day-list { display: flex; flex-direction: column; gap: 0.35rem; }
+        .day-list .chip { font-size: var(--fs-sm); padding: 0.4rem 0.6rem; }
+
+        /* With nothing in the next two weeks there is no panel: the calendar takes the whole width */
+        .side.idle.nothing-coming { display: none; }
+
+        /* ===== Coming up: what the panel shows while no event is open ===== */
+        .side-coming { display: flex; flex-direction: column; gap: 1.1rem; }
+        .coming-group h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.35rem; font: 500 var(--fs-md) var(--figures); color: var(--muted); }
+        .coming-group .swatch { width: 0.55rem; height: 0.55rem; border-radius: var(--radius-xs); background: var(--swatch); }
+        .coming-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.1rem; }
+        .coming-row {
+            display: grid;
+            grid-template-columns: 4.7rem auto minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.45rem 0.55rem;
+            margin: 0 -0.55rem;
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            text-decoration: none;
+            font-size: var(--fs-sm);
+        }
+        .coming-row:hover { background: var(--raised); }
+        .coming-date { color: var(--muted); font: var(--fs-xs) var(--figures); font-variant-numeric: tabular-nums; }
+        .coming-date.is-soon { color: var(--accent); }
+        .coming-row .logo { font-size: var(--fs-lg); }
+        .coming-symbol { font: 600 var(--fs-sm) var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .coming-extra { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted); font: 500 var(--fs-xs) var(--figures); white-space: nowrap; }
+        .coming-row[data-type="dividend"] .coming-extra { color: var(--dividend); }
+
+        /* ===== Narrower screens: the panel goes over the calendar ===== */
+        @media (max-width: 1100px) {
+            .side {
+                position: fixed;
+                top: 4rem;
+                right: 1rem;
+                bottom: 1rem;
+                z-index: 10;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+            }
+            .side.idle { display: none; }
+        }
+
+        /* ===== Phones: a list of the days that have events ===== */
+        @media (max-width: 700px) {
+            .calendar-page { padding: 1rem; }
+            .calendar-head h1 { min-width: 0; font-size: var(--fs-lg); }
+            .legend { margin-left: 0; width: 100%; }
+            .weekdays { display: none; }
+            .grid { display: flex; flex-direction: column; background: none; border: none; gap: 0.5rem; overflow: visible; }
+            .day { border-radius: var(--radius); padding: 0.6rem 0.75rem; gap: 0.35rem; }
+            .day.no-events, .day.outside { display: none; }
+            .day-number { display: none; }
+            .day-label { display: block; font-size: var(--fs-xs); color: var(--muted); }
+            .day.today .day-label { color: var(--accent); font-weight: 600; }
+            .chip { font-size: var(--fs-sm); padding: 0.35rem 0.55rem; }
+            .chip.extra { display: flex; }
+            .more { display: none; }
+            .side { left: 1rem; right: 1rem; top: auto; width: auto; max-height: 75vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="topbar">
+        <th:block th:replace="~{fragments/topbar :: bar('calendar')}"></th:block>
+    </header>
+
+    <!-- Sun: results before the US market opens. Moon: after it closes. -->
+    <svg class="sprite" aria-hidden="true">
+        <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+        <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+        <symbol id="icon-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+        <symbol id="icon-pointer" viewBox="0 0 24 24"><path d="M9 3v10l-3-2-1 1 5 6h7l1-7-6-1V3z"/></symbol>
+    </svg>
+
+    <main class="calendar-page">
+        <section class="calendar" id="calendar" aria-labelledby="month-title"
+                 th:with="month=${calendar.month()},
+                          monthName=${#strings.capitalize(#strings.toLowerCase(calendar.month().getMonth().name()))}">
+
+            <div class="calendar-head">
+                <h1 id="month-title"><th:block th:text="${monthName}">November</th:block> <span th:text="${month.getYear()}">2026</span></h1>
+                <nav class="month-nav" aria-label="Months">
+                    <a class="step" th:href="@{/calendar(month=${month.minusMonths(1)})}" title="Previous month" aria-label="Previous month">
+                        <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+                    </a>
+                    <a th:href="@{/calendar}" title="This month">Today</a>
+                    <a class="step" th:href="@{/calendar(month=${month.plusMonths(1)})}" title="Next month" aria-label="Next month">
+                        <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+                    </a>
+                </nav>
+
+                <div class="legend" aria-label="Show or hide">
+                    <button type="button" class="filter filter-chip with-swatch" data-filter="earnings" aria-pressed="true" style="--swatch: var(--earnings)">
+                        <span class="swatch"></span>Earnings
+                    </button>
+                    <button type="button" class="filter filter-chip with-swatch" data-filter="dividend" aria-pressed="true" style="--swatch: var(--dividend)">
+                        <span class="swatch"></span>Dividends
+                    </button>
+                    <button type="button" class="filter filter-chip with-swatch" data-filter="subscription" aria-pressed="true" style="--swatch: var(--subscription)">
+                        <span class="swatch"></span>Subscriptions
+                    </button>
+                    <span class="legend-hint" title="Before the US market opens"><svg class="icon session" aria-hidden="true"><use href="#icon-sun"/></svg>Pre-market</span>
+                    <span class="legend-hint" title="After the US market closes"><svg class="icon session" aria-hidden="true"><use href="#icon-moon"/></svg>After close</span>
+                </div>
+            </div>
+
+            <p class="empty-month"
+               th:if="${#lists.isEmpty(calendar.days().?[!earnings().isEmpty() or !dividends().isEmpty() or !subscriptions().isEmpty()])}">
+                No earnings, dividends or subscriptions this month.
+            </p>
+
+            <div class="weekdays" aria-hidden="true">
+                <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+            </div>
+
+            <div class="grid">
+                <div class="day" th:each="day : ${calendar.days()}"
+                     th:classappend="${(day.inMonth() ? '' : 'outside ') + (day.today() ? 'today ' : '') + (day.earnings().isEmpty() and day.dividends().isEmpty() and day.subscriptions().isEmpty() ? 'no-events' : '')}"
+                     th:attr="data-date=${day.date()}">
+                    <div class="day-head">
+                        <span class="day-number" th:text="${day.date().getDayOfMonth()}">1</span>
+                        <span class="day-label" th:text="${#strings.capitalize(#strings.toLowerCase(day.date().getDayOfWeek().name())) + ' ' + day.date().getDayOfMonth() + (day.today() ? ', today' : '')}">Monday 1</span>
+                        <!-- The script shows it, with the right number, when the chips do not fit in the day -->
+                        <button type="button" class="more hidden"
+                                th:unless="${day.earnings().isEmpty() and day.dividends().isEmpty() and day.subscriptions().isEmpty()}">more</button>
+                    </div>
+
+                    <button type="button" class="chip" data-type="earnings"
+                            th:each="event : ${day.earnings()}"
+                            th:with="published=${event.epsActual != null},
+                                     symbol=${symbols.getOrDefault(event.ticker, #strings.contains(event.ticker, '_') ? #strings.substringBefore(event.ticker, '_') : event.ticker)}"
+                            th:classappend="${published ? '' : 'upcoming'}"
+                            th:data-symbol="${symbol}"
+                            th:data-ticker="${event.ticker}"
+                            th:data-date="${event.reportDate}"
+                            th:data-hour="${event.reportHour}"
+                            th:data-year="${event.fiscalYear}"
+                            th:data-quarter="${event.fiscalQuarter}"
+                            th:data-eps-estimate="${event.epsEstimate}"
+                            th:data-eps-actual="${event.epsActual}"
+                            th:data-revenue-estimate="${event.revenueEstimate}"
+                            th:data-revenue-actual="${event.revenueActual}"
+                            th:data-eps-yoy="${event.epsYoy}"
+                            th:data-revenue-yoy="${event.revenueYoy}"
+                            th:title="${symbol + ' earnings' + (published ? '' : ' (not published yet)')}">
+                        <span class="logo" aria-hidden="true">
+                            <span class="logo-initial" th:text="${#strings.substring(symbol, 0, 1)}">M</span>
+                            <img th:src="@{/logos/{ticker}(ticker=${event.ticker})}" alt="" loading="lazy" onerror="this.remove()">
+                        </span>
+                        <span class="chip-ticker" th:text="${symbol}">MU</span>
+                        <span class="chip-type">Earnings</span>
+                        <span class="chip-end">
+                            <svg class="icon session" th:if="${event.reportHour == 'bmo'}" role="img" aria-label="Before market open"><use href="#icon-sun"/></svg>
+                            <svg class="icon session" th:if="${event.reportHour == 'amc'}" role="img" aria-label="After market close"><use href="#icon-moon"/></svg>
+                            <span class="result-dot" role="img"
+                                  th:if="${published and event.epsEstimate != null}"
+                                  th:classappend="${event.epsActual.compareTo(event.epsEstimate) >= 0} ? 'beat' : 'miss'"
+                                  th:attr="aria-label=${event.epsActual.compareTo(event.epsEstimate) >= 0} ? 'Beat the EPS estimate' : 'Missed the EPS estimate'"></span>
+                        </span>
+                    </button>
+
+                    <!-- Dividends on their payment day: what arrived, or an estimate (≈) while it is only announced -->
+                    <button type="button" class="chip" data-type="dividend"
+                            th:each="dividend : ${day.dividends()}"
+                            th:with="symbol=${symbols.getOrDefault(dividend.ticker(), #strings.contains(dividend.ticker(), '_') ? #strings.substringBefore(dividend.ticker(), '_') : dividend.ticker())},
+                                     amount=${dividend.isReceived() ? dividend.receivedEur() : dividend.estimatedEur()}"
+                            th:classappend="${dividend.isReceived() ? '' : 'upcoming'}"
+                            th:data-symbol="${symbol}"
+                            th:data-ticker="${dividend.ticker()}"
+                            th:data-date="${dividend.paymentDate()}"
+                            th:data-ex-date="${dividend.exDividendDate()}"
+                            th:data-per-share="${dividend.amountPerShare()}"
+                            th:data-received="${dividend.receivedEur()}"
+                            th:data-estimate="${dividend.estimatedEur()}"
+                            th:title="${symbol + ' dividend' + (dividend.isReceived() ? ', received' : ' (announced)')}">
+                        <span class="logo" aria-hidden="true">
+                            <span class="logo-initial" th:text="${#strings.substring(symbol, 0, 1)}">M</span>
+                            <img th:src="@{/logos/{ticker}(ticker=${dividend.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                        </span>
+                        <span class="chip-ticker" th:text="${symbol}">MU</span>
+                        <span class="chip-type">Dividend</span>
+                        <span class="chip-end" th:if="${amount != null}">
+                            <span class="chip-amount"
+                                  th:text="${(dividend.isReceived() ? '' : '≈ ') + #numbers.formatDecimal(amount, 1, 'COMMA', 2, 'POINT') + ' €'}">0.84 €</span>
+                        </span>
+                    </button>
+
+                    <!-- Subscriptions: the last real payment, and the ones expected on the same day every month (dashed, ≈) -->
+                    <button type="button" class="chip" data-type="subscription"
+                            th:each="s : ${day.subscriptions()}"
+                            th:classappend="${s.expected() ? 'upcoming' : ''}"
+                            th:data-merchant="${s.merchant()}"
+                            th:data-amount="${s.amount()}"
+                            th:data-date="${day.date()}"
+                            th:data-expected="${s.expected()}"
+                            th:title="${s.merchant() + (s.expected() ? ', expected' : ', paid')}">
+                        <span class="sub-initial" aria-hidden="true" th:text="${#strings.toUpperCase(#strings.substring(s.merchant(), 0, 1))}">G</span>
+                        <span class="chip-ticker" th:text="${s.merchant()}">Globo Gym</span>
+                        <span class="chip-end">
+                            <span class="chip-amount"
+                                  th:text="${(s.expected() ? '≈ ' : '') + #numbers.formatDecimal(s.amount(), 1, 'COMMA', 2, 'POINT') + ' €'}">29.90 €</span>
+                        </span>
+                    </button>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Side panel. While no event is open it shows what comes up in the next two weeks, whatever month is on screen;
+             with nothing coming up there is no panel at all. The script fills it with the details of a clicked event. -->
+        <aside class="side idle" id="side" aria-live="polite" aria-label="Details"
+               th:with="nothingComingUp=${comingUp.isEmpty() and comingUpDividends.isEmpty()}"
+               th:classappend="${nothingComingUp} ? 'nothing-coming'">
+            <div class="side-coming" id="side-empty">
+                <div class="side-head" th:unless="${nothingComingUp}">
+                    <div>
+                        <h2>Coming up</h2>
+                        <p class="side-sub">The next two weeks</p>
+                    </div>
+                </div>
+
+                <section class="coming-group" th:if="${!comingUp.isEmpty()}" aria-labelledby="coming-earnings">
+                    <h3 id="coming-earnings"><span class="swatch" style="--swatch: var(--earnings)"></span>Earnings</h3>
+                    <ul class="coming-list">
+                        <li th:each="e : ${comingUp}">
+                            <a class="coming-row" data-type="earnings" th:data-ticker="${e.ticker()}" th:data-date="${e.date()}"
+                               th:href="@{/calendar(month=${#temporals.format(e.date(), 'yyyy-MM')})} + '#type=earnings&ticker=' + ${e.ticker()} + '&date=' + ${e.date()}">
+                                <th:block th:replace="~{fragments/coming-date :: coming-date(${e.date()})}"></th:block>
+                                <span class="logo" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(e.symbol(), 0, 1)}">N</span>
+                                    <img th:src="@{/logos/{ticker}(ticker=${e.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                </span>
+                                <span class="coming-symbol" th:text="${e.symbol()}">NVDA</span>
+                                <span class="coming-extra">
+                                    <svg class="icon session" th:if="${e.hour() == 'bmo'}" aria-hidden="true"><use href="#icon-sun"/></svg>
+                                    <svg class="icon session" th:if="${e.hour() == 'amc'}" aria-hidden="true"><use href="#icon-moon"/></svg>
+                                    <span th:text="${e.hourLabel()}">after the close</span>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="coming-group" th:if="${!comingUpDividends.isEmpty()}" aria-labelledby="coming-dividends">
+                    <h3 id="coming-dividends"><span class="swatch" style="--swatch: var(--dividend)"></span>Dividends</h3>
+                    <ul class="coming-list">
+                        <li th:each="d : ${comingUpDividends}"
+                            th:with="amount=${d.receivedEur() != null ? d.receivedEur() : d.estimatedEur()}">
+                            <a class="coming-row" data-type="dividend" th:data-ticker="${d.ticker()}" th:data-date="${d.date()}"
+                               th:href="@{/calendar(month=${#temporals.format(d.date(), 'yyyy-MM')})} + '#type=dividend&ticker=' + ${d.ticker()} + '&date=' + ${d.date()}">
+                                <th:block th:replace="~{fragments/coming-date :: coming-date(${d.date()})}"></th:block>
+                                <span class="logo" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(d.symbol(), 0, 1)}">M</span>
+                                    <img th:src="@{/logos/{ticker}(ticker=${d.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                </span>
+                                <span class="coming-symbol" th:text="${d.symbol()}">MU</span>
+                                <span class="coming-extra" th:if="${amount != null}"
+                                      th:text="${(d.receivedEur() != null ? '' : '≈ ') + #numbers.formatDecimal(amount, 1, 'COMMA', 2, 'POINT') + ' €'}">≈ 0.86 €</span>
+                            </a>
+                        </li>
+                    </ul>
+                </section>
+            </div>
+
+        </aside>
+    </main>
+
+    <script>
+        (function () {
+            const calendar = document.getElementById('calendar');
+            const side = document.getElementById('side');
+            const sideEmpty = document.getElementById('side-empty');
+
+            // ----- Formatting -----
+            const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const bigMoney = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 });
+            // Euros the way the rest of the app writes them: 1,234.56 €
+            const euros = value => value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+            const longDate = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+            const number = value => (value === undefined || value === '' ? null : Number(value));
+            const dateOf = text => new Date(text + 'T00:00:00Z');
+
+            function signed(value, digits) {
+                const text = Math.abs(value).toFixed(digits) + '%';
+                return (value > 0 ? '+' : value < 0 ? '−' : '') + text;
+            }
+
+            // How far the actual figure was from the estimate, in %
+            function surprise(actual, estimate) {
+                if (actual === null || estimate === null || estimate === 0) return null;
+                return (actual - estimate) / Math.abs(estimate) * 100;
+            }
+
+            function element(tag, className, text) {
+                const node = document.createElement(tag);
+                if (className) node.className = className;
+                if (text !== undefined) node.textContent = text;
+                return node;
+            }
+
+            function row(label, value) {
+                const line = element('div', 'metric-row');
+                line.append(element('span', '', label), element('b', '', value));
+                return line;
+            }
+
+            function sessionText(hour) {
+                if (hour === 'bmo') return 'Before market open';
+                if (hour === 'amc') return 'After market close';
+                if (hour === 'dmh') return 'During market hours';
+                return 'Time not announced';
+            }
+
+            // One block: revenue or EPS, with the actual figure, the estimate and the surprise
+            function metric(title, actual, estimate, format) {
+                const block = element('section', 'metric');
+                block.append(element('h3', '', title));
+                if (actual !== null) {
+                    const main = element('div', 'metric-main', format(actual));
+                    const difference = surprise(actual, estimate);
+                    if (difference !== null) {
+                        main.append(element('span', 'surprise ' + (difference >= 0 ? 'up' : 'down'), signed(difference, 1) + ' vs estimate'));
+                    }
+                    block.append(main, row('Estimate', estimate === null ? '—' : format(estimate)));
+                } else {
+                    block.append(row('Estimate', estimate === null ? 'Not available' : format(estimate)));
+                    block.append(element('p', 'note', 'Not published yet.'));
+                }
+                return block;
+            }
+
+            function closeButton() {
+                const button = element('button', 'close');
+                button.type = 'button';
+                button.setAttribute('aria-label', 'Close');
+                button.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg>';
+                button.addEventListener('click', closePanel);
+                return button;
+            }
+
+            function openPanel(children) {
+                side.replaceChildren(...children);
+                side.classList.remove('idle');
+            }
+
+            function closePanel() {
+                side.replaceChildren(sideEmpty);
+                side.classList.add('idle');
+                calendar.querySelectorAll('.chip.selected').forEach(chip => chip.classList.remove('selected'));
+            }
+
+            // ----- Details of one result -----
+            function showEarnings(chip) {
+                const data = chip.dataset;
+                const epsActual = number(data.epsActual);
+                const epsEstimate = number(data.epsEstimate);
+                const published = epsActual !== null;
+
+                const head = element('div', 'side-head');
+                const logo = chip.querySelector('.logo');
+                if (logo) head.append(logo.cloneNode(true));
+                const titles = element('div');
+                titles.append(element('h2', '', data.symbol),
+                              element('p', 'side-sub', 'Q' + data.quarter + ' ' + data.year + ', ' + longDate.format(dateOf(data.date))));
+                head.append(titles, closeButton());
+
+                const tags = element('div', 'tags');
+                tags.append(element('span', 'tag', 'Earnings'), element('span', 'tag neutral', sessionText(data.hour)));
+                if (published && epsEstimate !== null) {
+                    const beat = epsActual >= epsEstimate;
+                    tags.append(element('span', 'tag ' + (beat ? 'beat' : 'miss'), beat ? 'Beat' : 'Missed'));
+                } else if (!published) {
+                    tags.append(element('span', 'tag neutral', 'Upcoming'));
+                }
+
+                const revenue = metric('Revenue', number(data.revenueActual), number(data.revenueEstimate), value => bigMoney.format(value));
+                const eps = metric('EPS', epsActual, epsEstimate, value => money.format(value));
+
+                const yoy = element('section', 'metric');
+                yoy.append(element('h3', '', 'Year over year'));
+                const revenueYoy = number(data.revenueYoy);
+                const epsYoy = number(data.epsYoy);
+                if (revenueYoy === null && epsYoy === null) {
+                    yoy.append(element('p', 'note', 'Not available yet.'));
+                } else {
+                    yoy.append(row('Revenue', revenueYoy === null ? '—' : signed(revenueYoy, 1)),
+                               row('EPS', epsYoy === null ? '—' : signed(epsYoy, 1)));
+                }
+
+                calendar.querySelectorAll('.chip.selected').forEach(other => other.classList.remove('selected'));
+                chip.classList.add('selected');
+                openPanel([head, tags, revenue, eps, yoy]);
+            }
+
+            // ----- Details of one dividend -----
+            // The amount per share is in the stock's own currency, which is only known for sure for US stocks
+            function perShareText(data) {
+                const perShare = number(data.perShare);
+                if (perShare === null) return '—';
+                const digits = Math.max(2, (data.perShare.split('.')[1] || '').replace(/0+$/, '').length);
+                const text = perShare.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits });
+                return data.ticker.includes('_US_') ? '$' + text : text;
+            }
+
+            function showDividend(chip) {
+                const data = chip.dataset;
+                const received = number(data.received);
+                const estimate = number(data.estimate);
+                const paymentDay = dateOf(data.date);
+                const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
+
+                const head = element('div', 'side-head');
+                const logo = chip.querySelector('.logo');
+                if (logo) head.append(logo.cloneNode(true));
+                const titles = element('div');
+                titles.append(element('h2', '', data.symbol), element('p', 'side-sub', 'Dividend, ' + longDate.format(paymentDay)));
+                head.append(titles, closeButton());
+
+                const tags = element('div', 'tags');
+                tags.append(element('span', 'tag dividend', 'Dividend'));
+                if (received !== null) tags.append(element('span', 'tag beat', 'Received'));
+                else if (paymentDay < today) tags.append(element('span', 'tag neutral', 'No payment recorded'));
+                else tags.append(element('span', 'tag neutral', 'Announced'));
+
+                const amount = element('section', 'metric');
+                if (received !== null) {
+                    amount.append(element('h3', '', 'You received'), element('div', 'metric-main', euros(received)));
+                } else if (estimate !== null) {
+                    amount.append(element('h3', '', 'You should receive'), element('div', 'metric-main', '≈ ' + euros(estimate)));
+                } else {
+                    amount.append(element('h3', '', 'Amount'));
+                }
+                amount.append(row('Per share', perShareText(data)));
+                if (received === null && estimate !== null) {
+                    amount.append(element('p', 'note', 'An estimate: the announced amount, times the shares you hold now, times the part of the gross that reached you last time (after tax and the exchange rate).'));
+                } else if (received === null) {
+                    amount.append(element('p', 'note', 'No estimate yet: there is no earlier payment of this stock to base it on.'));
+                }
+
+                const dates = element('section', 'metric');
+                dates.append(element('h3', '', 'Dates'),
+                             row('Ex-dividend', data.exDate ? longDate.format(dateOf(data.exDate)) : '—'),
+                             row('Payment', longDate.format(paymentDay)));
+                if (data.exDate && received === null) {
+                    dates.append(element('p', 'note', 'Shares bought on the ex-dividend date or later do not get this dividend.'));
+                }
+
+                calendar.querySelectorAll('.chip.selected').forEach(other => other.classList.remove('selected'));
+                chip.classList.add('selected');
+                openPanel([head, tags, amount, dates]);
+            }
+
+            // ----- Details of one subscription payment -----
+            function showSubscription(chip) {
+                const data = chip.dataset;
+                const expected = data.expected === 'true';
+
+                const head = element('div', 'side-head');
+                const titles = element('div');
+                titles.append(element('h2', '', data.merchant), element('p', 'side-sub', 'Subscription, ' + longDate.format(dateOf(data.date))));
+                head.append(titles, closeButton());
+
+                const tags = element('div', 'tags');
+                tags.append(element('span', 'tag subscription', 'Subscription'),
+                            element('span', 'tag ' + (expected ? 'neutral' : 'beat'), expected ? 'Expected' : 'Paid'));
+
+                const amount = element('section', 'metric');
+                amount.append(element('h3', '', expected ? 'You should pay' : 'You paid'),
+                              element('div', 'metric-main', (expected ? '≈ ' : '') + euros(number(data.amount))));
+                if (expected) {
+                    amount.append(element('p', 'note', 'Expected on the same day of the month as the last payment, for the same amount. The card may charge it a day or two later.'));
+                }
+
+                calendar.querySelectorAll('.chip.selected').forEach(other => other.classList.remove('selected'));
+                chip.classList.add('selected');
+                openPanel([head, tags, amount]);
+            }
+
+            function showEvent(chip) {
+                if (chip.dataset.type === 'dividend') showDividend(chip);
+                else if (chip.dataset.type === 'subscription') showSubscription(chip);
+                else showEarnings(chip);
+            }
+
+            // ----- Every event of a busy day ("+N more") -----
+            function showDay(day) {
+                const head = element('div', 'side-head');
+                const titles = element('div');
+                const chips = [...day.querySelectorAll('.chip')].filter(chip => !calendar.classList.contains('hide-' + chip.dataset.type));
+                titles.append(element('h2', '', longDate.format(dateOf(day.dataset.date))),
+                              element('p', 'side-sub', chips.length + ' events'));
+                head.append(titles, closeButton());
+
+                const list = element('div', 'day-list');
+                chips.forEach(chip => {
+                    const copy = chip.cloneNode(true);
+                    copy.classList.remove('extra', 'selected');
+                    copy.addEventListener('click', () => showEvent(chip));
+                    list.append(copy);
+                });
+                openPanel([head, list]);
+            }
+
+            calendar.addEventListener('click', event => {
+                const chip = event.target.closest('.chip');
+                if (chip) { showEvent(chip); return; }
+                const more = event.target.closest('.more');
+                if (more) showDay(more.closest('.day'));
+            });
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && !side.classList.contains('idle')) closePanel();
+            });
+
+            // ----- Coming up: a row opens its event here, or goes to its month and opens it there -----
+            function chipFor(type, ticker, date) {
+                return [...calendar.querySelectorAll('.chip')].find(chip =>
+                    chip.dataset.type === type && chip.dataset.ticker === ticker && chip.dataset.date === date);
+            }
+            side.addEventListener('click', event => {
+                const row = event.target.closest('.coming-row');
+                if (!row) return;
+                const chip = chipFor(row.dataset.type, row.dataset.ticker, row.dataset.date);
+                if (!chip) return;            // another month: the link goes there
+                event.preventDefault();
+                showEvent(chip);
+            });
+            const wanted = new URLSearchParams(location.hash.slice(1));
+            if (wanted.has('type')) {
+                const chip = chipFor(wanted.get('type'), wanted.get('ticker'), wanted.get('date'));
+                if (chip) showEvent(chip);
+                history.replaceState(null, '', location.pathname + location.search);   // a reload should not open it again
+            }
+
+            // ----- Filters in the legend, remembered in this browser -----
+            const STORAGE_KEY = 'calendar-hidden-types';
+            function readHidden() {
+                try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch (error) { return []; }
+            }
+            function saveHidden(hidden) {
+                try { localStorage.setItem(STORAGE_KEY, JSON.stringify(hidden)); } catch (error) { /* private window: not remembered */ }
+            }
+            function applyFilters(hidden) {
+                document.querySelectorAll('.filter[data-filter]').forEach(button => {
+                    const type = button.dataset.filter;
+                    const isHidden = hidden.includes(type);
+                    button.setAttribute('aria-pressed', String(!isHidden));
+                    calendar.classList.toggle('hide-' + type, isHidden);
+                });
+            }
+            document.querySelectorAll('.filter[data-filter]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const type = button.dataset.filter;
+                    const hidden = readHidden();
+                    const next = hidden.includes(type) ? hidden.filter(item => item !== type) : hidden.concat(type);
+                    saveHidden(next);
+                    applyFilters(next);
+                });
+            });
+            applyFilters(readHidden());
+
+            // ----- Each day shows the chips that fit; the rest go to "+N more" -----
+            // The height of a day depends on the window, so it is measured instead of assumed.
+            const phone = window.matchMedia('(max-width: 700px)');
+            function fitDays() {
+                calendar.querySelectorAll('.day').forEach(day => {
+                    const more = day.querySelector('.more');
+                    if (!more) return;
+                    const allChips = [...day.querySelectorAll('.chip')];
+                    allChips.forEach(chip => chip.classList.remove('extra'));
+                    more.classList.add('hidden');
+                    if (phone.matches) return;   // the phone list shows them all
+                    // Only the types that are not hidden by the legend take room in the day
+                    const chips = allChips.filter(chip => !calendar.classList.contains('hide-' + chip.dataset.type));
+
+                    let hiddenCount = 0;
+                    while (day.scrollHeight > day.clientHeight && hiddenCount < chips.length) {
+                        chips[chips.length - 1 - hiddenCount].classList.add('extra');
+                        hiddenCount++;
+                        more.textContent = '+' + hiddenCount + ' more';
+                        more.classList.remove('hidden');
+                    }
+                });
+            }
+            // While the window is being resized, wait until it stops for a moment before measuring again
+            let fitTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(fitTimer);
+                fitTimer = setTimeout(fitDays, 100);
+            });
+            phone.addEventListener('change', fitDays);
+            window.addEventListener('load', fitDays);   // measure again once everything has been drawn
+            document.querySelectorAll('.filter[data-filter]').forEach(button => button.addEventListener('click', fitDays));
+            fitDays();
+        })();
+    </script>
+</body>
+</html>

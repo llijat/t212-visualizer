@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>News · T212 Visualizer</title>
+    <!-- @{...} adds a fingerprint of the file to its name, so a changed stylesheet is never taken from the cache -->
+    <link rel="stylesheet" th:href="@{/css/common.css}" href="/css/common.css">
+    <style>
+        /* ===== Page: the sources on the left, like the folders of a mail app; the stories on the right ===== */
+        .news-page {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: 300px minmax(0, 1fr);
+        }
+
+        /* ===== Left: where the stories come from ===== */
+        .sources {
+            min-height: 0;
+            overflow-y: auto;
+            padding: 1.75rem 1.25rem 2rem 2rem;
+            border-right: 1px solid var(--border);
+        }
+        .sources h1 { margin: 0 0 1.25rem; font: 500 var(--fs-xl) var(--figures); letter-spacing: 0.01em; }
+        .source-group { margin: 0 0 1.5rem; padding: 0; list-style: none; }
+        .source-group-name { margin: 0 0 0.4rem; padding-left: 0.6rem; color: var(--faint); font-size: var(--fs-xs); }
+        .source {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.45rem 0.6rem;
+            border-radius: var(--radius-md);
+            background: none;
+            color: var(--muted);
+            font-size: var(--fs-md);
+            text-align: left;
+        }
+        .source:hover { background: var(--raised); color: var(--text); }
+        .source[aria-pressed="true"] { background: var(--raised); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+        .source .logo { font-size: 1.35rem; }
+        .source-symbol { flex: 1; min-width: 0; font: 500 var(--fs-md) var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .source-count { min-width: 1.1rem; color: var(--faint); font: var(--fs-xs) var(--figures); font-variant-numeric: tabular-nums; text-align: right; }
+        /* Each holding as a small watchlist: its last week as a line, how the last session went, and how many stories.
+           The script draws the line from data-closes; each on its own scale, so a quiet week still shows its shape */
+        .source-trend { flex: none; width: 2.6rem; height: 1.1rem; }
+        .source-trend svg { display: block; width: 100%; height: 100%; overflow: visible; }
+        .source-trend polyline { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+        .source-move { flex: none; width: 3.5rem; font: 500 var(--fs-xs) var(--figures); font-variant-numeric: tabular-nums; text-align: right; }
+        .source .up { color: var(--green); }
+        .source .down { color: var(--red); }
+        .source[aria-pressed="true"] .source-count { color: var(--accent); }
+        .source-icon { width: 1.35rem; display: grid; place-items: center; color: var(--muted); }
+        .sources-note { margin: 0; padding-left: 0.6rem; color: var(--faint); font-size: var(--fs-xs); line-height: 1.5; max-width: 26ch; }
+
+        /* ===== Right: the stories, a day at a time ===== */
+        .stories { min-height: 0; overflow-y: auto; padding: 1.75rem 2rem 3rem; }
+        .stories:focus { outline: none; }   /* it gets the focus only to start from there after "Skip to the stories" */
+        /* The stories keep a comfortable line length (760 px). On wide screens a column next to them shows what moves
+           and what comes up; on narrower ones that column goes above the stories, under the search. */
+        .stories-layout { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 760px; }
+        .stories-tools { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+        .rail { display: flex; flex-direction: column; gap: 1.5rem; order: 1; margin: 0.5rem 0 1rem; }
+        .stories-tools { order: 0; }
+        .stories-feeds { order: 2; min-width: 0; }
+        /* Wide screens: a third column of its own, which scrolls on its own like the sources and the stories.
+           The script moves the column there from above the stories (see placeRail). */
+        @media (min-width: 1400px) {
+            .news-page { grid-template-columns: 300px minmax(0, 1fr) 360px; }
+            .stories-layout { margin-inline: auto; }
+            .news-page > .rail {
+                min-height: 0;
+                overflow-y: auto;
+                margin: 0;
+                padding: 1.75rem 2rem 2rem 1.5rem;
+                border-left: 1px solid var(--border);
+            }
+            .rail .moves-list { grid-template-columns: minmax(0, 1fr); gap: 0.4rem; }
+            .rail .coming-item { grid-template-columns: 4.6rem auto minmax(0, 1fr) auto; gap: 0.55rem; padding: 0.45rem 0.6rem; }
+        }
+        /* Narrower screens: the column steps aside when one holding is chosen or the headlines are searched */
+        @media (max-width: 1399px) {
+            .rail.focused { display: none; }
+        }
+        .stories-search {
+            flex: 1;
+            min-width: 0;
+            height: 2.5rem;
+            padding: 0 0.9rem 0 2.3rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--panel) no-repeat 0.8rem 50% / 1rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+            font-size: var(--fs-md);
+        }
+        .stories-search::placeholder { color: var(--faint); }
+        .stories-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .stories-count { color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }
+
+        .day { margin-top: 0.5rem; }
+        .day-head {
+            position: sticky;
+            top: -1.75rem;              /* sticks at the top edge of the scrolling area, over its padding */
+            z-index: 1;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            padding: 1.25rem 0 0.6rem;
+            background: var(--bg);
+        }
+        /* What scrolls under the day's head fades out instead of being cut in half */
+        .day-head::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 0.75rem; background: linear-gradient(var(--bg), transparent); pointer-events: none; }
+        .day-head h2 { margin: 0; font: 500 var(--fs-lg) var(--figures); letter-spacing: 0.01em; }
+        .day-head span { color: var(--faint); font-size: var(--fs-xs); }
+        .day-list { list-style: none; margin: 0; padding: 0; }
+
+        /* One story on the day's timeline: the time, its holding's logo on a thin line, then the headline, two lines of summary
+           and where it comes from. The eye runs down the logos and knows whose news it is before reading it */
+        .story {
+            display: grid;
+            grid-template-columns: 2.9rem 1.7rem minmax(0, 1fr);
+            column-gap: 0.75rem;
+            padding: 0.85rem 0.75rem;
+            margin: 0 -0.75rem;
+            border-radius: var(--radius-md);
+        }
+        .story:hover { background: var(--panel); }
+        .story-time { padding-top: 0.2rem; color: var(--faint); font: var(--fs-sm) var(--figures); font-variant-numeric: tabular-nums; }
+        .story-mark { position: relative; display: flex; justify-content: center; align-items: flex-start; }
+        .story-mark::before { content: ""; position: absolute; left: 50%; top: -0.85rem; bottom: -0.85rem; width: 1px; background: var(--border); }
+        .story:first-child .story-mark::before { top: 0.75rem; }                      /* the line starts at the day's first story */
+        .story:last-child .story-mark::before { bottom: calc(100% - 0.75rem); }       /* and ends at its last */
+        .story-mark .logo { position: relative; font-size: var(--fs-lg); box-shadow: 0 0 0 3px var(--bg); }
+        .story-dot { position: relative; width: 0.55rem; height: 0.55rem; margin-top: 0.5rem; border-radius: 50%; background: var(--faint); box-shadow: 0 0 0 3px var(--bg); }
+        .story:hover .story-mark .logo, .story:hover .story-dot { box-shadow: 0 0 0 3px var(--panel); }
+        .story-headline {
+            color: var(--text);
+            font-size: var(--fs-lg);
+            font-weight: 500;
+            line-height: 1.35;
+            text-decoration: none;
+            text-wrap: pretty;
+        }
+        .story-headline:hover { color: var(--accent); }
+        .story-summary {
+            margin: 0.3rem 0 0;
+            color: var(--muted);
+            font-size: var(--fs-sm);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            overflow: hidden;
+        }
+        .story-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.8rem; margin-top: 0.5rem; color: var(--faint); font-size: var(--fs-xs); }
+        .story-symbol {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.15rem 0.55rem 0.15rem 0.2rem;
+            border-radius: var(--radius-pill);
+            background: var(--raised);
+            color: var(--text);
+            font: 500 var(--fs-xs) var(--figures);
+        }
+        .story-symbol:hover { background: var(--accent-bg); color: var(--accent); }
+        .story-symbol { padding-left: 0.55rem; }
+
+        /* Several stories in a row from the same holding: the first shows, the rest wait behind "N more from …" */
+        .story-fold { margin: 0 -0.75rem; padding: 0 0.75rem 0.4rem calc(2.9rem + 1.7rem + 1.5rem + 0.75rem); list-style: none; position: relative; }
+        .story-fold::before { content: ""; position: absolute; left: calc(0.75rem + 2.9rem + 0.75rem + 0.85rem); top: 0; bottom: 0; width: 1px; background: var(--border); }
+        .story-fold button { height: var(--control-h-sm); padding: 0 0.6rem; border-radius: var(--radius-pill); background: var(--raised); color: var(--muted); font-size: var(--fs-xs); }
+        .story-fold button:hover { background: var(--accent-bg); color: var(--accent); }
+
+        /* The star: faint until it is pressed, then filled with the colour of what is selected */
+        .star-form { margin: 0 0 0 auto; }
+        .star {
+            width: 2rem;
+            height: 2rem;
+            margin: -0.45rem -0.45rem -0.45rem 0;
+            display: grid;
+            place-items: center;
+            border-radius: var(--radius-sm);
+            background: none;
+            color: var(--faint);
+        }
+        .star .icon { width: 1.1rem; height: 1.1rem; }
+        .star:hover { background: var(--raised); color: var(--text); }
+        .star[aria-pressed="true"] { color: var(--accent); }
+        .star[aria-pressed="true"] .icon { fill: currentColor; }
+
+        /* ===== Moving today: the holdings that move most, before their news ===== */
+        .moves { margin: 0; }
+        .moves-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.6rem; }
+        .moves-head h2 { margin: 0; font: 500 var(--fs-lg) var(--figures); letter-spacing: 0.01em; }
+        .moves-head span { color: var(--faint); font-size: var(--fs-xs); }
+        .moves-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; }
+        .move {
+            width: 100%;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            align-items: center;
+            column-gap: 0.65rem;
+            row-gap: 0.1rem;
+            padding: 0.7rem 0.85rem;
+            border-radius: var(--radius-md);
+            background: var(--panel);
+            color: var(--text);
+            text-align: left;
+        }
+        .move:hover:not(:disabled) { background: var(--raised); }
+        .move:disabled { cursor: default; }
+        .move .logo { grid-row: span 2; font-size: 1.6rem; }
+        .move-symbol { font: 500 var(--fs-md) var(--figures); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .move-change { font: 500 var(--fs-md) var(--figures); font-variant-numeric: tabular-nums; }
+        .move-change.up { color: var(--green); }
+        .move-change.down { color: var(--red); }
+        .move-weight { grid-column: 2 / 4; color: var(--faint); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+
+        /* Gold and silver: the same cards, with a coin of the metal's colour instead of a logo */
+        .metal-logo { background: #c9a227; color: #1a1406; }
+        .metal-logo.is-silver { background: #b9c0cb; color: #14171c; }
+
+        /* ===== Coming up: the next results of the holdings, one line each ===== */
+        .coming { margin: 0; }
+        .coming-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+        .coming-item {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 6.5rem auto minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-md);
+            background: none;
+            color: var(--text);
+            text-align: left;
+        }
+        .coming-item:hover:not(:disabled) { background: var(--panel); }
+        .coming-item:disabled { cursor: default; }
+        .coming-date { color: var(--muted); font: var(--fs-sm) var(--figures); font-variant-numeric: tabular-nums; }
+        .coming-date.is-soon { color: var(--accent); }
+        .coming-item .logo { font-size: 1.35rem; }
+        .coming-symbol { font: 500 var(--fs-md) var(--figures); letter-spacing: 0.01em; }
+        .coming-hour { color: var(--faint); font-size: var(--fs-xs); }
+        .coming-group { margin: 0.6rem 0 0.25rem; color: var(--muted); font: 500 var(--fs-sm) var(--text-font); }
+        .coming-dividend { text-decoration: none; }
+        .coming-amount { color: var(--dividend); font: 500 var(--fs-xs) var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+        .empty { margin: 2rem 0; color: var(--muted); line-height: 1.6; }
+
+        /* ===== Narrow screens: the sources become a row of buttons above the stories ===== */
+        @media (max-width: 900px) {
+            .news-page { display: block; }
+            .sources { overflow: visible; padding: 1.25rem 1rem 0.5rem; border-right: none; }
+            .sources h1 { margin-bottom: 0.75rem; }
+            .source-group { display: flex; gap: 0.4rem; overflow-x: auto; margin-bottom: 0.75rem; padding-bottom: 0.25rem; }
+            .source-group li { flex: none; }
+            .source-group-name, .sources-note { display: none; }
+            .source { width: auto; height: 2.5rem; background: var(--panel); }
+            .source-trend, .source-move { display: none; }
+            .stories { overflow: visible; padding: 0.5rem 1rem 2rem; }
+            .day-head { top: 0; }
+            .story { grid-template-columns: 1.7rem minmax(0, 1fr); row-gap: 0.15rem; }
+            .story-time { grid-column: 2; grid-row: 1; padding-top: 0; }
+            .story-mark { grid-column: 1; grid-row: 1 / span 2; }
+            .story > div { grid-column: 2; }
+            .story-fold { padding-left: calc(1.7rem + 1.5rem); }
+            .story-fold::before { left: calc(0.75rem + 0.85rem); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- With 30+ holdings there are many buttons before the first story: this lets the keyboard jump over them -->
+    <a class="skip-link" href="#stories">Skip to the stories</a>
+
+    <header class="topbar">
+        <th:block th:replace="~{fragments/topbar :: bar('news')}"></th:block>
+    </header>
+
+    <svg class="sprite" aria-hidden="true">
+        <symbol id="icon-stack" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+        <symbol id="icon-ingot" viewBox="0 0 24 24"><path d="M7.5 8h9l3.5 9H4z"/><path d="M9 11.5h6"/></symbol>
+        <symbol id="icon-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></symbol>
+    </svg>
+
+    <main class="news-page"
+          th:with="total=${portfolioDays.isEmpty() ? 0 : #aggregates.sum(portfolioDays.![news().size()])},
+                   marketTotal=${marketDays.isEmpty() ? 0 : #aggregates.sum(marketDays.![news().size()])},
+                   metalTotal=${metalDays.isEmpty() ? 0 : #aggregates.sum(metalDays.![news().size()])}">
+
+        <!-- ===== Where the stories come from: every holding, or the market ===== -->
+        <nav class="sources" aria-label="Show news from">
+            <h1>News</h1>
+
+            <!-- First, so that with many holdings they are still in sight without scrolling -->
+            <p class="source-group-name">General</p>
+            <ul class="source-group">
+                <li>
+                    <button type="button" class="source" data-show="market" aria-pressed="false">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-globe"/></svg></span>
+                        <span class="source-symbol">Market</span>
+                        <span class="source-count" th:text="${marketTotal}">100</span>
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="source" data-show="metals" aria-pressed="false">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-ingot"/></svg></span>
+                        <span class="source-symbol">Metals</span>
+                        <span class="source-count" th:text="${metalTotal}">6</span>
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="source" data-show="starred" aria-pressed="false">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-star"/></svg></span>
+                        <span class="source-symbol">Starred</span>
+                        <span class="source-count" id="starred-count" th:text="${starredIds.size()}">3</span>
+                    </button>
+                </li>
+            </ul>
+
+            <p class="source-group-name">Your holdings</p>
+            <ul class="source-group">
+                <li>
+                    <button type="button" class="source" data-show="portfolio" aria-pressed="true">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-briefcase"/></svg></span>
+                        <span class="source-symbol">All holdings</span>
+                        <span class="source-count" th:text="${total}">48</span>
+                    </button>
+                </li>
+                <!-- One button per holding with news: its logo (through its T212 ticker), its symbol and how many stories -->
+                <li th:each="entry : ${newsCount}"
+                    th:with="ticker=${tickers.get(entry.key)},
+                             series=${priceSeries != null and ticker != null ? priceSeries.get(ticker) : null}">
+                    <button type="button" class="source" data-show="portfolio" th:data-symbol="${entry.key}" aria-pressed="false">
+                        <span class="logo" aria-hidden="true">
+                            <span class="logo-initial" th:text="${#strings.substring(entry.key, 0, 1)}">A</span>
+                            <img th:if="${ticker != null}" th:src="@{/logos/{ticker}(ticker=${ticker})}" alt="" loading="lazy" onerror="this.remove()">
+                        </span>
+                        <span class="source-symbol" th:text="${entry.key}">AAPL</span>
+                        <th:block th:if="${series != null}">
+                            <span class="source-trend" aria-hidden="true" th:data-closes="${#strings.listJoin(series.closes(), ',')}"></span>
+                            <span class="source-move" title="The last session, against the close before it"></span>
+                        </th:block>
+                        <span class="source-count" th:text="${entry.value}" th:title="${entry.value} + ' stories this week'">12</span>
+                    </button>
+                </li>
+            </ul>
+
+            <p class="sources-note">The free news service only covers US companies, so holdings listed elsewhere have no news here.</p>
+        </nav>
+
+        <!-- ===== The stories ===== -->
+        <section class="stories" id="stories" aria-label="Stories" tabindex="-1">
+            <div class="stories-layout">
+                <div class="stories-tools">
+                    <input type="search" class="stories-search" id="search" placeholder="Search the headlines" aria-label="Search the headlines" autocomplete="off">
+                    <span class="stories-count" id="count" aria-live="polite"></span>
+                </div>
+
+                <div class="stories-feeds">
+
+                <!-- Your holdings, a day at a time -->
+                <!-- The days and their stories are drawn by fragments/news-story.html, the same in the three folders -->
+                <div id="portfolio" class="feed">
+                    <p class="empty" th:if="${portfolioDays.isEmpty()}">No news from your holdings in the last 7 days. If the app has just started, reload the page in a few seconds.</p>
+                    <th:block th:each="day : ${portfolioDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
+                </div>
+
+                <!-- The market: the same, without holdings -->
+                <div id="market" class="feed hidden">
+                    <p class="empty" th:if="${marketDays.isEmpty()}">No market news in the last 7 days. If the app has just started, reload the page in a few seconds.</p>
+                    <th:block th:each="day : ${marketDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
+                </div>
+
+                <!-- Metals: the market news about gold and silver; how they moved is in the column on the right -->
+                <div id="metals" class="feed hidden">
+                    <p class="empty" th:if="${metalDays.isEmpty()}">No market news about gold or silver in the last 7 days.</p>
+                    <th:block th:each="day : ${metalDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
+                </div>
+
+                <!-- Starred: from both, of any age, because they are never deleted -->
+                <div id="starred" class="feed hidden">
+                    <p class="empty" th:if="${starredDays.isEmpty()}">No starred stories yet. Press the star on a story to keep it here for good: the others are deleted after 30 days.</p>
+                    <th:block th:each="day : ${starredDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
+                </div>
+
+                <p class="empty hidden" id="nothing">No story matches. Try another word or choose another source.</p>
+                </div>
+
+            <!-- ===== What moves and what comes up: next to the stories on wide screens, above them on narrower ones ===== -->
+            <aside class="rail" id="rail" aria-label="Today in short"
+                   th:if="${!moves.isEmpty() or !metals.isEmpty() or !comingUp.isEmpty() or !comingUpDividends.isEmpty()}">
+                <!-- Moving today: the six US holdings that move most, up or down; pressing one shows its news -->
+                <section class="moves" id="moves" th:if="${!moves.isEmpty()}" aria-labelledby="moves-title">
+                    <div class="moves-head">
+                        <h2 id="moves-title"
+                            th:text="${lastSession.isPresent() and lastSession.get().equals(today)} ? 'Moving today'
+                                   : 'Moving on ' + ${lastSession.isPresent()
+                                       ? #strings.capitalize(#strings.toLowerCase(lastSession.get().getDayOfWeek().name())) + ' ' + lastSession.get().getDayOfMonth() + ' '
+                                         + #strings.capitalize(#strings.toLowerCase(lastSession.get().getMonth().name()))
+                                       : 'the last session'}">Moving today</h2>
+                        <span>Against the previous close</span>
+                    </div>
+                    <ul class="moves-list">
+                        <li th:each="m : ${moves}" th:if="${mStat.index < 6}"
+                            th:with="hasNews=${newsCount.containsKey(m.symbol())}">
+                            <button type="button" class="move" th:data-symbol="${m.symbol()}" th:disabled="${!hasNews}"
+                                    th:title="${hasNews} ? 'Show the news of ' + ${m.symbol()} : 'No news of ' + ${m.symbol()} + ' in the last 7 days'">
+                                <span class="logo" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(m.symbol(), 0, 1)}">A</span>
+                                    <img th:src="@{/logos/{ticker}(ticker=${m.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                </span>
+                                <span class="move-symbol" th:text="${m.symbol()}">AAPL</span>
+                                <span class="move-change" th:classappend="${m.changePercent().signum() < 0} ? 'down' : 'up'"
+                                      th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">−4.19 %</span>
+                                <span class="move-weight" th:text="${#numbers.formatDecimal(m.weightPercent(), 1, 1, 'POINT')} + ' % of your portfolio'">15.0 % of your portfolio</span>
+                            </button>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- Gold and silver: pressing one opens the Metals folder -->
+                <section class="moves" th:if="${!metals.isEmpty()}" aria-labelledby="metals-title">
+                    <div class="moves-head">
+                        <h2 id="metals-title">Gold and silver</h2>
+                        <span>Through the GLD and SLV funds</span>
+                    </div>
+                    <ul class="moves-list">
+                        <li th:each="m : ${metals}">
+                            <!-- Only the change: a fund share holds a fraction of an ounce, so its price is not the metal's -->
+                            <button type="button" class="move metal-card" title="Show the news about gold and silver">
+                                <span class="logo metal-logo" th:classappend="${m.etf() == 'SLV'} ? 'is-silver'" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${#strings.substring(m.name(), 0, 1)}">G</span>
+                                </span>
+                                <span class="move-symbol" th:text="${m.name()}">Gold</span>
+                                <span class="move-change" th:classappend="${m.changePercent().signum() < 0} ? 'down' : 'up'"
+                                      th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">+1.20 %</span>
+                                <span class="move-weight" th:text="${m.etf()} + ' fund'">GLD fund</span>
+                            </button>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- Coming up: the results and dividends of the holdings in the next two weeks, the closest first -->
+                <section class="coming" id="coming" th:if="${!comingUp.isEmpty() or !comingUpDividends.isEmpty()}" aria-labelledby="coming-title">
+                    <div class="moves-head">
+                        <h2 id="coming-title">Coming up</h2>
+                        <span>The next two weeks</span>
+                    </div>
+
+                    <th:block th:if="${!comingUp.isEmpty()}">
+                        <h3 class="coming-group">Earnings</h3>
+                        <ul class="coming-list">
+                            <li th:each="e : ${comingUp}" th:if="${eStat.index < 6}"
+                                th:with="hasNews=${newsCount.containsKey(e.symbol())}">
+                                <!-- Pressing one shows the news of that holding -->
+                                <button type="button" class="coming-item" th:data-symbol="${e.symbol()}" th:disabled="${!hasNews}"
+                                        th:title="${hasNews} ? 'Show the news of ' + ${e.symbol()} : 'No news of ' + ${e.symbol()} + ' in the last 7 days'">
+                                    <th:block th:replace="~{fragments/coming-date :: coming-date(${e.date()})}"></th:block>
+                                    <span class="logo" aria-hidden="true">
+                                        <span class="logo-initial" th:text="${#strings.substring(e.symbol(), 0, 1)}">N</span>
+                                        <img th:src="@{/logos/{ticker}(ticker=${e.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                    </span>
+                                    <span class="coming-symbol" th:text="${e.symbol()}">NVDA</span>
+                                    <span class="coming-hour" th:text="${e.hourLabel()}">after the close</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </th:block>
+
+                    <th:block th:if="${!comingUpDividends.isEmpty()}">
+                        <h3 class="coming-group">Dividends</h3>
+                        <ul class="coming-list">
+                            <li th:each="d : ${comingUpDividends}" th:if="${dStat.index < 6}"
+                                th:with="amount=${d.receivedEur() != null ? d.receivedEur() : d.estimatedEur()}">
+                                <!-- Pressing one opens it in the calendar, with what you received or the estimate -->
+                                <a class="coming-item coming-dividend" th:title="'See the dividend of ' + ${d.symbol()} + ' in the calendar'"
+                                   th:href="@{/calendar(month=${#temporals.format(d.date(), 'yyyy-MM')})} + '#type=dividend&ticker=' + ${d.ticker()} + '&date=' + ${d.date()}">
+                                    <th:block th:replace="~{fragments/coming-date :: coming-date(${d.date()})}"></th:block>
+                                    <span class="logo" aria-hidden="true">
+                                        <span class="logo-initial" th:text="${#strings.substring(d.symbol(), 0, 1)}">M</span>
+                                        <img th:src="@{/logos/{ticker}(ticker=${d.ticker()})}" alt="" loading="lazy" onerror="this.remove()">
+                                    </span>
+                                    <span class="coming-symbol" th:text="${d.symbol()}">MU</span>
+                                    <span class="coming-amount" th:if="${amount != null}"
+                                          th:text="${(d.receivedEur() != null ? '' : '≈ ') + #numbers.formatDecimal(amount, 1, 'COMMA', 2, 'POINT') + ' €'}">≈ 0.86 €</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </th:block>
+                </section>
+            </aside>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Almost everything here only hides and shows what the page already has; the star is the one thing sent to the server
+        const sources = [...document.querySelectorAll('.source')];
+        const feeds = {
+            portfolio: document.getElementById('portfolio'),
+            market: document.getElementById('market'),
+            metals: document.getElementById('metals'),
+            starred: document.getElementById('starred')
+        };
+        const starredCount = document.getElementById('starred-count');
+        const rail = document.getElementById('rail');   // Moving today, gold and silver and Coming up, when there is any
+
+        // On wide screens the column is a third one, with its own scroll; on narrower ones it goes back above the stories
+        const wideScreen = window.matchMedia('(min-width: 1400px)');
+        const newsPage = document.querySelector('.news-page');
+        const storiesFeeds = document.querySelector('.stories-feeds');
+        function placeRail() {
+            if (!rail) return;
+            if (wideScreen.matches && rail.parentElement !== newsPage) newsPage.append(rail);
+            if (!wideScreen.matches && rail.parentElement === newsPage) storiesFeeds.before(rail);
+        }
+        placeRail();
+        wideScreen.addEventListener('change', placeRail);
+        window.addEventListener('resize', placeRail);   // also when the window is resized, in case a browser does not report the change
+        let starsChanged = false;
+        const search = document.getElementById('search');
+        const count = document.getElementById('count');
+        const nothing = document.getElementById('nothing');
+        const storiesArea = document.getElementById('stories');
+        let showing = 'portfolio';
+        let symbol = null;
+
+        // ----- The holdings as a watchlist: the last week as a line (5 sessions and the close before them) and the last session's move
+        document.querySelectorAll('.source-trend').forEach(box => {
+            const closes = box.dataset.closes.split(',').map(Number).slice(-6);
+            const low = Math.min(...closes), high = Math.max(...closes);
+            const y = close => high === low ? 15 : 28 - (close - low) / (high - low) * 26;
+            const points = closes.map((close, i) => (i / (closes.length - 1) * 100).toFixed(2) + ',' + y(close).toFixed(2)).join(' ');
+            box.innerHTML = '<svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="' + points + '"/></svg>';
+            const last = closes[closes.length - 1], before = closes[closes.length - 2];
+            const move = before ? (last / before - 1) * 100 : 0;
+            const label = box.nextElementSibling;
+            label.textContent = (move < 0 ? '−' : '+') + Math.abs(move).toFixed(2) + '%';
+            box.classList.add(closes[closes.length - 1] < closes[0] ? 'down' : 'up');   // the line: how the week went
+            label.classList.add(move < 0 ? 'down' : 'up');                              // the figure: how the last session went
+        });
+
+        // ----- Three or more stories in a row from one holding: the first shows, the rest fold behind "N more from …"
+        // A holding chosen or a search shows them all: then you are looking for them
+        const opened = new Set();
+        let runs = 0;
+        document.querySelectorAll('.day-list').forEach(list => {
+            const stories = [...list.querySelectorAll('.story')];
+            for (let start = 0; start < stories.length;) {
+                const owner = stories[start].dataset.symbol;
+                let end = start + 1;
+                while (owner && !owner.includes(',') && end < stories.length && stories[end].dataset.symbol === owner) end++;
+                if (end - start >= 3) {
+                    const run = String(++runs);
+                    stories.slice(start + 1, end).forEach(story => { story.dataset.run = run; });
+                    const fold = document.createElement('li');
+                    fold.className = 'story-fold';
+                    fold.dataset.run = run;
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.textContent = (end - start - 1) + ' more from ' + owner;
+                    button.addEventListener('click', () => { opened.add(run); filter(); });
+                    fold.append(button);
+                    stories[start].after(fold);
+                }
+                start = end;
+            }
+        });
+
+        function filter() {
+            const words = search.value.trim().toLowerCase();
+            const feed = feeds[showing];
+            let shown = 0;
+            let total = 0;
+            const focused = symbol !== null || words !== '';
+            feed.querySelectorAll('.day').forEach(day => {
+                let inDay = 0;
+                day.querySelectorAll('.story').forEach(story => {
+                    total++;
+                    const matches = (symbol === null || story.dataset.symbol === symbol) && story.dataset.search.includes(words);
+                    const folded = Boolean(story.dataset.run) && !focused && !opened.has(story.dataset.run);   // a boolean: toggle() with undefined would flip it
+                    story.classList.toggle('hidden', !matches || folded);
+                    if (matches) inDay++;   // a folded story still counts: it is there, one click away
+                });
+                day.querySelectorAll('.story-fold').forEach(fold => fold.classList.toggle('hidden', focused || opened.has(fold.dataset.run)));
+                // A day stays only while one of its stories does
+                day.classList.toggle('hidden', inDay === 0);
+                day.querySelector('.day-total').textContent = inDay + (inDay === 1 ? ' story' : ' stories');
+                shown += inDay;
+            });
+            // Moving today and Coming up belong to all the holdings: they step aside for one holding or a search
+            if (rail) rail.classList.toggle('focused', symbol !== null || words !== '');
+            count.textContent = total === 0 ? '' : (shown === total ? total + ' stories' : shown + ' of ' + total);
+            nothing.classList.toggle('hidden', shown > 0 || total === 0);
+        }
+
+        function choose(button) {
+            // The Starred folder was drawn when the page loaded: after starring something, draw it again
+            if (button.dataset.show === 'starred' && starsChanged) {
+                location.hash = 'starred';
+                location.reload();
+                return;
+            }
+            // Leaving Starred: a later reload should not bring it back
+            if (button.dataset.show !== 'starred' && location.hash) history.replaceState(null, '', location.pathname);
+            sources.forEach(other => other.setAttribute('aria-pressed', String(other === button)));
+            showing = button.dataset.show;
+            symbol = button.dataset.symbol || null;
+            Object.entries(feeds).forEach(([name, feed]) => feed.classList.toggle('hidden', name !== showing));
+            storiesArea.scrollTop = 0;
+            window.scrollTo(0, 0);
+            filter();
+        }
+
+        sources.forEach(button => button.addEventListener('click', () => choose(button)));
+        search.addEventListener('input', filter);
+
+        // The symbol on a story, or a holding in Moving today or Coming up, shows only that holding's stories
+        // Listened on the whole page: on wide screens the column with Moving today is outside the stories
+        newsPage.addEventListener('click', event => {
+            // Gold or silver opens the Metals folder
+            if (event.target.closest('.metal-card')) {
+                choose(sources.find(button => button.dataset.show === 'metals'));
+                return;
+            }
+            // Only what names a holding; a dividend in Coming up is a link to the calendar and goes there
+            const chip = event.target.closest('.story-symbol[data-symbol], .move[data-symbol], .coming-item[data-symbol]');
+            if (!chip) return;
+            const source = sources.find(button => button.dataset.symbol === chip.dataset.symbol);
+            if (source) choose(source);
+        });
+
+        // The star: sent without reloading, so the folder and the search stay as they are.
+        // If that fails, the form is sent the normal way and the page reloads.
+        storiesArea.addEventListener('submit', async event => {
+            const form = event.target.closest('.star-form');
+            if (!form) return;
+            event.preventDefault();
+            const starred = form.elements.starred.value === 'true';
+            try {
+                // 'manual': the answer is a redirect to the whole page, which is not needed here
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: new URLSearchParams(new FormData(form)),
+                    redirect: 'manual'
+                });
+                if (!response.ok && response.type !== 'opaqueredirect') throw new Error('Status ' + response.status);
+            } catch (error) {
+                form.submit();
+                return;
+            }
+            // The same story can be in two folders (a holding and Starred): both stars change
+            document.querySelectorAll('.star-form[data-id="' + form.dataset.id + '"]').forEach(other => {
+                other.elements.starred.value = String(!starred);
+                other.querySelector('.star').setAttribute('aria-pressed', String(starred));
+            });
+            starredCount.textContent = Number(starredCount.textContent) + (starred ? 1 : -1);
+            starsChanged = true;
+        });
+
+        // Back on Starred after that reload (or with /news#starred)
+        const starredButton = sources.find(button => button.dataset.show === 'starred');
+        if (location.hash === '#starred') choose(starredButton);
+
+        // From the dashboard: /news#metals opens the Metals folder
+        if (location.hash === '#metals') choose(sources.find(button => button.dataset.show === 'metals'));
+
+        // From the dashboard: /news#holding=NVDA opens that holding's news (if it has any this week)
+        const wantedHolding = new URLSearchParams(location.hash.slice(1)).get('holding');
+        const holdingButton = sources.find(button => button.dataset.symbol === wantedHolding);
+        if (holdingButton) choose(holdingButton);
+
+        filter();
+    </script>
+</body>
+</html>

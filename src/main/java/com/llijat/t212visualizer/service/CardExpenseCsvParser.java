@@ -1,6 +1,7 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.CardExpenseCsvResult;
+import com.llijat.t212visualizer.model.CardCashback;
 import com.llijat.t212visualizer.model.CardExpense;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -23,16 +24,31 @@ public class CardExpenseCsvParser {
             .setHeader()
             .setSkipHeaderRecord(true)
             .get();
+
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssxxx");
+    private static final String CARD_DEBIT = "Card debit";
+    private static final String CASHBACK = "Spending cashback";
+
 
     public CardExpenseCsvResult parse(Reader reader) throws IOException {
         List<CardExpense> expenses = new ArrayList<>();
+        List<CardCashback> cashback = new ArrayList<>();
         Map<String, Long> ignored = new HashMap<>();
 
         try (CSVParser csv = CSV_FORMAT.parse(reader)) {
             for (CSVRecord row : csv) {
                 String action = row.get("Action");
-                if (!action.equals("Card debit")) {
+
+                if (action.equals(CASHBACK)) {
+                    cashback.add(new CardCashback(
+                            row.get("ID"),
+                            OffsetDateTime.parse(row.get("Time (UTC)"), TIME_FORMAT).toInstant(),
+                            new BigDecimal(row.get("Total")),
+                            row.get("Currency (Total)")));
+                    continue;
+                }
+
+                if (!action.equals(CARD_DEBIT)) {
                     ignored.merge(action, 1L, Long::sum);
                     continue;
                 }
@@ -47,6 +63,6 @@ public class CardExpenseCsvParser {
                         row.get("Merchant category")));
             }
         }
-        return new CardExpenseCsvResult(expenses, ignored);
+        return new CardExpenseCsvResult(expenses, cashback, ignored);
     }
 }

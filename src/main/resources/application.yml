@@ -1,5 +1,13 @@
 server:
   port: 8080
+  # The session (used to carry a message across a redirect) travels only in a cookie, never as ;jsessionid=... in the URL,
+  # where it would end up in the browser history
+  servlet:
+    session:
+      tracking-modes: cookie
+
+app:
+  zone: Europe/Madrid
 
 spring:
   profiles:
@@ -8,6 +16,18 @@ spring:
     scheduling:
       pool:
         size: 4
+  # Static files (CSS) get a fingerprint of their content in their name, for example common-3f9a2c.css.
+  # A changed file gets a new name, so browsers can keep each version for a year without ever showing a stale one.
+  web:
+    resources:
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /**
+      cache:
+        cachecontrol:
+          max-age: 365d
   servlet:
     multipart:
       max-file-size: 10MB
@@ -41,3 +61,15 @@ t212:
 finnhub:
   base-url: https://finnhub.io/api/v1
   api-key: ${FINNHUB_API_KEY:}
+  # The free plan allows 60 requests a minute: one second between quotes keeps the 15-minute refresh under it
+  request-delay-ms: 1000
+
+# Announced dividends and past closing prices. The free plan allows 25 requests a day and 5 a minute, 13 seconds apart.
+# The closes go first (backfill-per-day), but only for stocks without a month of them: once filled, they cost nothing.
+# The dividends get the rest (stocks-per-day), the stocks checked longest ago first.
+alpha-vantage:
+  base-url: https://www.alphavantage.co
+  api-key: ${ALPHA_VANTAGE_API_KEY:}
+  backfill-per-day: 15
+  stocks-per-day: 10
+  request-delay-ms: 13000

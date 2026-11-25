@@ -1,10 +1,18 @@
 package com.llijat.t212visualizer.service;
 
+import java.time.Clock;
+import java.time.ZoneId;
+
 import com.llijat.t212visualizer.dto.CardExpenseSummary;
 import com.llijat.t212visualizer.dto.CategorySpending;
 import com.llijat.t212visualizer.dto.MerchantSpending;
+import com.llijat.t212visualizer.dto.DailySpending;
+import com.llijat.t212visualizer.dto.MonthReport;
 import com.llijat.t212visualizer.dto.MonthlySpending;
+import com.llijat.t212visualizer.dto.PaymentLine;
+import com.llijat.t212visualizer.model.CardCashback;
 import com.llijat.t212visualizer.model.CardExpense;
+import com.llijat.t212visualizer.repository.CardCashbackRepository;
 import com.llijat.t212visualizer.repository.CardExpenseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,22 +26,34 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CardExpenseSummaryServiceTest {
 
+    private static final Clock CLOCK = Clock.system(ZoneId.of("Europe/Madrid"));
+
     @Mock
     private CardExpenseRepository repository;
+
+    @Mock
+    private CardCashbackRepository cashbackRepository;
+
+    // Without stubbing, Mockito answers an empty Map: no corrections, like a fresh install
+    @Mock
+    private MerchantCategoryService merchantCategoryService;
 
     private CardExpenseSummaryService summaryService;
 
     @BeforeEach
     void setUp() {
-        summaryService = new CardExpenseSummaryService(repository);
+        summaryService = new CardExpenseSummaryService(repository, cashbackRepository, merchantCategoryService, CLOCK);
     }
 
     private CardExpense expense(String amount, String dateTime, String merchant, String category) {
@@ -184,5 +204,375 @@ class CardExpenseSummaryServiceTest {
         assertTrue(summary.months().isEmpty());
         assertTrue(summary.categories().isEmpty());
         assertTrue(summary.topMerchants().isEmpty());
+    }
+
+    // ===== getMonthReport: one month, compared with the one before =====
+
+    private static final LocalDate NOV_15 = LocalDate.of(2026, 11, 15);
+
+    @Test
+    void theRunningMonth_countsUpToToday_andComparesWithTheSameDaysOfTheMonthBefore() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-100.00", "2026-11-03T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-60.00", "2026-11-15T12:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-80.00", "2026-10-10T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-500.00", "2026-10-20T12:00:00Z", "Shop", "RETAIL_STORES")));  // after day 15: not compared
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertTrue(report.current());
+        assertAmount("160.00", report.spent());
+        assertAmount("80.00", report.previousSameDays());
+        assertAmount("100.0", report.changePercent());
+    }
+
+    @Test
+    void aPastMonth_isComparedWithTheWholeMonthBefore_andHasNoProjection() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-90.00", "2026-09-30T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-80.00", "2026-08-31T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-20.00", "2026-08-02T12:00:00Z", "Bar", "RESTAURANTS")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 9), NOV_15);
+
+        assertFalse(report.current());
+        assertAmount("90.00", report.spent());
+        assertAmount("100.00", report.previousSameDays());
+        assertNull(report.projected());
+    }
+
+    @Test
+    void on31March_februaryIsComparedUpToThe28th_withoutFailing() {
+        // Without Math.min, February 31 would throw a DateTimeException
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-40.00", "2026-03-31T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-25.00", "2026-02-28T12:00:00Z", "Market", "RETAIL_STORES")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 3), LocalDate.of(2026, 3, 31));
+
+        assertAmount("40.00", report.spent());
+        assertAmount("25.00", report.previousSameDays());
+    }
+
+    @Test
+    void aPaymentJustAfterMidnightInSpain_belongsToTheSpanishDay() {
+        // 31 October 23:30 UTC is already 1 November 00:30 in Madrid
+        when(repository.findAll()).thenReturn(List.of(expense("-15.00", "2026-10-31T23:30:00Z", "Bar", "RESTAURANTS")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertAmount("15.00", report.spent());
+        assertAmount("0", report.previousSameDays());
+    }
+
+    @Test
+    void theProjection_addsTheUsualDailySpendingOfTheLast3FullMonths_forTheDaysLeft() {
+        // August to October: 920 EUR in 92 days = 10 EUR a day.
+        // On 15 November, with 200 spent and 15 days left: 200 + 15 * 10 = 350
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-200.00", "2026-11-03T12:00:00Z", "Shop", "RETAIL_STORES"),
+                expense("-300.00", "2026-08-01T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-300.00", "2026-09-15T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-320.00", "2026-10-31T12:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-1000.00", "2026-07-31T12:00:00Z", "Travel", "HOTELS")));  // before August: not counted
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertAmount("350.00", report.projected());
+    }
+
+    @Test
+    void onTheLastDayOfTheMonth_theProjectionIsWhatWasSpent() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-70.00", "2026-11-30T12:00:00Z", "Shop", "RETAIL_STORES"),
+                expense("-920.00", "2026-09-15T12:00:00Z", "Market", "RETAIL_STORES")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 30));
+
+        assertAmount("70.00", report.projected());
+    }
+
+    @Test
+    void categoriesAndMerchants_onlyIncludeThePaymentsOfThatMonth() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-30.00", "2026-11-05T12:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-10.00", "2026-11-06T12:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-99.00", "2026-10-05T12:00:00Z", "Cinema", "ENTERTAINMENT")));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertEquals(1, report.categories().size());
+        assertEquals("RESTAURANTS", report.categories().get(0).category());
+        assertAmount("40.00", report.categories().get(0).total());
+        assertEquals(1, report.topMerchants().size());
+        assertEquals("Bar", report.topMerchants().get(0).name());
+    }
+
+    @Test
+    void withNoPaymentsAtAll_everythingIsZero_andThereIsNoChange() {
+        when(repository.findAll()).thenReturn(List.of());
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15);
+
+        assertAmount("0", report.spent());
+        assertAmount("0", report.previousSameDays());
+        assertAmount("0", report.projected());
+        assertNull(report.changePercent());
+        assertTrue(report.categories().isEmpty());
+    }
+
+    // ===== The days of the month, for the heat map =====
+
+    @Test
+    void theRunningMonth_hasOneEntryPerDayUpToToday_withZeroOnDaysWithoutPayments() {
+        // Days 16 to 30 have not happened yet: they must not look like days without spending
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-10.00", "2026-11-03T09:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-52.40", "2026-11-03T18:00:00Z", "Market", "RETAIL_STORES"),
+                expense("-4.20", "2026-11-15T12:00:00Z", "Bar", "RESTAURANTS")));
+
+        List<DailySpending> days = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15).days();
+
+        assertEquals(15, days.size());
+        assertEquals(LocalDate.of(2026, 11, 1), days.get(0).date());
+        assertEquals(LocalDate.of(2026, 11, 15), days.get(14).date());
+        assertAmount("0", days.get(0).total());
+        assertAmount("62.40", days.get(2).total());   // two payments on the 3rd, added up
+        assertAmount("4.20", days.get(14).total());
+    }
+
+    @Test
+    void aPastMonth_hasEveryOneOfItsDays() {
+        when(repository.findAll()).thenReturn(List.of(expense("-20.00", "2026-09-30T12:00:00Z", "Bar", "RESTAURANTS")));
+
+        List<DailySpending> days = summaryService.getMonthReport(YearMonth.of(2026, 9), NOV_15).days();
+
+        assertEquals(30, days.size());
+        assertAmount("20.00", days.get(29).total());
+    }
+
+    @Test
+    void aPaymentLateAtNightInSpain_countsOnTheSpanishDay() {
+        // 2 November 23:30 UTC is already 3 November 00:30 in Madrid
+        when(repository.findAll()).thenReturn(List.of(expense("-15.00", "2026-11-02T23:30:00Z", "Bar", "RESTAURANTS")));
+
+        List<DailySpending> days = summaryService.getMonthReport(YearMonth.of(2026, 11), NOV_15).days();
+
+        assertAmount("0", days.get(1).total());
+        assertAmount("15.00", days.get(2).total());
+    }
+
+    // ===== Cashback =====
+
+    private static CardCashback cashback(String id, String amount, String dateTime) {
+        return new CardCashback(id, Instant.parse(dateTime), new BigDecimal(amount), "EUR");
+    }
+
+    @Test
+    void theTotalCashback_addsUpEveryPayment() {
+        when(cashbackRepository.findAll()).thenReturn(List.of(
+                cashback("cb-1", "0.08", "2026-10-03T01:10:00Z"),
+                cashback("cb-2", "0.12", "2026-11-04T01:10:00Z"),
+                cashback("cb-3", "5.40", "2026-11-05T01:10:00Z")));
+
+        assertAmount("5.60", summaryService.getTotalCashback());
+    }
+
+    @Test
+    void theCashbackOfAMonth_onlyCountsThatMonth_inSpanishTime() {
+        // 31 October 23:30 UTC is already 1 November in Madrid
+        when(cashbackRepository.findAll()).thenReturn(List.of(
+                cashback("cb-1", "0.08", "2026-10-31T12:00:00Z"),
+                cashback("cb-2", "0.30", "2026-10-31T23:30:00Z"),
+                cashback("cb-3", "0.12", "2026-11-14T01:10:00Z"),
+                cashback("cb-4", "0.50", "2026-12-01T01:10:00Z")));
+
+        assertAmount("0.42", summaryService.getCashback(YearMonth.of(2026, 11)));
+        assertAmount("0.08", summaryService.getCashback(YearMonth.of(2026, 10)));
+    }
+
+    @Test
+    void withoutCashback_bothAreZero() {
+        when(cashbackRepository.findAll()).thenReturn(List.of());
+
+        assertAmount("0", summaryService.getTotalCashback());
+        assertAmount("0", summaryService.getCashback(YearMonth.of(2026, 11)));
+    }
+
+    // ===== Categories corrected by merchant =====
+
+    @Test
+    void aCorrectedMerchant_countsInItsNewCategory_inTheSummaryAndInTheMonth() {
+        // T212 calls the ferry a hotel; the user said it is transport
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-60.00", "2026-11-03T10:00:00Z", "Ferry Company", "HOTELS"),
+                expense("-20.00", "2026-11-04T10:00:00Z", "Ferry Company", "HOTELS")));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        List<CategorySpending> inSummary = summaryService.getSummary().categories();
+        List<CategorySpending> inMonth = summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 16)).categories();
+
+        for (List<CategorySpending> categories : List.of(inSummary, inMonth)) {
+            assertEquals(1, categories.size());
+            assertEquals("TRANSPORT", categories.get(0).category());
+            assertAmount("80.00", categories.get(0).total());
+            assertEquals(2, categories.get(0).payments());
+        }
+    }
+
+    @Test
+    void aCorrection_onlyChangesThatMerchant() {
+        // A real hotel stays a hotel
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-60.00", "2026-11-03T10:00:00Z", "Ferry Company", "HOTELS"),
+                expense("-90.00", "2026-11-05T10:00:00Z", "Seaside Hotel", "HOTELS")));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        List<CategorySpending> categories = summaryService.getSummary().categories();
+
+        assertEquals(2, categories.size());
+        assertEquals("HOTELS", categories.get(0).category());
+        assertAmount("90.00", categories.get(0).total());
+        assertEquals("TRANSPORT", categories.get(1).category());
+        assertAmount("60.00", categories.get(1).total());
+    }
+
+    @Test
+    void aMerchantWithoutCategory_canBeGivenOne() {
+        // Without the correction it would fall into OTHER
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-12.00", "2026-11-03T10:00:00Z", "Street Market", null)));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Street Market", "GROCERY"));
+
+        assertEquals("GROCERY", summaryService.getSummary().categories().get(0).category());
+    }
+
+    @Test
+    void aPaymentWithoutMerchant_doesNotBreakTheCorrections() {
+        // Map.of throws if asked about a null key: the merchant must be checked first
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-5.00", "2026-11-03T10:00:00Z", null, "RESTAURANTS")));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        assertEquals("RESTAURANTS", summaryService.getSummary().categories().get(0).category());
+    }
+
+    @Test
+    void theCorrections_areReadOncePerPage_notOncePerPayment() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-1.00", "2026-11-01T10:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-2.00", "2026-11-02T10:00:00Z", "Bar", "RESTAURANTS"),
+                expense("-3.00", "2026-11-03T10:00:00Z", "Bar", "RESTAURANTS")));
+
+        summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 16));
+
+        org.mockito.Mockito.verify(merchantCategoryService, org.mockito.Mockito.times(1)).getCorrections();
+    }
+
+    // ===== The list of payments of the month =====
+
+    private List<PaymentLine> paymentsOfNovember() {
+        return summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 16)).payments();
+    }
+
+    @Test
+    void thePayments_comeFromTheNewestToTheOldest_evenWithinTheSameDay() {
+        // Three payments on the same day: only the hour can sort them
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-3.00", "2026-11-10T09:00:00Z", "Bakery", "GROCERY"),
+                expense("-30.00", "2026-11-10T19:00:00Z", "Corner Bistro", "RESTAURANTS"),
+                expense("-50.00", "2026-11-02T12:00:00Z", "Market", "GROCERY"),
+                expense("-12.00", "2026-11-10T13:00:00Z", "Bookshop", "RETAIL_STORES")));
+
+        List<PaymentLine> payments = paymentsOfNovember();
+
+        assertEquals(List.of("Corner Bistro", "Bookshop", "Bakery", "Market"),
+                payments.stream().map(PaymentLine::merchant).toList());
+    }
+
+    @Test
+    void eachPayment_showsItsSpanishDate_andWhatWasSpent_asAPositiveAmount() {
+        // 23:30 UTC on 4 November is already 5 November in Spain
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-18.40", "2026-11-04T23:30:00Z", "Night Bar", "RESTAURANTS")));
+
+        PaymentLine payment = paymentsOfNovember().get(0);
+
+        assertEquals(LocalDate.of(2026, 11, 5), payment.date());
+        assertAmount("18.40", payment.amount());
+        assertEquals("RESTAURANTS", payment.category());
+        assertFalse(payment.corrected());
+    }
+
+    @Test
+    void onlyThePaymentsOfTheMonth_areListed() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-10.00", "2026-10-31T10:00:00Z", "Market", "GROCERY"),
+                expense("-20.00", "2026-11-01T10:00:00Z", "Market", "GROCERY"),
+                expense("-30.00", "2026-12-01T10:00:00Z", "Market", "GROCERY")));
+
+        List<PaymentLine> payments = paymentsOfNovember();
+
+        assertEquals(1, payments.size());
+        assertAmount("20.00", payments.get(0).amount());
+    }
+
+    @Test
+    void aCorrectedMerchant_showsItsNewCategory_andIsMarkedAsCorrected() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-60.00", "2026-11-03T10:00:00Z", "Ferry Company", "HOTELS"),
+                expense("-90.00", "2026-11-05T10:00:00Z", "Seaside Hotel", "HOTELS")));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        List<PaymentLine> payments = paymentsOfNovember();
+
+        assertEquals("Seaside Hotel", payments.get(0).merchant());
+        assertEquals("HOTELS", payments.get(0).category());
+        assertFalse(payments.get(0).corrected());
+        assertEquals("Ferry Company", payments.get(1).merchant());
+        assertEquals("TRANSPORT", payments.get(1).category());
+        assertTrue(payments.get(1).corrected());
+    }
+
+    @Test
+    void aPaymentWithoutMerchantOrCategory_isListedAsOther_andNotCorrected() {
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-5.00", "2026-11-03T10:00:00Z", null, null)));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        PaymentLine payment = paymentsOfNovember().get(0);
+
+        assertEquals("OTHER", payment.category());
+        assertFalse(payment.corrected());
+    }
+
+    @Test
+    void theListAndTheCategories_alwaysAgree() {
+        // Adding up the list by category must give exactly the category totals
+        when(repository.findAll()).thenReturn(List.of(
+                expense("-60.00", "2026-11-03T10:00:00Z", "Ferry Company", "HOTELS"),
+                expense("-25.00", "2026-11-04T10:00:00Z", "Bus Line", "TRANSPORT"),
+                expense("-90.00", "2026-11-05T10:00:00Z", "Seaside Hotel", "HOTELS"),
+                expense("-7.00", "2026-11-06T10:00:00Z", "Kiosk", null)));
+        when(merchantCategoryService.getCorrections()).thenReturn(Map.of("Ferry Company", "TRANSPORT"));
+
+        MonthReport report = summaryService.getMonthReport(YearMonth.of(2026, 11), LocalDate.of(2026, 11, 16));
+
+        for (CategorySpending category : report.categories()) {
+            BigDecimal fromTheList = report.payments().stream()
+                    .filter(payment -> payment.category().equals(category.category()))
+                    .map(PaymentLine::amount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            assertAmount(category.total().toPlainString(), fromTheList);
+        }
+        assertAmount("85.00", report.categories().stream()
+                .filter(category -> category.category().equals("TRANSPORT")).findFirst().orElseThrow().total());
+    }
+
+    @Test
+    void aMonthWithoutPayments_hasAnEmptyList() {
+        when(repository.findAll()).thenReturn(List.of());
+
+        assertTrue(paymentsOfNovember().isEmpty());
     }
 }

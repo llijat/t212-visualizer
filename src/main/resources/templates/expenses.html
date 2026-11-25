@@ -4,37 +4,62 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Expenses · T212 Visualizer</title>
-    <link rel="stylesheet" href="/css/common.css">
+    <!-- @{...} adds a fingerprint of the file to its name, so a changed stylesheet is never taken from the cache -->
+    <link rel="stylesheet" th:href="@{/css/common.css}" href="/css/common.css">
+    <script>
+        // Changing month or saving a form reloads this same page: mark it before it is drawn, so the bars do not grow again.
+        // Browsers without the Navigation API simply keep the animation.
+        try {
+            const from = navigation.activation.from;
+            if (from && from.url && new URL(from.url).pathname === location.pathname) {
+                document.documentElement.classList.add('same-page');
+            }
+        } catch (e) { /* no Navigation API: nothing to do */ }
+    </script>
     <style>
+        /* ===== One colour per category: its icon, its bar, its share of the month and its menu ===== */
+        .tinted { --c: var(--muted); }
+        .cat-RESTAURANTS { --c: var(--cat-2); }
+        .cat-RETAIL_STORES { --c: var(--cat-3); }
+        .cat-TRANSPORT { --c: var(--cat-1); }
+        .cat-ENTERTAINMENT { --c: var(--cat-5); }
+        .cat-SERVICE_PROVIDERS { --c: var(--cat-6); }
+        .cat-PERSONAL_SERVICES { --c: var(--cat-4); }
+        .cat-CLOTHING_STORES { --c: var(--cat-7); }
+        .cat-HOTELS { --c: var(--cat-8); }
+        .cat-AUTOMOBILE { --c: var(--cat-9); }
+        .cat-AUTOMOBILE_RENTAL { --c: var(--cat-9); }
+        .cat-BUSINESS_SERVICES { --c: var(--cat-6); }
+        .cat-GOVERNMENT_SERVICES { --c: var(--cat-10); }
+        /* Your own categories: a colour by the order they were made in, the same one everywhere on the page */
+        .custom-0 { --c: var(--cat-custom-1); }
+        .custom-1 { --c: var(--cat-custom-2); }
+        .custom-2 { --c: var(--cat-custom-3); }
+        .custom-3 { --c: var(--cat-custom-4); }
+        .custom-4 { --c: var(--cat-custom-5); }
+        .custom-5 { --c: var(--cat-custom-6); }
+
         /* ===== Import result, above the content ===== */
         .notice {
-            margin: 1rem 1.5rem 0;
-            padding: 0.7rem 1rem;
-            border: 1px solid var(--border);
-            border-radius: 10px;
+            margin: 1rem 2rem 0;
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius-md);
             background: var(--panel);
             display: flex;
             align-items: baseline;
             flex-wrap: wrap;
             gap: 0.25rem 0.9rem;
-            font-size: 0.9rem;
+            font-size: var(--fs-sm);
         }
         .notice strong { font-weight: 600; }
-        .notice-success { border-color: #1f5c3a; }
+        .notice-success { box-shadow: inset 3px 0 0 var(--green); }
         .notice-success strong { color: var(--green); }
-        .notice-error { border-color: #7a2e2e; }
+        .notice-error { box-shadow: inset 3px 0 0 var(--red); }
         .notice-error strong { color: var(--red); }
-        .notice details { color: var(--muted); font-size: 0.82rem; }
+        .notice details { color: var(--muted); font-size: var(--fs-xs); }
         .notice summary { cursor: pointer; }
         .notice summary:hover { color: var(--text); }
-        .skipped {
-            list-style: none;
-            margin: 0.45rem 0 0;
-            padding: 0;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.25rem 1rem;
-        }
+        .skipped { list-style: none; margin: 0.45rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
         .skipped b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
 
         /* ===== No data yet: the drop area has the shape of a bank card ===== */
@@ -52,9 +77,9 @@
             position: relative;
             width: min(440px, 100%);
             aspect-ratio: 85.6 / 54;    /* the real proportions of a bank card */
-            border: 1.5px dashed #3d4452;
-            border-radius: 20px;
-            background: var(--panel);
+            border: 1.5px dashed #3a4558;
+            border-radius: var(--radius-lg);
+            background: linear-gradient(135deg, #1a2230, var(--panel));
             color: var(--text);
             display: flex;
             flex-direction: column;
@@ -64,7 +89,7 @@
             padding: 1.75rem;
             text-align: left;
         }
-        .card-drop:hover, .card-drop.is-busy { border-color: var(--accent); background: #1a1f29; }
+        .card-drop:hover, .card-drop.is-busy { border-color: var(--accent); }
         .card-drop.is-busy { cursor: wait; }
         .card-chip {
             position: absolute;
@@ -73,181 +98,357 @@
             width: 46px;
             height: 34px;
             border: 1.5px solid #5b6372;
-            border-radius: 7px;
+            border-radius: var(--radius-sm);
             background:
                 linear-gradient(#5b6372, #5b6372) 0 50% / 100% 1.5px no-repeat,
                 linear-gradient(#5b6372, #5b6372) 50% 0 / 1.5px 100% no-repeat;
         }
         .card-brand-icon { position: absolute; top: 1.75rem; right: 1.75rem; font-size: 1.5rem; color: var(--accent); }
-        .card-title { font-size: 1.35rem; font-weight: 600; }
-        .card-hint { color: var(--muted); font-size: 0.9rem; }
-        .welcome-note { max-width: 44ch; margin: 0; text-align: center; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+        .card-hint { color: var(--muted); font-size: var(--fs-sm); }
+        .welcome-note { max-width: 44ch; margin: 0; text-align: center; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
 
-        /* ===== With data: overview on top, two lists below ===== */
-        .spending {
-            flex: 1;
-            min-height: 0;
+        /* ===== With data: the month on top, three columns below. This area scrolls; the top bar stays ===== */
+        .spending { flex: 1; min-height: 0; overflow-y: auto; padding: 1.75rem 2rem 2.5rem; }
+
+        /* ===== The month: the one bold element ===== */
+        .month {
             display: grid;
-            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-            grid-template-rows: auto minmax(0, 1fr);
-            gap: 1rem;
-            padding: 1rem 1.5rem;
+            grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 1.45fr);
+            gap: 3rem;
+            align-items: end;
+            padding-bottom: 2rem;
         }
-        .panel {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 1rem 1.25rem;
-            min-height: 0;
-            display: flex;
-            flex-direction: column;
-        }
-        .panel h2 { margin: 0 0 0.6rem; font-size: 1rem; }
-
-        /* ===== Overview: the total as a sentence, next to the months ===== */
-        .overview {
-            grid-column: 1 / -1;
-            display: grid;
-            grid-template-columns: minmax(220px, 1fr) minmax(0, 3fr);
-            gap: 2rem;
-            align-items: stretch;
-        }
-        .total { display: flex; flex-direction: column; justify-content: center; gap: 0.5rem; }
-        .total-label { color: var(--muted); font-size: 0.9rem; }
-        .total-value {
-            font-size: clamp(2rem, 3.1vw, 2.9rem);
-            font-weight: 700;
-            line-height: 1.05;
-            letter-spacing: -0.02em;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-        .total-detail { margin: 0; max-width: 34ch; color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
-        .total-detail b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
-
-        /* ===== Bars per month. Each height is its amount (--v) over the biggest month (--max) ===== */
-        .chart {
-            list-style: none;
-            margin: 0;
-            padding: 1.5rem 0 0;
-            height: 190px;
-            display: flex;
-            gap: 2px;
-        }
-        .chart-column {
-            flex: 1;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            border-radius: 4px;
-            cursor: default;
-        }
-        .chart-plot {
-            position: relative;
-            flex: 1;
-            min-height: 0;
-            border-bottom: 1px solid var(--border);
-        }
-        .chart-bar {
-            position: absolute;
-            left: 50%;
-            bottom: 0;
-            width: min(70%, 34px);
-            transform: translateX(-50%);
-            height: max(2px, calc(var(--v) / var(--max) * 100%));
-            border-radius: 4px 4px 0 0;
-            background: #3b6ea5;
-        }
-        .chart-column.is-peak .chart-bar { background: var(--accent); }
-        .chart-column:hover .chart-bar, .chart-column:focus-visible .chart-bar { background: #93c5fd; }
-
-        .chart-value, .chart-tip {
-            position: absolute;
-            left: 50%;
-            bottom: calc(max(2px, var(--v) / var(--max) * 100%) + 0.3rem);
-            transform: translateX(-50%);
-            font-size: 0.75rem;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-        .chart-value { color: var(--text); font-weight: 600; }
-        .chart-tip {
-            z-index: 1;
-            padding: 0.2rem 0.5rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: #252a34;
-            color: var(--text);
-            opacity: 0;
-            pointer-events: none;
-        }
-        .chart-column:hover .chart-tip, .chart-column:focus-visible .chart-tip { opacity: 1; }
-        /* At both ends of the chart the tip opens inwards, so it never leaves the screen */
-        .chart-column:nth-child(-n+3) .chart-tip { left: 0; transform: none; }
-        .chart-column:nth-last-child(-n+3) .chart-tip { left: auto; right: 0; transform: none; }
-        /* The month's tip replaces the fixed label of the peak, so they do not overlap */
-        .chart-column:hover .chart-value, .chart-column:focus-visible .chart-value { opacity: 0; }
-
-        .chart-axis {
-            height: 2.1rem;
-            padding-top: 0.3rem;
-            text-align: center;
-            color: var(--muted);
-            font-size: 0.72rem;
-            line-height: 1.25;
-        }
-        .chart-year { display: block; color: var(--text); font-variant-numeric: tabular-nums; }
-
-        /* Only on load, and only if the person has not asked for reduced motion */
-        @media (prefers-reduced-motion: no-preference) {
-            .chart-bar { transform-origin: bottom; animation: grow 0.5s ease-out both; }
-            @keyframes grow {
-                from { transform: translateX(-50%) scaleY(0); }
-                to { transform: translateX(-50%) scaleY(1); }
-            }
-        }
-
-        /* ===== Ranked lists: categories and merchants ===== */
-        .rank-list { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0; overflow-y: auto; }
-        .rank-list {
-            scrollbar-width: thin;
-            scrollbar-color: transparent transparent;
-        }
-        .rank-list:hover { scrollbar-color: #3a3f4b transparent; }
-
-        .rank-row {
-            display: grid;
-            grid-template-columns: 2.25rem minmax(0, 1fr) auto;
-            column-gap: 0.75rem;
-            align-items: center;
-            padding: 0.5rem 0.25rem 0.5rem 0;
-            border-bottom: 1px solid var(--border);
-        }
-        .rank-row:last-child { border-bottom: none; }
-        .rank-symbol {
-            grid-row: span 2;
-            width: 2.25rem;
-            height: 2.25rem;
+        .month-nav { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.1rem; }
+        .month-name { margin: 0; font: 500 var(--fs-xl) var(--figures); letter-spacing: 0.01em; }
+        .month-step {
+            width: 2rem;
+            height: 2rem;
             display: grid;
             place-items: center;
-            border-radius: 8px;
-            background: var(--accent-bg);
-            color: #93c5fd;
-            font-size: 1.05rem;
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            color: var(--muted);
         }
-        .rank-initial { font-size: 0.85rem; font-weight: 600; }
-        .rank-name { min-width: 0; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .rank-amount { font-size: 0.9rem; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .rank-track { display: block; height: 4px; margin-top: 0.3rem; }
-        .rank-fill {
-            display: block;
-            height: 100%;
-            min-width: 3px;
-            width: calc(var(--v) / var(--max) * 100%);
-            border-radius: 2px;
-            background: #3b6ea5;
+        .month-step:hover { color: var(--text); border-color: var(--faint); }
+        .month-step.is-placeholder { visibility: hidden; }
+        .month-today { color: var(--accent); font-size: var(--fs-sm); text-decoration: none; }
+        .month-today:hover { text-decoration: underline; }
+
+        .figure { margin: 0; font: 300 clamp(2.6rem, 4vw, var(--fs-display))/1 var(--figures);   /* the same size as the account value on the dashboard */ letter-spacing: -0.02em; white-space: nowrap; }
+        .figure small { margin-left: 0.15em; font-size: 0.42em; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+        .verdict { margin: 0.6rem 0 0; max-width: 42ch; color: var(--muted); font-size: var(--fs-md); text-wrap: pretty; }
+        .verdict b { font-weight: 600; }
+        .verdict .is-up { color: var(--red); }      /* spending more */
+        .verdict .is-down { color: var(--green); }  /* spending less */
+
+        /* Pace: the month so far, against the month before at this point and in full, and where it is heading */
+        .pace { margin-top: 1.5rem; max-width: 34rem; }
+        .pace-track { position: relative; height: 10px; border-radius: var(--radius-sm); background: var(--raised); }
+        .pace-spent {
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: max(4px, var(--spent));
+            border-radius: var(--radius-sm);
+            background: linear-gradient(90deg, #4f7fd6, var(--accent));
         }
-        .rank-detail { color: var(--muted); font-size: 0.75rem; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .pace-ahead {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: var(--spent);
+            width: calc(var(--projected) - var(--spent));
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--accent) 35%, transparent) 0 4px, transparent 4px 8px);
+        }
+        .pace-tick { position: absolute; top: -5px; bottom: -5px; left: var(--at); width: 2px; border-radius: var(--radius-xs); background: var(--text); }
+        .pace-tick.is-now { top: -3px; bottom: -3px; background: var(--muted); }
+        .pace-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1.4rem; margin: 0.8rem 0 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--fs-xs); }
+        .pace-legend li { display: inline-flex; align-items: center; gap: 0.45rem; }
+        .pace-legend b { color: var(--text); font: 500 var(--fs-sm) var(--figures); }
+        .mark { width: 2px; height: 12px; border-radius: var(--radius-xs); background: var(--text); }
+        .mark.is-now { height: 9px; background: var(--muted); }
+        .mark.is-ahead { width: 12px; height: 8px; border-radius: var(--radius-xs); background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--accent) 60%, transparent) 0 2px, transparent 2px 4px); }
+
+        .month-notes { margin-top: 1.1rem; display: flex; flex-wrap: wrap; gap: 0.35rem 1.6rem; color: var(--muted); font-size: var(--fs-sm); }
+        .month-notes b { color: var(--text); font-family: var(--figures); font-weight: 500; }
+
+        /* Heat map: one square per day, Monday first. Its colour is a step (data-level) of the day over the month's biggest day */
+        .heatmap { align-self: stretch; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.5rem; }
+        .heatmap-head, .heatmap-grid { display: grid; grid-template-columns: repeat(7, 30px); gap: 5px; }
+        .heatmap-head { color: var(--faint); font-size: var(--fs-2xs); text-align: center; }
+        .heatmap-grid { list-style: none; margin: 0; padding: 0; }
+        .heatmap-grid > :first-child { grid-column-start: var(--start); }
+        .heatmap-day {
+            width: 30px;
+            height: 30px;
+            display: grid;
+            place-items: center;
+            border-radius: var(--radius-sm);
+            background: color-mix(in srgb, var(--accent) var(--mix, 0%), #1a212c);
+            color: var(--text);
+            font: 500 var(--fs-2xs) var(--figures);
+            font-variant-numeric: tabular-nums;
+            transition: transform 0.12s;
+        }
+        button.heatmap-day:hover { transform: scale(1.08); }
+        /* Four steps instead of a smooth scale: in the middle of a smooth one, neither a light nor a dark number
+           reaches the 4.5:1 contrast. Light numbers on steps 1-2 (8.6:1, 5.2:1), dark ones on steps 3-4 (5.5:1, 9.0:1); a day with nothing, 4.5:1 */
+        .heatmap-day[data-level="1"] { --mix: 22%; }
+        .heatmap-day[data-level="2"] { --mix: 44%; }
+        .heatmap-day[data-level="3"] { --mix: 72%; }
+        .heatmap-day[data-level="4"] { --mix: 100%; }
+        .heatmap-day.is-strong { color: var(--bg); }        /* dark number on the brightest days */
+        .heatmap-day.is-zero { color: var(--faint); }
+        .heatmap-day.is-future { background: none; border: 1px dashed var(--border); color: var(--faint); }
+        .heatmap-day.is-today { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--text); }
+        .heatmap-day.is-selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent); }
+        .heatmap-detail { margin: 0; min-height: 1.3em; color: var(--muted); font-size: var(--fs-xs); }
+        .heatmap-detail b { color: var(--text); font-family: var(--figures); font-weight: 500; }
+
+        /* Bars per month. Each height is its amount (--v) over the top of the chart (--max) */
+        .year { align-self: stretch; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
+        .chart {
+            position: relative;
+            list-style: none;
+            margin: 0;
+            padding: 1.4rem 0 0 2.6rem;
+            height: 215px;
+            display: flex;
+            gap: 6px;
+        }
+        /* Guide lines, drawn by the script at round amounts */
+        .chart-grid { position: absolute; inset: 1.4rem 0 2.1rem 2.6rem; pointer-events: none; }
+        .chart-grid span { position: absolute; left: 0; right: 0; bottom: var(--at); border-top: 1px dashed var(--border); }
+        .chart-grid b { position: absolute; left: -2.6rem; top: -0.55rem; color: var(--faint); font: 400 var(--fs-2xs) var(--figures); }
+        .chart-column { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .chart-link { flex: 1; min-height: 0; display: flex; flex-direction: column; border-radius: var(--radius-sm); color: inherit; text-decoration: none; }
+        .chart-plot { position: relative; flex: 1; min-height: 0; }
+        .chart-bar {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: max(2px, calc(var(--v) / var(--max) * 100%));
+            border-radius: var(--radius-sm) var(--radius-sm) var(--radius-xs) var(--radius-xs);
+            background: linear-gradient(#3e5f96, #2b4269);
+            transition: filter 0.15s;
+        }
+        .chart-column:hover .chart-bar, .chart-column:focus-within .chart-bar { filter: brightness(1.35); }
+        .chart-column.is-selected .chart-bar { background: linear-gradient(var(--accent), #5b86d4); }
+        /* Where the running month is heading, drawn dashed on top of its bar */
+        .chart-projection {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: calc(var(--v) / var(--max) * 100%);
+            height: calc((var(--p) - var(--v)) / var(--max) * 100%);
+            border: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+            border-bottom: none;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+        }
+        .chart-tip {
+            position: absolute;
+            z-index: 1;
+            left: 50%;
+            bottom: calc(max(2px, var(--v) / var(--max) * 100%) + 6px);
+            translate: -50% 4px;
+            padding: 0.25rem 0.55rem;
+            border-radius: var(--radius-sm);
+            background: var(--raised);
+            color: var(--text);
+            font: 500 var(--fs-2xs) var(--figures);
+            white-space: nowrap;
+            box-shadow: 0 6px 16px rgb(0 0 0 / 0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s, translate 0.15s;
+        }
+        .chart-column:hover .chart-tip, .chart-column:focus-within .chart-tip { opacity: 1; translate: -50% 0; }
+        /* At both ends of the chart the tip opens inwards, so it never leaves the screen */
+        .chart-column:nth-child(-n+3 of .chart-column) .chart-tip { left: 0; translate: 0 4px; }
+        .chart-column:nth-child(-n+3 of .chart-column):hover .chart-tip { translate: 0 0; }
+        .chart-column:nth-last-child(-n+3) .chart-tip { left: auto; right: 0; translate: 0 4px; }
+        .chart-column:nth-last-child(-n+3):hover .chart-tip { translate: 0 0; }
+        .chart-axis { height: 2.1rem; padding-top: 0.4rem; text-align: center; color: var(--faint); font-size: var(--fs-2xs); line-height: 1.25; }
+        .chart-column.is-selected .chart-axis { color: var(--text); font-weight: 600; }
+        .chart-year { display: block; color: var(--muted); font-family: var(--figures); }
+
+        /* Only on arrival, and only if the person has not asked for reduced motion */
+        @media (prefers-reduced-motion: no-preference) {
+            .chart-bar { transform-origin: bottom; animation: grow 0.5s ease-out both; }
+            .same-page .chart-bar { animation: none; }
+            @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+        }
+
+        /* ===== Below: categories · payments · budgets, subscriptions and merchants ===== */
+        /* The three columns end on the same line: the board is as tall as its longest column, the categories card and the
+           last card on the right grow to it, and the payments list fills its card (contain: size, so its own length never sets the height) */
+        .board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 1.25rem; align-items: stretch; }
+        .stack { display: grid; gap: 1.25rem; grid-template-rows: auto auto 1fr; }
+        .payments-panel { display: flex; flex-direction: column; }
+        .panel { background: var(--panel); border-radius: var(--radius); padding: 1.25rem 1.35rem; }
+        .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+        .panel-head > span { color: var(--muted); font-size: var(--fs-sm); }
+        .panel-head .figures { color: var(--text); }
+        .empty-month, .panel-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+        .panel-error { margin: 0 0 0.75rem; color: var(--red); font-size: var(--fs-sm); }
+        .amount { font: 500 var(--fs-md) var(--figures); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .rows { list-style: none; margin: 0; padding: 0; }
+
+        /* Icon tile, tinted with the category's colour */
+        .tile {
+            flex: none;
+            width: 2.2rem;
+            height: 2.2rem;
+            display: grid;
+            place-items: center;
+            border-radius: var(--radius-md);
+            background: color-mix(in srgb, var(--c) 16%, transparent);
+            color: var(--c);
+            font-size: var(--fs-lg);
+        }
+        .avatar {
+            flex: none;
+            width: 2.2rem;
+            height: 2.2rem;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: var(--raised);
+            color: var(--muted);
+            font: 600 var(--fs-sm) var(--figures);
+        }
+
+        /* Categories: the month split in one bar, then one row each */
+        .split { display: flex; height: 12px; gap: 3px; margin-bottom: 1.1rem; }
+        .split i { flex: var(--v); min-width: 3px; border-radius: var(--radius-xs); background: var(--c); }
+        .cat-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.55rem 0.5rem; margin: 0 -0.5rem; border-radius: var(--radius-md); }
+        .cat-row:hover { background: var(--raised); }
+        /* A category or a merchant shows only its payments: the same row pressed again shows them all */
+        [data-only] { cursor: pointer; }
+        [data-only]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        [data-only][aria-pressed="true"] { background: var(--raised); }
+        .line-row[data-only] { margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; border-radius: var(--radius-md); }
+        .line-row[data-only]:hover { background: var(--raised); }
+        .row-main { flex: 1; min-width: 0; }
+        .row-line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+        .row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .row-sub { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.1rem; color: var(--muted); font-size: var(--fs-xs); }
+
+        /* Payments, grouped by day */
+        .payments-tools { display: flex; gap: 0.6rem; margin-bottom: 0.6rem; }
+        .payments-search {
+            flex: 1;
+            min-width: 0;
+            height: var(--control-h);
+            padding: 0 0.85rem 0 2.2rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--bg) no-repeat 0.75rem 50% / 1rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+            font-size: var(--fs-sm);
+        }
+        .payments-search::placeholder { color: var(--faint); }
+        .payments-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .payments-hint { margin: 0 0 0.6rem; color: var(--faint); font-size: var(--fs-xs); }
+        .payments { flex: 1 1 0; min-height: 26rem; contain: size; overflow-y: auto; margin: 0 -0.5rem; padding: 0 0.5rem; }
+        .day-head {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            justify-content: space-between;
+            padding: 0.6rem 0 0.35rem;
+            background: var(--panel);
+            color: var(--muted);
+            font-size: var(--fs-xs);
+        }
+        .day-head .figures { color: var(--muted); }
+        /* What scrolls under the day's head fades out instead of being cut in half (the amount looked crossed out) */
+        .day-head::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 0.75rem; background: linear-gradient(var(--panel), transparent); pointer-events: none; }
+        .pay-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.5rem; margin: 0 -0.5rem; border-radius: var(--radius-md); }
+        .pay-row:hover { background: var(--raised); }
+        .pay-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pay-fix { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.15rem; min-width: 0; }
+        .pay-fix form { margin: 0; min-width: 0; }
+        .pay-plain { color: var(--muted); font-size: var(--fs-xs); }
+        /* The category menu: a small pill in the category's colour */
+        .pay-category {
+            max-width: 100%;
+            height: 1.6rem;
+            padding: 0 0.55rem;
+            border: 1px solid transparent;
+            border-radius: var(--radius-pill);
+            background: color-mix(in srgb, var(--c) 12%, transparent);
+            color: color-mix(in srgb, var(--c) 75%, var(--text));
+            font-size: var(--fs-2xs);
+            cursor: pointer;
+        }
+        .pay-category:hover { border-color: color-mix(in srgb, var(--c) 45%, transparent); }
+        .pay-category.is-corrected { box-shadow: inset 0 0 0 1px var(--accent); }
+        .pay-category::picker-icon { font-size: 0.7em; color: currentColor; }
+        .pay-reset { padding: 4px 0; margin: -4px 0; background: none; color: var(--muted); font-size: var(--fs-2xs); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+        .pay-reset:hover { color: var(--text); }
+
+        /* Budgets: measured against the limit (--p, in %), with a button to remove */
+        .budget { position: relative; padding: 0.55rem 3.8rem 0.55rem 0; }
+        .budget-line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font-size: var(--fs-md); }
+        .budget-line .figures { color: var(--muted); font-size: var(--fs-sm); }
+        .budget-line .figures b { color: var(--text); font-weight: 500; }
+        .meter { height: 6px; margin: 0.45rem 0 0.3rem; border-radius: var(--radius-xs); background: var(--raised); overflow: hidden; }
+        .meter i { display: block; height: 100%; width: min(calc(var(--p) * 1%), 100%); border-radius: var(--radius-xs); background: var(--c); }
+        .budget-sub { color: var(--muted); font-size: var(--fs-xs); }
+        .budget.is-over .meter i { background: var(--red); }
+        .budget.is-over .budget-sub { color: var(--red); }
+        .budget-delete { position: absolute; top: 0.45rem; right: 0; margin: 0; }
+        .budget-delete button { width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: var(--radius-sm); background: none; color: var(--faint); }
+        .budget-delete button:hover, .budget-delete button:focus-visible { background: var(--raised); color: var(--red); }
+        /* Changing the limit: a pencil next to the cross; the form opens under the budget */
+        .budget-edit summary { position: absolute; top: 0.45rem; right: 1.8rem; width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--faint); cursor: pointer; list-style: none; }
+        .budget-edit summary::-webkit-details-marker { display: none; }
+        .budget-edit summary:hover, .budget-edit summary:focus-visible, .budget-edit[open] summary { background: var(--raised); color: var(--text); }
+        .budget-edit .budget-form { margin: 0.55rem -3.8rem 0 0; }   /* the whole width, under the two buttons too */
+        .budget-form .budget-cancel { background: none; color: var(--muted); padding: 0 0.6rem; font-weight: 500; }
+        .budget-form .budget-cancel:hover { color: var(--text); }
+        /* Naming a new category from a payment's menu: the form opens under that payment */
+        .new-category { margin: 0 0 0.5rem 3.05rem; }
+        /* Your categories: a dot in their colour, and a cross to delete */
+        .custom-list { list-style: none; margin: 0.6rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .custom-list li { display: inline-flex; align-items: center; gap: 0.4rem; height: 1.9rem; padding: 0 0.2rem 0 0.65rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--c) 12%, transparent); color: color-mix(in srgb, var(--c) 75%, var(--text)); font-size: var(--fs-xs); }
+        .custom-list li::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--c); }
+        .custom-list form { margin: 0; }
+        .custom-list button { width: 1.5rem; height: 1.5rem; display: grid; place-items: center; border-radius: 50%; background: none; color: var(--faint); }
+        .custom-list button:hover, .custom-list button:focus-visible { background: var(--raised); color: var(--red); }
+        .custom-list .icon { width: 0.95em; height: 0.95em; }
+        .custom-hint { margin: 0.6rem 0 0; color: var(--faint); font-size: var(--fs-xs); }
+        .add { margin-top: 0.75rem; }
+        .add summary { padding: 0.3rem 0; color: var(--accent); font-size: var(--fs-sm); cursor: pointer; list-style: none; width: fit-content; }   /* padding: at least 24 px tall to tap */
+        .add summary::-webkit-details-marker { display: none; }
+        .add summary:hover { text-decoration: underline; }
+        .add[open] summary { color: var(--muted); }
+        .budget-form { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+        .budget-form select, .budget-form input {
+            min-width: 0;
+            height: 2.2rem;
+            padding: 0 0.7rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-small);
+            background: var(--bg);
+            font-size: var(--fs-sm);
+        }
+        .budget-form select { flex: 1.4; }
+        .budget-form input { flex: 1; width: 0; }
+        .budget-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .budget-form button { height: 2.2rem; padding: 0 1rem; border-radius: var(--radius-small); background: var(--accent); color: var(--bg); font-size: var(--fs-sm); font-weight: 600; }
+
+        /* Subscriptions and merchants */
+        .line-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.5rem 0; }
+        .line-sub { display: block; color: var(--muted); font-size: var(--fs-xs); }
+        .badge { margin-left: 0.4rem; padding: 0.05rem 0.45rem; border-radius: var(--radius-pill); font-size: var(--fs-2xs); white-space: nowrap; }
+        .badge.is-up { background: color-mix(in srgb, #f2c25a 16%, transparent); color: #f2c25a; }
+        .badge.is-down { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+        .share { display: block; height: 4px; margin-top: 0.35rem; border-radius: var(--radius-xs); background: var(--raised); }
+        .share i { display: block; height: 100%; min-width: 3px; width: calc(var(--v) / var(--max) * 100%); border-radius: var(--radius-xs); background: #3e5f96; }
 
         /* ===== Dragging a file over the page ===== */
         .drop-overlay {
@@ -256,25 +457,36 @@
             z-index: 10;
             display: none;
             place-items: center;
-            background: rgba(15, 17, 21, 0.88);
+            background: color-mix(in srgb, var(--bg) 90%, transparent);
             border: 3px dashed var(--accent);
             color: var(--text);
-            font-size: 1.5rem;
-            font-weight: 600;
+            font: 500 var(--fs-xl) var(--figures);
             pointer-events: none;
         }
         body.is-dragging .drop-overlay { display: grid; }
 
-        /* ===== Narrow screens: a single column ===== */
+        /* ===== Narrower screens ===== */
+        @media (max-width: 1200px) {
+            .month { grid-template-columns: minmax(0, 1fr) auto; }
+            .year { grid-column: 1 / -1; }
+            .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .board > .stack { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: none; align-items: stretch; }
+        }
         @media (max-width: 900px) {
             .notice { margin: 1rem 1rem 0; }
-            .spending { display: block; padding: 1rem; }
-            .spending > .panel + .panel { margin-top: 1rem; }
-            .overview { grid-template-columns: 1fr; gap: 1rem; }
-            .chart-axis { font-size: 0.65rem; }
-            .chart-value { display: none; }
-            .rank-list { overflow-y: visible; }
+            .spending { overflow: visible; padding: 1.25rem 1rem 2rem; }
+            .month { grid-template-columns: 1fr; gap: 2rem; }
+            .board, .board > .stack { grid-template-columns: 1fr; }
+            .payments { flex: none; height: 32rem; min-height: 0; }
+            .chart { padding-left: 0; }
+            .chart-grid { left: 0; }
+            .chart-grid b { display: none; }
+            .chart-axis { font-size: var(--fs-2xs); }
+            .payments { max-height: none; }
             .welcome { padding-block: 2rem; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .heatmap-day, .chart-bar, .chart-tip { transition: none; }
         }
     </style>
 </head>
@@ -302,7 +514,10 @@
         <symbol id="cat-AUTOMOBILE" viewBox="0 0 24 24"><path d="M5 17H4a1 1 0 0 1-1-1v-4l2-6h14l2 6v4a1 1 0 0 1-1 1h-1M3 12h18M9 17h6"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></symbol>
         <symbol id="cat-BUSINESS_SERVICES" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></symbol>
         <symbol id="cat-GOVERNMENT_SERVICES" viewBox="0 0 24 24"><path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M3 10l9-6 9 6"/></symbol>
+        <symbol id="cat-CUSTOM" viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
         <symbol id="cat-OTHER" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+        <symbol id="icon-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+        <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></symbol>
     </svg>
 
     <!-- The form has no visible parts: the button, the card and dragging a file all fill it in -->
@@ -325,6 +540,8 @@
         <strong th:if="${imported == 0 and known > 0}">Nothing new in this file.</strong>
         <strong th:if="${imported == 0 and known == 0}">This file has no card payments. Check that you exported the transactions.</strong>
         <span th:if="${known > 0}" th:text="${known} + (${known == 1} ? ' payment was already saved.' : ' payments were already saved.')">3 payments were already saved.</span>
+        <span th:if="${importResult.cashbackImported() > 0}"
+              th:text="'Also ' + ${importResult.cashbackImported()} + (${importResult.cashbackImported() == 1} ? ' cashback payment.' : ' cashback payments.')">Also 37 cashback payments.</span>
         <details th:unless="${skipped.isEmpty()}">
             <summary th:text="'Skipped ' + ${#numbers.formatInteger(#aggregates.sum(skipped.values()), 1, 'COMMA')} + ' rows that are not card payments'">Skipped 20 rows that are not card payments</summary>
             <ul class="skipped">
@@ -344,82 +561,384 @@
         <p class="welcome-note">Export your history from Trading 212 as CSV to see where your card money goes. You can import overlapping files: a payment is never counted twice.</p>
     </main>
 
-    <!-- ===== With data: the summary ===== -->
-    <main class="spending" th:if="${hasData}">
+    <!-- ===== With data. report: the month shown (?month=2026-11, the running month by default). spending: the whole history ===== -->
+    <main class="spending" th:if="${hasData}"
+          th:with="knownIcons=${ {'RETAIL_STORES','RESTAURANTS','TRANSPORT','CLOTHING_STORES','ENTERTAINMENT','HOTELS','SERVICE_PROVIDERS','PERSONAL_SERVICES','AUTOMOBILE_RENTAL','AUTOMOBILE','BUSINESS_SERVICES','GOVERNMENT_SERVICES'} },
+                   customNames=${customCategories.![name]},
+                   monthName=${#strings.capitalize(#strings.toLowerCase(report.month().getMonth().name()))},
+                   previousMonth=${report.month().minusMonths(1)},
+                   previousName=${#strings.capitalize(#strings.toLowerCase(report.month().minusMonths(1).getMonth().name()))}">
 
-        <section class="panel overview" aria-labelledby="total-heading">
-            <div class="total">
-                <span class="total-label" id="total-heading">Spent with your card</span>
-                <span class="total-value" th:text="${#numbers.formatDecimal(spending.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
-                <p class="total-detail">
-                    <b th:text="${#numbers.formatInteger(spending.payments(), 1, 'COMMA')}">0</b> payments from
-                    <b th:text="${#temporals.format(spending.firstPayment(), 'dd/MM/yyyy')}">01/01/2026</b> to
-                    <b th:text="${#temporals.format(spending.lastPayment(), 'dd/MM/yyyy')}">01/01/2026</b>,
-                    about <b th:text="${#numbers.formatDecimal(spending.monthlyAverage(), 1, 'COMMA', 0, 'POINT')} + ' €'">0 €</b> a month.
+        <!-- ===== The month ===== -->
+        <section class="month" aria-labelledby="month-title">
+            <div th:with="change=${report.changePercent()}">
+                <nav class="month-nav" aria-label="Month">
+                    <a class="month-step" th:href="@{/expenses(month=${previousMonth})}" th:aria-label="${previousName}">
+                        <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+                    </a>
+                    <h1 class="month-name" id="month-title" th:text="${monthName + ' ' + report.month().getYear()}">November 2026</h1>
+                    <a class="month-step" th:unless="${report.current()}" th:href="@{/expenses(month=${report.month().plusMonths(1)})}" aria-label="Next month">
+                        <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+                    </a>
+                    <span class="month-step is-placeholder" th:if="${report.current()}" aria-hidden="true"></span>
+                    <a class="month-today" th:unless="${report.current()}" th:href="@{/expenses}">This month</a>
+                </nav>
+
+                <p class="figure figures"><th:block th:text="${#numbers.formatDecimal(report.spent(), 1, 'COMMA', 2, 'POINT')}">612.40</th:block><small>€</small></p>
+
+                <!-- In the running month, against the same days of the month before; otherwise against the whole month -->
+                <p class="verdict" th:with="than=${(report.current() ? previousName + ' by this day' : 'all of ' + previousName)}">
+                    <th:block th:if="${change == null}" th:text="'Nothing spent in ' + ${previousName} + ' to compare with.'">Nothing spent in October to compare with.</th:block>
+                    <th:block th:if="${change != null and change.signum() == 0}" th:text="'The same as ' + ${than} + '.'">The same as October.</th:block>
+                    <th:block th:if="${change != null and change.signum() != 0}">
+                        <b th:class="${change.signum() > 0} ? 'is-up' : 'is-down'"
+                           th:text="${#numbers.formatDecimal(change.abs(), 1, 0)} + ' % ' + ${change.signum() > 0 ? 'more' : 'less'}">13 % more</b>
+                        <span th:text="'than ' + ${than} + '.'">than October by this day.</span>
+                    </th:block>
+                    <th:block th:if="${report.projected() != null}"
+                              th:text="'At this pace, about ' + ${#numbers.formatDecimal(report.projected(), 1, 'COMMA', 0, 'POINT')} + ' € by the end of the month.'">At this pace, about 1,060 € by the end of the month.</th:block>
                 </p>
+
+                <!-- Pace: only when there is a month before to measure against -->
+                <th:block th:each="m : ${spending.months()}" th:if="${m.month().equals(previousMonth)}"
+                          th:with="ahead=${report.projected() != null ? report.projected() : report.spent()},
+                                   top=${report.spent().max(m.total()).max(ahead)}">
+                    <div class="pace" th:if="${top.signum() > 0}"
+                         th:with="spentAt=${report.spent().doubleValue() * 100 / top.doubleValue()},
+                                  aheadAt=${ahead.doubleValue() * 100 / top.doubleValue()},
+                                  nowAt=${report.previousSameDays().doubleValue() * 100 / top.doubleValue()},
+                                  allAt=${m.total().doubleValue() * 100 / top.doubleValue()}"
+                         th:style="'--spent:' + ${spentAt} + '%; --projected:' + ${aheadAt} + '%'">
+                        <div class="pace-track" role="img"
+                             th:aria-label="${#numbers.formatDecimal(report.spent(), 1, 'COMMA', 2, 'POINT')} + ' euros spent; ' + ${previousName} + ' had ' + ${#numbers.formatDecimal(m.total(), 1, 'COMMA', 0, 'POINT')} + ' euros in total'">
+                            <span class="pace-spent"></span>
+                            <span class="pace-ahead" th:if="${report.projected() != null}"></span>
+                            <span class="pace-tick is-now" th:if="${report.current()}" th:style="'--at:' + ${nowAt} + '%'"></span>
+                            <span class="pace-tick" th:style="'--at:' + ${allAt} + '%'"></span>
+                        </div>
+                        <ul class="pace-legend" aria-hidden="true">
+                            <li th:if="${report.current()}"><i class="mark is-now"></i><b th:text="${#numbers.formatDecimal(report.previousSameDays(), 1, 'COMMA', 0, 'POINT')} + ' €'">540 €</b><span th:text="${previousName} + ' by now'">October by now</span></li>
+                            <li><i class="mark"></i><b th:text="${#numbers.formatDecimal(m.total(), 1, 'COMMA', 0, 'POINT')} + ' €'">760 €</b><span th:text="'all of ' + ${previousName}">all of October</span></li>
+                            <li th:if="${report.projected() != null}"><i class="mark is-ahead"></i><b th:text="${#numbers.formatDecimal(report.projected(), 1, 'COMMA', 0, 'POINT')} + ' €'">1,060 €</b><span>expected</span></li>
+                        </ul>
+                    </div>
+                </th:block>
+
+                <div class="month-notes">
+                    <!-- Money the card gave back: it lowers what the spending really cost -->
+                    <span th:if="${cashbackTotal.signum() > 0}">Cashback <b th:text="${#numbers.formatDecimal(cashbackMonth, 1, 'COMMA', 2, 'POINT')} + ' €'">8.42 €</b>
+                        in <th:block th:text="${monthName}">November</th:block>, <b th:text="${#numbers.formatDecimal(cashbackTotal, 1, 'COMMA', 2, 'POINT')} + ' €'">96.10 €</b> in total</span>
+                    <span><b th:text="${#numbers.formatDecimal(spending.total(), 1, 'COMMA', 0, 'POINT')} + ' €'">4,894 €</b>
+                        since <th:block th:text="${#temporals.format(spending.firstPayment(), 'dd/MM/yyyy')}">01/12/2025</th:block>,
+                        about <b th:text="${#numbers.formatDecimal(spending.monthlyAverage(), 1, 'COMMA', 0, 'POINT')} + ' €'">408 €</b> a month</span>
+                </div>
             </div>
 
-            <div>
-                <!-- The bars are for the eye; the table below gives screen readers the same figures -->
-                <ol class="chart" aria-hidden="true" th:style="'--max:' + ${spending.biggestMonth()}">
-                    <li class="chart-column" tabindex="0" th:each="m, stat : ${spending.months()}"
-                        th:with="isPeak=${m.total().compareTo(spending.biggestMonth()) == 0},
-                                 monthName=${#strings.substring(m.month().getMonth().name(), 0, 3)}"
-                        th:classappend="${isPeak} ? 'is-peak'"
+            <!-- Days still to come are drawn apart: they have not happened, which is not the same as spending nothing -->
+            <div class="heatmap"
+                 th:with="max=${report.biggestDay()},
+                          length=${report.month().lengthOfMonth()},
+                          shown=${report.days().size()}">
+                <div class="heatmap-head" aria-hidden="true"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+                <!-- Every day is a button: choosing one writes what it spent below and shows only its payments -->
+                <ol class="heatmap-grid" id="heatmap-grid"
+                    th:aria-label="'Spending per day in ' + ${monthName}"
+                    th:style="'--start:' + ${report.month().atDay(1).getDayOfWeek().getValue()}">
+                    <li th:each="d, stat : ${report.days()}"
+                        th:with="share=${max.signum() == 0 ? 0 : d.total() / max},
+                                 level=${d.total().signum() == 0 ? 0 : (share <= 0.25 ? 1 : (share <= 0.5 ? 2 : (share <= 0.75 ? 3 : 4)))},
+                                 label=${#strings.capitalize(#strings.toLowerCase(#strings.substring(d.date().getDayOfWeek().name(), 0, 3)))} + ' ' + ${d.date().getDayOfMonth()} + ' ' + ${#strings.capitalize(#strings.toLowerCase(#strings.substring(d.date().getMonth().name(), 0, 3)))},
+                                 amount=${#numbers.formatDecimal(d.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">
+                        <button type="button" class="heatmap-day"
+                                th:classappend="${(d.total().signum() == 0 ? 'is-zero ' : '') + (level >= 3 ? 'is-strong ' : '') + (stat.last and report.current() ? 'is-today' : '')}"
+                                th:data-level="${level}"
+                                th:data-label="${label}" th:data-amount="${amount}" th:data-date="${d.date()}"
+                                th:aria-label="${label} + ': ' + ${amount}"
+                                th:text="${d.date().getDayOfMonth()}">1</button>
+                    </li>
+                    <th:block th:if="${shown < length}">
+                        <li th:each="future : ${#numbers.sequence(shown + 1, length)}">
+                            <span class="heatmap-day is-future" th:text="${future}" th:title="${future} + ': still to come'">16</span>
+                        </li>
+                    </th:block>
+                </ol>
+                <p class="heatmap-detail" id="heatmap-detail" aria-live="polite">Choose a day to see its payments.</p>
+            </div>
+
+            <!-- Every month is a link to it; the bars and labels inside are for the eye, the link's name says the figure -->
+            <div class="year" th:with="top=${report.projected() != null ? spending.biggestMonth().max(report.projected()) : spending.biggestMonth()}">
+                <ol class="chart" id="chart" th:style="'--max:' + ${top}" th:data-max="${top}">
+                    <li class="chart-grid" aria-hidden="true" id="chart-grid"></li>
+                    <li class="chart-column" th:each="m, stat : ${spending.months()}"
+                        th:with="selected=${m.month().equals(report.month())},
+                                 shortName=${#strings.capitalize(#strings.toLowerCase(#strings.substring(m.month().getMonth().name(), 0, 3)))},
+                                 label=${shortName + ' ' + m.month().getYear() + ': ' + #numbers.formatDecimal(m.total(), 1, 'COMMA', 2, 'POINT') + ' €'}"
+                        th:classappend="${selected} ? 'is-selected'"
                         th:style="'--v:' + ${m.total()}">
-                        <div class="chart-plot">
-                            <span class="chart-bar" th:style="'animation-delay:' + ${stat.index * 25} + 'ms'"></span>
-                            <span class="chart-value" th:if="${isPeak}" th:text="${#numbers.formatDecimal(m.total(), 1, 'COMMA', 0, 'POINT')} + ' €'">0 €</span>
-                            <span class="chart-tip" th:text="${#strings.capitalize(#strings.toLowerCase(monthName))} + ' ' + ${m.month().getYear()} + ': ' + ${#numbers.formatDecimal(m.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">Jan 2026: 0.00 €</span>
-                        </div>
-                        <div class="chart-axis">
-                            <span th:text="${#strings.capitalize(#strings.toLowerCase(monthName))}">Jan</span>
-                            <span class="chart-year" th:if="${stat.first or m.month().getMonthValue() == 1}" th:text="${m.month().getYear()}">2026</span>
-                        </div>
+                        <a class="chart-link" th:href="@{/expenses(month=${m.month()})}" th:aria-label="${label}" th:aria-current="${selected} ? 'true'">
+                            <span class="chart-plot" aria-hidden="true">
+                                <span class="chart-bar"></span>
+                                <span class="chart-projection" th:if="${selected and report.projected() != null}" th:style="'--p:' + ${report.projected()}"></span>
+                                <span class="chart-tip" th:text="${label}">Jan 2026: 0.00 €</span>
+                            </span>
+                            <span class="chart-axis" aria-hidden="true">
+                                <span th:text="${shortName}">Jan</span>
+                                <span class="chart-year" th:if="${stat.first or m.month().getMonthValue() == 1}" th:text="${m.month().getYear()}">2026</span>
+                            </span>
+                        </a>
                     </li>
                 </ol>
-                <table class="visually-hidden">
-                    <caption>Card spending per month</caption>
-                    <tr><th scope="col">Month</th><th scope="col">Spent</th></tr>
-                    <tr th:each="m : ${spending.months()}">
-                        <td th:text="${m.month()}">2026-01</td>
-                        <td th:text="${#numbers.formatDecimal(m.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</td>
-                    </tr>
-                </table>
             </div>
         </section>
 
-        <section class="panel" aria-labelledby="categories-heading">
-            <h2 id="categories-heading">Categories</h2>
-            <ul class="rank-list" th:if="${!spending.categories().isEmpty()}"
-                th:style="'--max:' + ${spending.categories()[0].total()}"
-                th:with="knownIcons=${ {'RETAIL_STORES','RESTAURANTS','TRANSPORT','CLOTHING_STORES','ENTERTAINMENT','HOTELS','SERVICE_PROVIDERS','PERSONAL_SERVICES','AUTOMOBILE_RENTAL','AUTOMOBILE','BUSINESS_SERVICES','GOVERNMENT_SERVICES'} }">
-                <li class="rank-row" th:each="c : ${spending.categories()}" th:style="'--v:' + ${c.total()}"
-                    th:with="share=${c.total() * 100 / spending.total()}">
-                    <span class="rank-symbol" aria-hidden="true">
-                        <svg class="icon"><use th:href="${knownIcons.contains(c.category())} ? ${'#cat-' + c.category()} : '#cat-OTHER'"/></svg>
-                    </span>
-                    <span class="rank-name" th:with="name=${c.category() == null ? 'Uncategorised' : #strings.capitalize(#strings.toLowerCase(#strings.replace(c.category(), '_', ' ')))}" th:text="${name}" th:title="${name}">Retail stores</span>
-                    <span class="rank-amount" th:text="${#numbers.formatDecimal(c.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
-                    <span class="rank-track" aria-hidden="true"><span class="rank-fill"></span></span>
-                    <span class="rank-detail" th:text="${c.payments()} + (${c.payments() == 1} ? ' payment, ' : ' payments, ') + ${share < 1 ? '<1' : #numbers.formatDecimal(share, 1, 0)} + ' %'">0 payments, 0 %</span>
-                </li>
-            </ul>
-        </section>
+        <!-- ===== Below ===== -->
+        <div class="board">
 
-        <section class="panel" aria-labelledby="merchants-heading">
-            <h2 id="merchants-heading">Top merchants</h2>
-            <ol class="rank-list" th:if="${!spending.topMerchants().isEmpty()}"
-                th:style="'--max:' + ${spending.topMerchants()[0].total()}">
-                <li class="rank-row" th:each="merchant : ${spending.topMerchants()}" th:style="'--v:' + ${merchant.total()}">
-                    <span class="rank-symbol rank-initial" aria-hidden="true" th:text="${#strings.toUpperCase(#strings.substring(merchant.name(), 0, 1))}">M</span>
-                    <span class="rank-name" th:text="${merchant.name()}" th:title="${merchant.name()}">Merchant</span>
-                    <span class="rank-amount" th:text="${#numbers.formatDecimal(merchant.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">0.00 €</span>
-                    <span class="rank-track" aria-hidden="true"><span class="rank-fill"></span></span>
-                    <span class="rank-detail" th:text="${merchant.payments()} + (${merchant.payments() == 1} ? ' payment' : ' payments')">0 payments</span>
-                </li>
-            </ol>
-        </section>
+            <!-- Categories of the month: one bar with the split, then one row each -->
+            <section class="panel" aria-labelledby="categories-heading">
+                <div class="panel-head">
+                    <h2 class="card-title" id="categories-heading">Categories</h2>
+                    <span th:unless="${report.categories().isEmpty()}" th:text="${report.categories().size()} + ' in ' + ${monthName}">6 in November</span>
+                </div>
+                <p class="empty-month" th:if="${report.categories().isEmpty()}">No card payments in this month.</p>
+                <th:block th:unless="${report.categories().isEmpty()}">
+                    <div class="split" role="img" aria-label="How the month is split between categories">
+                        <i th:each="c : ${report.categories()}" class="tinted" th:classappend="${customNames.contains(c.category()) ? 'custom-' + (customNames.indexOf(c.category()) % 6) : 'cat-' + c.category()}"
+                           th:style="'--v:' + ${c.total()}" th:title="${categoryNames.of(c.category())}"></i>
+                    </div>
+                    <ul class="rows">
+                        <li class="cat-row" th:each="c : ${report.categories()}"
+                            th:with="name=${categoryNames.of(c.category())},
+                                     share=${c.total() * 100 / report.spent()}"
+                            tabindex="0" role="button" aria-pressed="false" data-only="category"
+                            th:data-value="${c.category()}" th:data-label="${name}" th:title="'Show only the payments in ' + ${name}">
+                            <span class="tile tinted" th:classappend="${customNames.contains(c.category()) ? 'custom-' + (customNames.indexOf(c.category()) % 6) : 'cat-' + c.category()}" aria-hidden="true">
+                                <svg class="icon"><use th:href="${knownIcons.contains(c.category()) ? '#cat-' + c.category() : (customNames.contains(c.category()) ? '#cat-CUSTOM' : '#cat-OTHER')}"/></svg>
+                            </span>
+                            <div class="row-main">
+                                <div class="row-line">
+                                    <span class="row-name" th:text="${name}" th:title="${name}">Restaurants</span>
+                                    <span class="amount" th:text="${#numbers.formatDecimal(c.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">214.30 €</span>
+                                </div>
+                                <div class="row-sub">
+                                    <span th:text="${c.payments()} + (${c.payments() == 1} ? ' payment' : ' payments')">14 payments</span>
+                                    <span class="figures" th:text="${share < 1 ? '<1' : #numbers.formatDecimal(share, 1, 0)} + ' %'">35 %</span>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </th:block>
+            </section>
+
+            <!-- Payments of the month, newest first, grouped by day. A merchant's category can be corrected here:
+                 it changes every payment to that merchant, and every figure on the page -->
+            <section class="panel payments-panel" aria-labelledby="payments-heading"
+                     th:with="choices=${categoryNames.choices()},
+                              total=${report.payments().size()}">
+                <div class="panel-head">
+                    <h2 class="card-title" id="payments-heading">Payments</h2>
+                    <span id="payment-count" th:unless="${total == 0}" th:text="${total} + (${total == 1} ? ' payment' : ' payments')">31 payments</span>
+                </div>
+                <p class="panel-error" role="alert" th:if="${categoryError != null}" th:text="${categoryError}">Choose a category.</p>
+                <p class="empty-month" th:if="${total == 0}">No card payments in this month.</p>
+
+                <th:block th:if="${total > 0}">
+                    <div class="payments-tools">
+                        <input type="search" class="payments-search" id="payment-search" placeholder="Search a merchant or category" aria-label="Search the payments" autocomplete="off">
+                        <button type="button" class="payments-day filter-chip removable hidden" id="payment-day" aria-label="Show every day again"></button>
+                        <button type="button" class="payments-day filter-chip removable hidden" id="payment-only" aria-label="Show every payment again"></button>
+                    </div>
+                    <p class="payments-hint">Changing a category changes it for every payment to that merchant. "New category…" in the menu makes your own.</p>
+
+                    <div class="payments scroll-hints" id="payment-list">
+                        <th:block th:each="p, stat : ${report.payments()}"
+                                  th:with="merchantName=${p.merchant() == null ? 'Unknown merchant' : p.merchant()},
+                                           categoryName=${categoryNames.of(p.category())}">
+                            <!-- A new day: its date and what it spent in total -->
+                            <div class="day-head" th:if="${stat.first or !p.date().equals(report.payments()[stat.index - 1].date())}"
+                                 th:data-date="${p.date()}">
+                                <span th:text="${#strings.capitalize(#strings.toLowerCase(p.date().getDayOfWeek().name()))} + ' ' + ${p.date().getDayOfMonth()} + ' ' + ${monthName}">Thursday 12 November</span>
+                                <span class="figures" th:text="${#numbers.formatDecimal(report.days()[p.date().getDayOfMonth() - 1].total(), 1, 'COMMA', 2, 'POINT')} + ' €'">102.46 €</span>
+                            </div>
+
+                            <div class="pay-row" th:data-date="${p.date()}" th:data-category="${p.category()}" th:data-merchant="${merchantName}"
+                                 th:data-search="${#strings.toLowerCase(merchantName + ' ' + categoryName)}">
+                                <span class="tile tinted" th:classappend="${customNames.contains(p.category()) ? 'custom-' + (customNames.indexOf(p.category()) % 6) : 'cat-' + p.category()}" aria-hidden="true">
+                                    <svg class="icon"><use th:href="${knownIcons.contains(p.category()) ? '#cat-' + p.category() : (customNames.contains(p.category()) ? '#cat-CUSTOM' : '#cat-OTHER')}"/></svg>
+                                </span>
+                                <div class="row-main">
+                                    <span class="pay-name" th:text="${merchantName}" th:title="${merchantName}">Ferry Company</span>
+                                    <div class="pay-fix">
+                                        <!-- Without a merchant there is nothing to attach a correction to -->
+                                        <span class="pay-plain" th:if="${p.merchant() == null}" th:text="${categoryName}">Other</span>
+
+                                        <form method="post" th:action="@{/expenses/categories}" th:if="${p.merchant() != null}">
+                                            <input type="hidden" name="merchant" th:value="${p.merchant()}">
+                                            <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                                            <select name="category" class="pay-category tinted"
+                                                    th:classappend="${customNames.contains(p.category()) ? 'custom-' + (customNames.indexOf(p.category()) % 6) : 'cat-' + p.category()} + ${p.corrected() ? ' is-corrected' : ''}"
+                                                    th:aria-label="'Category of ' + ${merchantName}">
+                                                <option th:each="c : ${choices}" th:value="${c}" th:selected="${c == p.category()}"
+                                                        th:text="${categoryNames.of(c)}">Transport</option>
+                                                <!-- A category T212 may add one day, so it can still be shown and chosen -->
+                                                <option th:each="c : ${spending.categories()}" th:unless="${choices.contains(c.category())}"
+                                                        th:value="${c.category()}" th:selected="${c.category() == p.category()}"
+                                                        th:text="${categoryNames.of(c.category())}">Grocery</option>
+                                            </select>
+                                            <noscript><button type="submit" class="pay-reset">Save</button></noscript>
+                                        </form>
+
+                                        <form method="post" th:action="@{/expenses/categories/reset}" th:if="${p.corrected()}">
+                                            <input type="hidden" name="merchant" th:value="${p.merchant()}">
+                                            <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                                            <button type="submit" class="pay-reset"
+                                                    th:title="'Go back to the category Trading 212 gives ' + ${merchantName}">Use T212's</button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <span class="amount" th:text="${#numbers.formatDecimal(p.amount(), 1, 'COMMA', 2, 'POINT')} + ' €'">64.80 €</span>
+                            </div>
+                        </th:block>
+                        <p class="empty-month hidden" id="payment-none">No payment matches. Try another word, or clear the filters above.</p>
+                    </div>
+
+                    <!-- "New category…" in a payment's menu (added by the script, as it needs it): this form opens under that payment,
+                         creates the category and gives it that merchant at once -->
+                    <form class="budget-form new-category" id="new-category" method="post" th:action="@{/expenses/custom-categories}" hidden>
+                        <input type="hidden" name="merchant">
+                        <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                        <input type="text" name="name" maxlength="100" required autocomplete="off"
+                               placeholder="Name of the new category" aria-label="Name of the new category">
+                        <button type="submit">Create</button>
+                        <button type="button" class="budget-cancel">Cancel</button>
+                    </form>
+                </th:block>
+            </section>
+
+            <div class="stack">
+                <!-- Budgets: a monthly limit per category, against what the shown month spent -->
+                <section class="panel" aria-labelledby="budgets-heading">
+                    <div class="panel-head">
+                        <h2 class="card-title" id="budgets-heading">Budgets</h2>
+                        <span th:text="'for ' + ${monthName}">for November</span>
+                    </div>
+                    <p class="panel-error" role="alert" th:if="${budgetError != null}" th:text="${budgetError}">The monthly limit must be more than 0.</p>
+                    <p class="panel-empty" th:if="${budgets.isEmpty()}">Set a monthly limit for a category to see how close you are to it.</p>
+
+                    <div class="budget tinted" th:each="b : ${budgets}"
+                         th:with="name=${categoryNames.of(b.category())}"
+                         th:classappend="${customNames.contains(b.category()) ? 'custom-' + (customNames.indexOf(b.category()) % 6) : 'cat-' + b.category()} + ${b.isOver() ? ' is-over' : ''}"
+                         th:style="'--p:' + ${b.percent()}">
+                        <div class="budget-line">
+                            <span th:text="${name}">Restaurants</span>
+                            <span class="figures"><b th:text="${#numbers.formatDecimal(b.spent(), 1, 'COMMA', 2, 'POINT')} + ' €'">214.30 €</b>
+                                of <th:block th:text="${#numbers.formatDecimal(b.limit(), 1, 'COMMA', 0, 'POINT')} + ' €'">250 €</th:block></span>
+                        </div>
+                        <div class="meter" aria-hidden="true"><i></i></div>
+                        <div class="budget-sub"
+                             th:text="${b.isOver()}
+                                      ? ${#numbers.formatDecimal(b.spent().subtract(b.limit()), 1, 'COMMA', 2, 'POINT')} + ' € over the limit'
+                                      : ${#numbers.formatDecimal(b.limit().subtract(b.spent()), 1, 'COMMA', 2, 'POINT')} + ' € left, ' + ${b.percent()} + ' % used'">35.70 € left, 86 % used</div>
+                        <form class="budget-delete" method="post" th:action="@{/expenses/budgets/delete}">
+                            <input type="hidden" name="category" th:value="${b.category()}">
+                            <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                            <button type="submit" th:aria-label="'Remove the budget for ' + ${name}" th:title="'Remove the budget for ' + ${name}">
+                                <svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg>
+                            </button>
+                        </form>
+                        <!-- Changing the limit: the same form as "Add a budget", with this category fixed.
+                             Saving a category that already has a budget changes its limit, so nothing new is needed on the server -->
+                        <details class="budget-edit">
+                            <summary th:aria-label="'Change the limit for ' + ${name}" th:title="'Change the limit for ' + ${name}">
+                                <svg class="icon" aria-hidden="true"><use href="#icon-edit"/></svg>
+                            </summary>
+                            <form class="budget-form" method="post" th:action="@{/expenses/budgets}">
+                                <input type="hidden" name="category" th:value="${b.category()}">
+                                <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                                <input type="number" name="monthlyLimit" min="0.01" step="0.01" required th:value="${b.limit()}"
+                                       th:aria-label="'New monthly limit for ' + ${name} + ', in euros'">
+                                <button type="submit">Save</button>
+                                <button type="button" class="budget-cancel">Cancel</button>
+                            </form>
+                        </details>
+                    </div>
+
+                    <!-- Saving a category that already has a budget changes its limit -->
+                    <details class="add" th:open="${budgets.isEmpty() or budgetError != null}">
+                        <summary>Add a budget</summary>
+                        <form class="budget-form" method="post" th:action="@{/expenses/budgets}">
+                            <select name="category" aria-label="Category" required>
+                                <option value="" disabled selected>Category</option>
+                                <option th:each="c : ${categoryNames.choices()}" th:value="${c}" th:text="${categoryNames.of(c)}">Restaurants</option>
+                                <option th:each="c : ${spending.categories()}" th:unless="${categoryNames.choices().contains(c.category())}"
+                                        th:value="${c.category()}" th:text="${categoryNames.of(c.category())}">Grocery</option>
+                            </select>
+                            <input type="number" name="monthlyLimit" min="0.01" step="0.01" placeholder="€ a month" aria-label="Monthly limit in euros" required>
+                            <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                            <button type="submit">Save</button>
+                        </form>
+                    </details>
+
+                    <!-- Your own categories, to delete them. They are made from a payment's menu ("New category…") -->
+                    <details class="add" th:unless="${customCategories.isEmpty()}">
+                        <summary th:text="'Your categories (' + ${customCategories.size()} + ')'">Your categories (2)</summary>
+                        <ul class="custom-list">
+                            <li th:each="k : ${customCategories}" class="tinted" th:classappend="${'custom-' + (kStat.index % 6)}">
+                                <span th:text="${k.name}">Gym</span>
+                                <form class="custom-delete" method="post" th:action="@{/expenses/custom-categories/delete}">
+                                    <input type="hidden" name="name" th:value="${k.name}">
+                                    <input type="hidden" name="month" th:value="${report.month()}" th:unless="${report.current()}">
+                                    <button type="submit" th:aria-label="'Delete the category ' + ${k.name}" th:title="'Delete ' + ${k.name}">
+                                        <svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg>
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                        <p class="custom-hint">To make a new one, choose "New category…" in a payment's menu. Deleting one gives its merchants back the Trading 212 category and removes its budget.</p>
+                    </details>
+                </section>
+
+                <!-- Subscriptions: found in the whole history, so they do not depend on the month shown -->
+                <section class="panel" aria-labelledby="subscriptions-heading">
+                    <div class="panel-head">
+                        <h2 class="card-title" id="subscriptions-heading">Subscriptions</h2>
+                        <span th:unless="${subscriptions.isEmpty()}"><span class="figures" th:text="${#numbers.formatDecimal(#aggregates.sum(subscriptions.![amount()]), 1, 'COMMA', 2, 'POINT')} + ' €'">57.87 €</span> a month</span>
+                    </div>
+                    <p class="panel-empty" th:if="${subscriptions.isEmpty()}">Payments to the same merchant, for about the same amount every month, show up here after the third one.</p>
+                    <div class="line-row" th:each="s : ${subscriptions}">
+                        <span class="avatar" aria-hidden="true" th:text="${#strings.toUpperCase(#strings.substring(s.merchant(), 0, 1))}">G</span>
+                        <span class="row-main">
+                            <span th:text="${s.merchant()}">Globo Gym</span><span class="badge" th:if="${s.priceChanged()}"
+                                  th:classappend="${s.amount().compareTo(s.previousAmount()) > 0} ? 'is-up' : 'is-down'"
+                                  th:text="${s.amount().compareTo(s.previousAmount()) > 0 ? 'Up' : 'Down'} + ' from ' + ${#numbers.formatDecimal(s.previousAmount(), 1, 'COMMA', 2, 'POINT')} + ' €'">Up from 12.99 €</span>
+                            <span class="line-sub" th:text="'Next around ' + ${s.nextPayment().getDayOfMonth()} + ' ' + ${#strings.capitalize(#strings.toLowerCase(#strings.substring(s.nextPayment().getMonth().name(), 0, 3)))}">Next around 26 Nov</span>
+                        </span>
+                        <span class="amount" th:text="${#numbers.formatDecimal(s.amount(), 1, 'COMMA', 2, 'POINT')} + ' €'">29.90 €</span>
+                    </div>
+                </section>
+
+                <section class="panel" aria-labelledby="merchants-heading">
+                    <div class="panel-head">
+                        <h2 class="card-title" id="merchants-heading">Top merchants</h2>
+                        <span th:text="'in ' + ${monthName}">in November</span>
+                    </div>
+                    <p class="empty-month" th:if="${report.topMerchants().isEmpty()}">No card payments in this month.</p>
+                    <div th:unless="${report.topMerchants().isEmpty()}" th:style="'--max:' + ${report.topMerchants()[0].total()}">
+                        <div class="line-row" th:each="merchant : ${report.topMerchants()}" th:style="'--v:' + ${merchant.total()}"
+                             tabindex="0" role="button" aria-pressed="false" data-only="merchant"
+                             th:data-value="${merchant.name()}" th:data-label="${merchant.name()}" th:title="'Show only the payments to ' + ${merchant.name()}">
+                            <span class="avatar" aria-hidden="true" th:text="${#strings.toUpperCase(#strings.substring(merchant.name(), 0, 1))}">A</span>
+                            <span class="row-main">
+                                <span class="row-name" th:text="${merchant.name()}" th:title="${merchant.name()}">Acme Market</span>
+                                <span class="line-sub" th:text="${merchant.payments()} + (${merchant.payments() == 1} ? ' payment' : ' payments')">3 payments</span>
+                                <span class="share" aria-hidden="true"><i></i></span>
+                            </span>
+                            <span class="amount" th:text="${#numbers.formatDecimal(merchant.total(), 1, 'COMMA', 2, 'POINT')} + ' €'">149.65 €</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
     </main>
 
     <div class="drop-overlay" aria-hidden="true">Drop the CSV to import it</div>
@@ -460,6 +979,200 @@
             form.submit();
         }
 
+        // ===== Guide lines of the chart, at round amounts (100, 250, 500, 1,000…) =====
+        const chart = document.getElementById('chart');
+        if (chart) {
+            const chartTop = Number(chart.dataset.max);
+            const steps = [50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 25000, 50000];
+            const step = steps.find(candidate => chartTop / candidate <= 3) || steps[steps.length - 1];
+            const grid = document.getElementById('chart-grid');
+            for (let value = step; chartTop > 0 && value <= chartTop; value += step) {
+                const line = document.createElement('span');
+                line.style.setProperty('--at', (value / chartTop * 100) + '%');
+                const label = document.createElement('b');
+                label.textContent = value.toLocaleString('en-GB');
+                line.append(label);
+                grid.append(line);
+            }
+        }
+
+        // ===== Heat map and payments: choosing a day writes what it spent and shows only its payments =====
+        const heatmapGrid = document.getElementById('heatmap-grid');            // only exists with data
+        const heatmapDetail = document.getElementById('heatmap-detail');
+        const HEATMAP_HINT = 'Choose a day to see its payments.';
+
+        const paymentList = document.getElementById('payment-list');         // only exists with payments this month
+        const paymentSearch = document.getElementById('payment-search');
+        const paymentDay = document.getElementById('payment-day');
+        const paymentOnly = document.getElementById('payment-only');
+        const paymentCount = document.getElementById('payment-count');
+        const paymentNone = document.getElementById('payment-none');
+        const paymentRows = paymentList ? [...paymentList.querySelectorAll('.pay-row')] : [];
+        const dayHeads = paymentList ? [...paymentList.querySelectorAll('.day-head')] : [];
+        let chosenDate = null;
+        let only = null;   // the category or merchant row pressed: { key: 'category' | 'merchant', value, row }
+
+        function filterPayments() {
+            const words = paymentSearch.value.trim().toLowerCase();
+            let shown = 0;
+            const visibleDates = new Set();
+            paymentRows.forEach(row => {
+                const visible = (chosenDate === null || row.dataset.date === chosenDate)
+                    && (only === null || row.dataset[only.key] === only.value)
+                    && row.dataset.search.includes(words);
+                row.classList.toggle('hidden', !visible);
+                if (visible) {
+                    shown++;
+                    visibleDates.add(row.dataset.date);
+                }
+            });
+            // A day stays only while one of its payments does
+            dayHeads.forEach(head => head.classList.toggle('hidden', !visibleDates.has(head.dataset.date)));
+            paymentCount.textContent = shown === paymentRows.length
+                ? paymentRows.length + (paymentRows.length === 1 ? ' payment' : ' payments')
+                : shown + ' of ' + paymentRows.length;
+            paymentNone.classList.toggle('hidden', shown > 0);
+        }
+
+        function clearDay() {
+            chosenDate = null;
+            if (paymentDay) paymentDay.classList.add('hidden');
+            heatmapGrid.querySelectorAll('.is-selected').forEach(day => {
+                day.classList.remove('is-selected');
+                day.removeAttribute('aria-pressed');
+            });
+            heatmapDetail.textContent = HEATMAP_HINT;
+            if (paymentList) filterPayments();
+        }
+
+        if (heatmapGrid) {
+            heatmapGrid.addEventListener('click', event => {
+                const day = event.target.closest('button.heatmap-day');
+                if (!day) return;
+                // Choosing the chosen day again shows every day
+                if (day.classList.contains('is-selected')) {
+                    clearDay();
+                    return;
+                }
+                heatmapGrid.querySelectorAll('.is-selected').forEach(other => {
+                    other.classList.remove('is-selected');
+                    other.removeAttribute('aria-pressed');
+                });
+                day.classList.add('is-selected');
+                day.setAttribute('aria-pressed', 'true');
+
+                const amount = document.createElement('b');
+                amount.textContent = day.dataset.amount;
+                heatmapDetail.replaceChildren(day.dataset.label + ': ', amount);
+
+                if (!paymentList) return;
+                chosenDate = day.dataset.date;
+                paymentDay.textContent = 'Only ' + day.dataset.label + '  ✕';
+                paymentDay.classList.remove('hidden');
+                filterPayments();
+            });
+        }
+
+        // A category (Categories) or a merchant (Top merchants): only its payments. Pressed again, or its ✕, shows them all
+        function chooseOnly(row) {
+            if (only) only.row.setAttribute('aria-pressed', 'false');
+            only = (row && only?.row !== row) ? { key: row.dataset.only, value: row.dataset.value, row } : null;
+            if (only) {
+                row.setAttribute('aria-pressed', 'true');
+                paymentOnly.textContent = 'Only ' + row.dataset.label + '  ✕';
+            }
+            paymentOnly.classList.toggle('hidden', !only);
+            filterPayments();
+        }
+
+        if (paymentList) {
+            document.querySelectorAll('[data-only]').forEach(row => {
+                row.addEventListener('click', () => {
+                    chooseOnly(row);
+                    if (only) paymentList.closest('.panel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                });
+                row.addEventListener('keydown', event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    row.click();
+                });
+            });
+            paymentOnly.addEventListener('click', () => chooseOnly(null));
+            paymentSearch.addEventListener('input', filterPayments);
+            paymentDay.addEventListener('click', () => {
+                clearDay();
+                paymentSearch.focus();
+            });
+            // Choosing a category saves it at once; "New category…" opens a form to name it instead
+            paymentList.addEventListener('change', event => {
+                if (!event.target.matches('select.pay-category')) return;
+                if (event.target.value === NEW_CATEGORY) openNewCategory(event.target);
+                else event.target.form.requestSubmit();
+            });
+        }
+
+        // ===== A new category from a payment's menu =====
+        // The option is added here and not in the page: without the script, choosing it would save a category called "new"
+        const NEW_CATEGORY = '__new__';
+        const newCategory = document.getElementById('new-category');
+        let newCategoryMenu = null;
+        let openNewCategory = () => {};
+        if (newCategory) {
+            document.querySelectorAll('select.pay-category').forEach(menu => menu.add(new Option('New category…', NEW_CATEGORY)));
+            const nameInput = newCategory.querySelector('input[name="name"]');
+            const closeNewCategory = () => {
+                newCategory.hidden = true;
+                nameInput.value = '';
+                if (!newCategoryMenu) return;
+                // Back to the category it had, which the page still marks as selected
+                newCategoryMenu.value = [...newCategoryMenu.options].find(option => option.defaultSelected).value;
+                newCategoryMenu.focus();
+                newCategoryMenu = null;
+            };
+            openNewCategory = menu => {
+                if (newCategoryMenu && newCategoryMenu !== menu) closeNewCategory();
+                newCategoryMenu = menu;
+                newCategory.querySelector('input[name="merchant"]').value = menu.form.querySelector('input[name="merchant"]').value;
+                menu.closest('.pay-row').after(newCategory);
+                newCategory.hidden = false;
+                nameInput.focus();
+            };
+            newCategory.querySelector('.budget-cancel').addEventListener('click', closeNewCategory);
+            newCategory.addEventListener('keydown', event => { if (event.key === 'Escape') closeNewCategory(); });
+        }
+
+        // Deleting one of your categories also changes merchants and a budget: ask first
+        document.querySelectorAll('.custom-delete').forEach(form => form.addEventListener('submit', event => {
+            const name = form.querySelector('input[name="name"]').value;
+            if (!confirm('Delete "' + name + '"? Its merchants go back to the Trading 212 category, and its budget is removed.')) event.preventDefault();
+        }));
+
+        // Saving a form reloads the page: remember where it was, so correcting several payments does not mean scrolling back each time.
+        // Only this browser tab keeps it, and only until the next page; without storage the page simply starts at the top.
+        const spendingArea = document.querySelector('main.spending');
+        const PLACE_KEY = 'expenses-place';
+        if (spendingArea) {
+            spendingArea.addEventListener('submit', () => {
+                try {
+                    sessionStorage.setItem(PLACE_KEY, JSON.stringify({
+                        page: location.pathname + location.search,
+                        area: spendingArea.scrollTop,
+                        window: window.scrollY,
+                        payments: paymentList ? paymentList.scrollTop : 0
+                    }));
+                } catch (e) { /* no storage: nothing to remember */ }
+            });
+            try {
+                const place = JSON.parse(sessionStorage.getItem(PLACE_KEY));
+                sessionStorage.removeItem(PLACE_KEY);
+                if (place && place.page === location.pathname + location.search) {
+                    spendingArea.scrollTop = place.area;
+                    window.scrollTo(0, place.window || 0);      // on phones the whole page scrolls
+                    if (paymentList) paymentList.scrollTop = place.payments;
+                }
+            } catch (e) { /* no storage or nothing saved: start at the top */ }
+        }
+
         // Dragging a file: the whole page accepts it.
         // The browser fires enter/leave for every element it crosses, so they are counted.
         let dragDepth = 0;
@@ -486,6 +1199,20 @@
             document.body.classList.remove('is-dragging');
             fileInput.files = event.dataTransfer.files;
             sendFile();
+        });
+
+        // ===== Changing a budget's limit: one open at a time, the figure ready to type over, Esc or Cancel to close =====
+        document.querySelectorAll('.budget-edit').forEach(edit => {
+            const input = edit.querySelector('input[name="monthlyLimit"]');
+            const close = () => { edit.open = false; input.value = input.defaultValue; edit.querySelector('summary').focus(); };
+            edit.addEventListener('toggle', () => {
+                if (!edit.open) return;
+                document.querySelectorAll('.budget-edit[open]').forEach(other => { if (other !== edit) other.open = false; });
+                input.focus();
+                input.select();
+            });
+            edit.querySelector('.budget-cancel').addEventListener('click', close);
+            edit.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
         });
     </script>
 </body>

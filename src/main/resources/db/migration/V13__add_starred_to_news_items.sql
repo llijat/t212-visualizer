@@ -1,0 +1,1 @@
+alter table news_items add column starred boolean not null default false;

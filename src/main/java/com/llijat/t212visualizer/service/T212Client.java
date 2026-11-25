@@ -1,6 +1,7 @@
 package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.T212AccountSummaryDto;
+import com.llijat.t212visualizer.dto.T212DividendPageDto;
 import com.llijat.t212visualizer.dto.T212PositionDto;
 import com.llijat.t212visualizer.dto.T212TransactionPageDto;
 
@@ -10,4 +11,5 @@ public interface T212Client {
     List<T212PositionDto> fetchPositions();
     T212AccountSummaryDto fetchAccountSummary();
     T212TransactionPageDto fetchTransactions(String path);
+    T212DividendPageDto fetchDividends(String path);
 }

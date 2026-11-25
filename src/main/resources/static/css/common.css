@@ -3,15 +3,156 @@
 /* ===== App colours (change them here and the whole app follows) ===== */
 :root {
     color-scheme: dark;     /* tells the browser the page is dark, so its controls (scrollbars, search box...) match */
-    --bg: #0f1115;          /* page background */
-    --panel: #171a21;       /* card background */
-    --border: #2a2d35;      /* borders and separators */
-    --text: #e6e6e6;        /* main text */
-    --muted: #9aa0ab;       /* secondary text (grey) */
-    --accent: #60a5fa;      /* highlight blue */
-    --accent-bg: #1e3a5f;   /* dark blue for backgrounds (badges, chips) */
-    --green: #4ade80;
-    --red: #f87171;
+    --bg: #0e1219;          /* page background: ink blue, not black */
+    --panel: #151b24;       /* card background */
+    --raised: #1c2431;      /* hover, tracks and open menus: one step above the cards */
+    --border: #252f3e;      /* the few lines left */
+    --text: #e7ebf1;        /* main text */
+    --muted: #9aa3b4;       /* secondary text (6.8:1 on the cards) */
+    --faint: #7e889a;       /* hints and axis labels: the dimmest text that still reads at 4.5:1 on the cards (WCAG AA) */
+    --accent: #8ab4ff;      /* only for what is selected or can be acted on */
+    --accent-bg: color-mix(in srgb, var(--accent) 16%, transparent);
+    --green: #6fd3a0;       /* up, beat, less spending */
+    --red: #f58b8b;         /* down, missed, more spending */
+    --dividend: #f2c25a;    /* dividends, in the calendar and the portfolio */
+    --subscription: #a996d4; /* subscriptions in the calendar: a muted purple, quieter than the money coming in (6.2:1 on the cards) */
+
+    /* ===== Type scale: every font size in the app is one of these ===== */
+    --fs-2xs: 0.72rem;      /* axis labels, initials, the smallest data */
+    --fs-xs: 0.8rem;        /* secondary text, table headers, hints */
+    --fs-sm: 0.875rem;      /* controls, sub-headings (h3) */
+    --fs-md: 0.95rem;       /* table and list text, figures */
+    --fs-lg: 1.1rem;        /* card titles (h2) */
+    --fs-xl: 1.4rem;        /* page titles (h1): always above the card titles */
+    --fs-display: 3.5rem;   /* the one big figure of a page */
+
+    /* ===== Corners ===== */
+    --radius-xs: 3px;       /* bars, swatches, chart marks */
+    --radius-sm: 6px;       /* buttons inside a group, calendar events, menu options */
+    --radius-md: 9px;       /* buttons, fields, menus */
+    --radius-lg: 14px;      /* cards */
+    --radius-pill: 999px;   /* filters and tags */
+    --radius: var(--radius-lg);         /* older names, same values */
+    --radius-small: var(--radius-md);
+
+    /* ===== Controls: nothing that can be clicked is under 24px (WCAG 2.2 AA) ===== */
+    --control-h: 2rem;      /* toolbar buttons, fields, filters */
+    --control-h-sm: 1.5rem; /* compact controls: ranges, periods, sort headers */
+
+    /* ===== Categories: positions in the allocation bar, spending categories =====
+       None is a colour that already means something (gain, loss, dividend, action, subscription); each is 6.9:1 or more on the cards.
+       Neighbours in the allocation bar alternate warm and cool, so two next to each other never look alike. */
+    --cat-1: #58b4e8;       /* sky */
+    --cat-2: #f2a65a;       /* orange */
+    --cat-3: #c5d97a;       /* lime */
+    --cat-4: #ec8fab;       /* pink */
+    --cat-5: #c38cf0;       /* violet */
+    --cat-6: #8fb8d8;       /* steel */
+    --cat-7: #ffb199;       /* peach */
+    --cat-8: #e3a3ea;       /* orchid */
+    --cat-9: #c9a27e;       /* sand */
+    --cat-10: #a9b2c3;      /* slate */
+    --cat-other: var(--faint);
+    /* Your own spending categories: lighter tones of the first six, so they never match a Trading 212 one */
+    --cat-custom-1: color-mix(in srgb, var(--cat-1) 55%, white);
+    --cat-custom-2: color-mix(in srgb, var(--cat-2) 55%, white);
+    --cat-custom-3: color-mix(in srgb, var(--cat-3) 55%, white);
+    --cat-custom-4: color-mix(in srgb, var(--cat-4) 55%, white);
+    --cat-custom-5: color-mix(in srgb, var(--cat-5) 55%, white);
+    --cat-custom-6: color-mix(in srgb, var(--cat-6) 55%, white);
+
+    /* Figures and titles in a DIN (Bahnschrift comes with Windows; DIN Alternate with macOS), text in the system face.
+       Nothing is downloaded: the app makes no requests to third parties. */
+    --figures: Bahnschrift, "DIN Alternate", "Segoe UI Variable Display", system-ui, sans-serif;
+    --text-font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+
+    /* Scrollbars: the thumb keeps a 3:1 contrast with the cards, so it is easy to see how far down a list is */
+    --scroll-thumb: #5f6879;
+    --scroll-track: transparent;
+}
+
+/* ===== Scrollbars: thin and in the app's colours, everywhere ===== */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+/* Older Chrome and Safari, which only know their own pseudo-elements */
+@supports not (scrollbar-color: auto) {
+    * { scrollbar-width: auto; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: var(--radius-xs); }
+    ::-webkit-scrollbar-track { background: var(--scroll-track); }
+}
+
+/* ===== Lists that scroll: a soft shadow at the edge where there is more to see ===== */
+/* Add the class to the scrolling element. It needs no script and takes no space. */
+.scroll-hints { container-type: scroll-state; }
+.scroll-hints::before,
+.scroll-hints::after {
+    content: "";
+    display: block;
+    position: sticky;
+    z-index: 1;
+    block-size: 1rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.scroll-hints::before {
+    inset-block-start: 0;
+    margin-block-end: -1rem;
+    background: radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / 0.55), transparent);
+}
+.scroll-hints::after {
+    inset-block-end: 0;
+    margin-block-start: -1rem;
+    background: radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / 0.55), transparent);
+}
+@container scroll-state(scrollable: block-start) { .scroll-hints::before { opacity: 1; } }
+@container scroll-state(scrollable: block-end) { .scroll-hints::after { opacity: 1; } }
+/* Browsers without scroll-state queries: the shadows fade in with the scroll itself */
+@supports not (container-type: scroll-state) {
+    .scroll-hints::before, .scroll-hints::after { animation: show-scroll-hint linear both; animation-timeline: scroll(); }
+    .scroll-hints::before { animation-range: 0 2rem; }
+    .scroll-hints::after { animation-direction: reverse; animation-range: calc(100% - 2rem) 100%; }
+}
+@keyframes show-scroll-hint { to { opacity: 1; } }
+
+/* ===== Moving between pages: a short cross-fade instead of a white flash; the top bar stays still ===== */
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.18s; }
+}
+.topbar { view-transition-name: topbar; }
+
+/* ===== Drop-down menus drawn by the app, not by the operating system =====
+   Browsers that cannot (Firefox today) keep their own menu, which works the same. */
+@supports (appearance: base-select) {
+    select, ::picker(select) { appearance: base-select; }
+    /* align-items: the drawn menu is a flex box that stretches its parts, which left the text and the arrow at the top */
+    select { cursor: pointer; align-items: center; gap: 0.35em; }
+    select::picker-icon { color: var(--muted); line-height: 1; transition: rotate 0.15s; }
+    select:open::picker-icon { rotate: 180deg; }
+    ::picker(select) {
+        margin-block: 4px;
+        padding: 0.3rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--raised);
+        color: var(--text);
+        box-shadow: 0 14px 32px rgb(0 0 0 / 0.5);
+        max-block-size: min(22rem, 60vh);
+    }
+    option {
+        padding: 0.4rem 0.6rem;
+        border-radius: var(--radius-sm);
+        font-size: var(--fs-sm);
+        background: none;
+        color: var(--text);
+    }
+    option:hover, option:focus-visible { background: var(--accent-bg); outline: none; }
+    option:checked { font-weight: 600; }
+    option::checkmark { color: var(--accent); }
 }
 
 /* ===== Overall layout: the page fills the screen exactly, with no page scroll ===== */
@@ -19,13 +160,21 @@
 html, body { height: 100%; }
 body {
     margin: 0;
-    font-family: system-ui, sans-serif;
+    font: 15px/1.45 var(--text-font);
+    -webkit-font-smoothing: antialiased;
     background: var(--bg);
     color: var(--text);
     display: flex;
     flex-direction: column;     /* bar on top, content below */
     overflow: hidden;           /* the page does not scroll: each card scrolls on its own */
 }
+input, select, textarea { font: inherit; color: inherit; }
+
+/* Figures: the DIN face, every digit the same width so columns line up */
+.figures { font-family: var(--figures); font-variant-numeric: tabular-nums; }
+
+/* ===== Cards: no border, set apart by their tone ===== */
+.card-title { margin: 0; font: 500 var(--fs-lg) var(--figures); letter-spacing: 0.01em; }
 
 /* ===== Icons: drawn with lines that take the colour of the text around them ===== */
 .sprite { position: absolute; width: 0; height: 0; }
@@ -45,11 +194,11 @@ body {
     display: flex;
     align-items: center;
     gap: 2rem;
-    padding: 0.6rem 1.5rem;
+    padding: 0.65rem 2rem;
     border-bottom: 1px solid var(--border);
-    background: var(--panel);
+    background: var(--bg);
 }
-.brand { font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
+.brand { font: 600 var(--fs-lg) var(--figures); letter-spacing: 0.01em; white-space: nowrap; }
 .brand span { color: var(--accent); }
 
 .nav { display: flex; gap: 0.25rem; flex: 1; }   /* flex: 1 pushes the button to the right */
@@ -57,15 +206,17 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    padding: 0.4rem 0.7rem;
-    border-radius: 6px;
+    padding: 0.42rem 0.8rem;
+    border-radius: var(--radius-sm);
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     text-decoration: none;
+    transition: color 0.15s, background-color 0.15s;
 }
-a.nav-item:hover { color: var(--text); background: #1f232c; }
-.nav-item.active { color: var(--accent); background: var(--accent-bg); }
-.nav-item.soon { opacity: 0.45; cursor: default; }   /* sections not built yet */
+a.nav-item:hover { color: var(--text); background: var(--raised); }
+/* The page you are on: lifted, with a line underneath */
+.nav-item.active { color: var(--text); background: var(--raised); box-shadow: inset 0 -2px 0 var(--accent); }
+.nav-item.soon { opacity: 0.4; cursor: default; }   /* sections not built yet */
 
 button { font: inherit; border: none; cursor: pointer; }
 /* No white outline on mouse click; with the keyboard (Tab) it shows in blue, for accessibility */
@@ -78,30 +229,129 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    background: #2563eb;
-    color: white;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text);
     padding: 0.45rem 1rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-sm);
     white-space: nowrap;
+    transition: background-color 0.15s;
 }
-.topbar-action:hover { background: #1d4ed8; }
+.topbar-action:hover { background: var(--raised); }
 .topbar-action:disabled { opacity: 0.6; cursor: wait; }
+.topbar-action.icon-action { padding: 0.45rem 0.6rem; }
+.topbar-action[aria-pressed="true"] { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-bg); color: var(--accent); }
+
+/* ===== Privacy mode: every amount in euros marked "money" is blurred; percentages stay readable =====
+   For screenshots or showing the app to someone. The page's <html> gets the class "privacy" */
+.privacy .money { filter: blur(7px); user-select: none; }
 
 /* ===== Demo mode notice ===== */
 .demo-badge {
     margin-left: 0.6rem;
     padding: 0.15rem 0.55rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--accent-bg);
     color: var(--accent);
-    font-size: 0.75rem;
-    font-weight: 500;
+    font: 400 var(--fs-2xs) var(--text-font);
     white-space: nowrap;
 }
 
+/* ===== Company logos: a circle with the initial, and the logo on top when there is one ===== */
+/* The image is removed if /logos/... answers 404, so the initial shows instead */
+.logo {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35em;
+    height: 1.35em;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--raised);
+    color: var(--muted);
+    font-family: var(--figures);
+    font-size: 1em;
+    font-weight: 700;
+    line-height: 1;
+}
+.logo-initial { font-size: max(0.6em, var(--fs-2xs)); }   /* never under the smallest size of the scale, even in a tiny logo */
+.logo img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #fff;           /* most logos are drawn for a light background */
+}
+
+/* ===== Choosing one of a few (exclusive): a rail of buttons, the pressed one lifted =====
+   <div class="segmented" role="group" aria-label="..."> with aria-pressed on each button.
+   .compact: inside charts and table headers, without the rail and 24px high */
+.segmented { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); }
+.segmented button {
+    height: calc(var(--control-h) - 6px);
+    padding: 0 0.7rem;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    white-space: nowrap;
+    transition: color 0.15s, background-color 0.15s;
+}
+.segmented button:hover { color: var(--text); }
+.segmented button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.segmented button:disabled { opacity: 0.45; cursor: default; color: var(--muted); }
+.segmented.compact { gap: 1px; padding: 0; border: 0; background: none; }
+.segmented.compact button { height: var(--control-h-sm); min-width: var(--control-h-sm); padding: 0 0.4rem; color: var(--faint); font: 500 var(--fs-2xs) var(--figures); }
+.segmented.compact button:hover { color: var(--text); }
+.segmented.compact button[aria-pressed="true"] { color: var(--text); }
+
+/* ===== A filter that is on or off, as a pill =====
+   aria-pressed="true": on, in the accent. .removable: a filter already applied, closed with its ✕.
+   .with-swatch: the filter has a colour of its own (calendar types): on is the filled swatch, so the accent does not fight it */
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    height: var(--control-h);
+    padding: 0 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+.filter-chip:hover { color: var(--text); border-color: var(--faint); }
+.filter-chip[aria-pressed="true"], .filter-chip.removable { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-bg); color: var(--accent); }
+.filter-chip.removable:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+.filter-chip:disabled { opacity: 0.45; cursor: default; }
+.filter-chip .swatch { width: 0.55rem; height: 0.55rem; border-radius: var(--radius-xs); background: var(--swatch); }
+.filter-chip.with-swatch[aria-pressed="true"] { border-color: var(--border); background: none; color: var(--text); }
+.filter-chip.with-swatch[aria-pressed="false"] .swatch { background: transparent; outline: 1px solid var(--swatch); }
+
 /* Hide: !important so it always wins, even over a rule that says display:flex */
 .hidden { display: none !important; }
+
+/* "Skip to ...": hidden until the keyboard reaches it, so keyboard users can jump over a long list of buttons */
+.skip-link {
+    position: absolute;
+    left: 1rem;
+    top: 0.5rem;
+    z-index: 10;
+    padding: 0.5rem 0.9rem;
+    border-radius: var(--radius-small);
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+    text-decoration: none;
+    transform: translateY(-200%);
+}
+.skip-link:focus-visible { transform: none; outline: 2px solid var(--text); outline-offset: 2px; }
 
 /* Hidden on screen, but screen readers still read it */
 .visually-hidden {
@@ -113,10 +363,16 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
     white-space: nowrap;
 }
 
+/* ===== Medium screens: the top bar buttons keep only their icons (screen readers still read their text) ===== */
+@media (max-width: 1150px) {
+    .action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .topbar-action { padding: 0.45rem 0.6rem; }
+}
+
 /* ===== Narrow screens: the page does scroll ===== */
 @media (max-width: 900px) {
     body { overflow: auto; height: auto; }
-    .topbar { gap: 1rem; padding: 0.6rem 1rem; }
+    .topbar { gap: 1rem; padding: 0.6rem 1rem; position: sticky; top: 0; z-index: 5; }
     .demo-badge { display: none; }
 }
 
@@ -124,7 +380,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .chart-column:focu
 @media (max-width: 640px) {
     .topbar { gap: 0.5rem; }
     .nav-label { display: none; }
-    .nav-item { padding: 0.4rem; font-size: 1.05rem; }
+    .nav-item { padding: 0.4rem; font-size: var(--fs-lg); }
     /* The button also keeps only its icon. Screen readers still read its text. */
     .action-label {
         position: absolute;
