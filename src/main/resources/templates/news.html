@@ -219,9 +219,11 @@
         .move-change.down { color: var(--red); }
         .move-weight { grid-column: 2 / 4; color: var(--faint); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 
-        /* Gold and silver: the same cards, with a coin of the metal's colour instead of a logo */
+        /* Gold, silver, oil and bitcoin: the same cards, with a coin of each one's colour instead of a logo */
         .metal-logo { background: #c9a227; color: #1a1406; }
         .metal-logo.is-silver { background: #b9c0cb; color: #14171c; }
+        .metal-logo.is-oil { background: #4a3f33; color: #f3e6cf; }
+        .metal-logo.is-bitcoin { background: #f7931a; color: #1f1203; }
 
         /* ===== Coming up: the next results of the holdings, one line each ===== */
         .coming { margin: 0; }
@@ -284,13 +286,19 @@
     <svg class="sprite" aria-hidden="true">
         <symbol id="icon-stack" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
         <symbol id="icon-ingot" viewBox="0 0 24 24"><path d="M7.5 8h9l3.5 9H4z"/><path d="M9 11.5h6"/></symbol>
+        <symbol id="icon-drop" viewBox="0 0 24 24"><path d="M12 3.5c3.2 4 5.5 7.2 5.5 10a5.5 5.5 0 0 1-11 0c0-2.8 2.3-6 5.5-10z"/></symbol>
+        <symbol id="icon-bitcoin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 7.5h3.8a2.1 2.1 0 0 1 0 4.2H9.5zM9.5 11.7h4.4a2.4 2.4 0 0 1 0 4.8H9.5zM9.5 7.5v9M11 6v1.5M11 16.5V18"/></symbol>
+        <symbol id="icon-funnel" viewBox="0 0 24 24"><path d="M4 5h16l-6 7.5V18l-4 2v-7.5z"/></symbol>
         <symbol id="icon-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></symbol>
     </svg>
 
     <main class="news-page"
           th:with="total=${portfolioDays.isEmpty() ? 0 : #aggregates.sum(portfolioDays.![news().size()])},
                    marketTotal=${marketDays.isEmpty() ? 0 : #aggregates.sum(marketDays.![news().size()])},
-                   metalTotal=${metalDays.isEmpty() ? 0 : #aggregates.sum(metalDays.![news().size()])}">
+                   metalTotal=${metalDays.isEmpty() ? 0 : #aggregates.sum(metalDays.![news().size()])},
+                   oilTotal=${oilDays.isEmpty() ? 0 : #aggregates.sum(oilDays.![news().size()])},
+                   cryptoTotal=${cryptoDays.isEmpty() ? 0 : #aggregates.sum(cryptoDays.![news().size()])},
+                   looseTotal=${looseDays.isEmpty() ? 0 : #aggregates.sum(looseDays.![news().size()])}">
 
         <!-- ===== Where the stories come from: every holding, or the market ===== -->
         <nav class="sources" aria-label="Show news from">
@@ -314,6 +322,20 @@
                     </button>
                 </li>
                 <li>
+                    <button type="button" class="source" data-show="oil" aria-pressed="false">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-drop"/></svg></span>
+                        <span class="source-symbol">Oil</span>
+                        <span class="source-count" th:text="${oilTotal}">4</span>
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="source" data-show="crypto" aria-pressed="false">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-bitcoin"/></svg></span>
+                        <span class="source-symbol">Crypto</span>
+                        <span class="source-count" th:text="${cryptoTotal}">30</span>
+                    </button>
+                </li>
+                <li>
                     <button type="button" class="source" data-show="starred" aria-pressed="false">
                         <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-star"/></svg></span>
                         <span class="source-symbol">Starred</span>
@@ -329,6 +351,15 @@
                         <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-briefcase"/></svg></span>
                         <span class="source-symbol">All holdings</span>
                         <span class="source-count" th:text="${total}">48</span>
+                    </button>
+                </li>
+                <!-- Stories the news service files under a holding although they never name it: kept apart, not deleted -->
+                <li th:if="${looseTotal > 0}">
+                    <button type="button" class="source" data-show="loose" aria-pressed="false"
+                            title="Stories filed under one of your holdings that never name it in the headline or the summary">
+                        <span class="source-icon" aria-hidden="true"><svg class="icon"><use href="#icon-funnel"/></svg></span>
+                        <span class="source-symbol">Only in passing</span>
+                        <span class="source-count" th:text="${looseTotal}">5</span>
                     </button>
                 </li>
                 <!-- One button per holding with news: its logo (through its T212 ticker), its symbol and how many stories -->
@@ -372,6 +403,14 @@
                     </th:block>
                 </div>
 
+                <!-- Filed under a holding, but the headline and the summary never name it -->
+                <div id="loose" class="feed hidden">
+                    <p class="empty" th:if="${looseDays.isEmpty()}">Every story from your holdings names the company.</p>
+                    <th:block th:each="day : ${looseDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
+                </div>
+
                 <!-- The market: the same, without holdings -->
                 <div id="market" class="feed hidden">
                     <p class="empty" th:if="${marketDays.isEmpty()}">No market news in the last 7 days. If the app has just started, reload the page in a few seconds.</p>
@@ -384,6 +423,22 @@
                 <div id="metals" class="feed hidden">
                     <p class="empty" th:if="${metalDays.isEmpty()}">No market news about gold or silver in the last 7 days.</p>
                     <th:block th:each="day : ${metalDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
+                </div>
+
+                <!-- Oil: the market news about crude, Brent, WTI or OPEC -->
+                <div id="oil" class="feed hidden">
+                    <p class="empty" th:if="${oilDays.isEmpty()}">No market news about oil in the last 7 days.</p>
+                    <th:block th:each="day : ${oilDays}">
+                        <section th:replace="~{fragments/news-story :: day(${day})}"></section>
+                    </th:block>
+                </div>
+
+                <!-- Crypto: the news service's own crypto feed -->
+                <div id="crypto" class="feed hidden">
+                    <p class="empty" th:if="${cryptoDays.isEmpty()}">No crypto news in the last 7 days. If the app has just started, reload the page in a few seconds.</p>
+                    <th:block th:each="day : ${cryptoDays}">
                         <section th:replace="~{fragments/news-story :: day(${day})}"></section>
                     </th:block>
                 </div>
@@ -401,7 +456,7 @@
 
             <!-- ===== What moves and what comes up: next to the stories on wide screens, above them on narrower ones ===== -->
             <aside class="rail" id="rail" aria-label="Today in short"
-                   th:if="${!moves.isEmpty() or !metals.isEmpty() or !comingUp.isEmpty() or !comingUpDividends.isEmpty()}">
+                   th:if="${!moves.isEmpty() or !commodities.isEmpty() or !comingUp.isEmpty() or !comingUpDividends.isEmpty()}">
                 <!-- Moving today: the six US holdings that move most, up or down; pressing one shows its news -->
                 <section class="moves" id="moves" th:if="${!moves.isEmpty()}" aria-labelledby="moves-title">
                     <div class="moves-head">
@@ -431,23 +486,26 @@
                     </ul>
                 </section>
 
-                <!-- Gold and silver: pressing one opens the Metals folder -->
-                <section class="moves" th:if="${!metals.isEmpty()}" aria-labelledby="metals-title">
+                <!-- Gold, silver, oil and bitcoin: pressing one opens its news folder -->
+                <section class="moves" th:if="${!commodities.isEmpty()}" aria-labelledby="metals-title">
                     <div class="moves-head">
-                        <h2 id="metals-title">Gold and silver</h2>
-                        <span>Through the GLD and SLV funds</span>
+                        <h2 id="metals-title">Commodities &amp; crypto</h2>
+                        <span>Funds, and bitcoin in dollars</span>
                     </div>
                     <ul class="moves-list">
-                        <li th:each="m : ${metals}">
-                            <!-- Only the change: a fund share holds a fraction of an ounce, so its price is not the metal's -->
-                            <button type="button" class="move metal-card" title="Show the news about gold and silver">
-                                <span class="logo metal-logo" th:classappend="${m.etf() == 'SLV'} ? 'is-silver'" aria-hidden="true">
-                                    <span class="logo-initial" th:text="${#strings.substring(m.name(), 0, 1)}">G</span>
+                        <li th:each="m : ${commodities}"
+                            th:with="crypto=${m.symbol().contains(':')},
+                                     folder=${m.symbol() == 'USO' ? 'oil' : (crypto ? 'crypto' : 'metals')},
+                                     coin=${m.symbol() == 'SLV' ? 'is-silver' : (m.symbol() == 'USO' ? 'is-oil' : (crypto ? 'is-bitcoin' : ''))}">
+                            <!-- Only the change: a fund share holds a fraction of an ounce or a barrel, so its price is not the commodity's -->
+                            <button type="button" class="move metal-card" th:data-folder="${folder}" th:title="'Show the news about ' + ${#strings.toLowerCase(m.name())}">
+                                <span class="logo metal-logo" th:classappend="${coin}" aria-hidden="true">
+                                    <span class="logo-initial" th:text="${crypto ? '₿' : #strings.substring(m.name(), 0, 1)}">G</span>
                                 </span>
                                 <span class="move-symbol" th:text="${m.name()}">Gold</span>
                                 <span class="move-change" th:classappend="${m.changePercent().signum() < 0} ? 'down' : 'up'"
                                       th:text="${m.changePercent().signum() < 0 ? '−' : '+'} + ${#numbers.formatDecimal(m.changePercent().abs(), 1, 2, 'POINT')} + ' %'">+1.20 %</span>
-                                <span class="move-weight" th:text="${m.etf()} + ' fund'">GLD fund</span>
+                                <span class="move-weight" th:text="${crypto ? 'BTC / USDT' : m.symbol() + ' fund'}">GLD fund</span>
                             </button>
                         </li>
                     </ul>
@@ -511,8 +569,11 @@
         const sources = [...document.querySelectorAll('.source')];
         const feeds = {
             portfolio: document.getElementById('portfolio'),
+            loose: document.getElementById('loose'),
             market: document.getElementById('market'),
             metals: document.getElementById('metals'),
+            oil: document.getElementById('oil'),
+            crypto: document.getElementById('crypto'),
             starred: document.getElementById('starred')
         };
         const starredCount = document.getElementById('starred-count');
@@ -631,9 +692,10 @@
         // The symbol on a story, or a holding in Moving today or Coming up, shows only that holding's stories
         // Listened on the whole page: on wide screens the column with Moving today is outside the stories
         newsPage.addEventListener('click', event => {
-            // Gold or silver opens the Metals folder
-            if (event.target.closest('.metal-card')) {
-                choose(sources.find(button => button.dataset.show === 'metals'));
+            // Gold or silver opens the Metals folder, oil the Oil one and bitcoin the Crypto one
+            const card = event.target.closest('.metal-card');
+            if (card) {
+                choose(sources.find(button => button.dataset.show === (card.dataset.folder || 'metals')));
                 return;
             }
             // Only what names a holding; a dividend in Coming up is a link to the calendar and goes there
@@ -675,8 +737,9 @@
         const starredButton = sources.find(button => button.dataset.show === 'starred');
         if (location.hash === '#starred') choose(starredButton);
 
-        // From the dashboard: /news#metals opens the Metals folder
-        if (location.hash === '#metals') choose(sources.find(button => button.dataset.show === 'metals'));
+        // From the dashboard: /news#metals, #oil or #crypto opens that folder
+        const folderFromHash = ['metals', 'oil', 'crypto'].find(name => location.hash === '#' + name);
+        if (folderFromHash) choose(sources.find(button => button.dataset.show === folderFromHash));
 
         // From the dashboard: /news#holding=NVDA opens that holding's news (if it has any this week)
         const wantedHolding = new URLSearchParams(location.hash.slice(1)).get('holding');

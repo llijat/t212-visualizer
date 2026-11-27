@@ -2,7 +2,7 @@ package com.llijat.t212visualizer.service;
 
 import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.HoldingMove;
-import com.llijat.t212visualizer.dto.MetalMove;
+import com.llijat.t212visualizer.dto.CommodityMove;
 import com.llijat.t212visualizer.dto.Subsector;
 import com.llijat.t212visualizer.model.Position;
 import com.llijat.t212visualizer.model.PriceClose;
@@ -27,7 +27,7 @@ public class QuoteService {
     private static final Logger log = LoggerFactory.getLogger(QuoteService.class);
     private static final BigDecimal HUNDRED = new BigDecimal("100");
     private final Clock clock;
-    private static final List<String> METAL_ETFS = List.of("GLD","SLV");
+    private static final List<String> COMMODITIES = List.of("GLD", "SLV", "USO", "BINANCE:BTCUSDT");
     private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
 
     private final FinnhubClient finnhubClient;
@@ -35,7 +35,7 @@ public class QuoteService {
     private final PriceCloseRepository priceCloseRepository;
     private final CompanyProfileService companyProfileService;
     private volatile Map<String, FinnhubQuoteDto> quoteByTicker = Map.of();
-    private volatile Map<String, FinnhubQuoteDto> quoteByMetalEtf = Map.of();
+    private volatile Map<String, FinnhubQuoteDto> quoteByCommodity = Map.of();
     private volatile Map<String, FinnhubQuoteDto> quoteBySectorEtf = Map.of();
     private final long requestDelayMs;
 
@@ -84,12 +84,12 @@ public class QuoteService {
                 .map(time -> LocalDate.ofInstant(Instant.ofEpochSecond(time), clock.getZone()));
     }
 
-    public List<MetalMove> getMetals() {
-        List<MetalMove> metals = new ArrayList<>();
-        for (String etf : METAL_ETFS) {
-            FinnhubQuoteDto quote = quoteByMetalEtf.get(etf);
+    public List<CommodityMove> getCommodities() {
+        List<CommodityMove> metals = new ArrayList<>();
+        for (String symbol : COMMODITIES) {
+            FinnhubQuoteDto quote = quoteByCommodity.get(symbol);
             if (quote == null) continue;
-            metals.add(new MetalMove(etf, quote.changePercent()));
+            metals.add(new CommodityMove(symbol, quote.changePercent()));
         }
         return metals;
     }
@@ -117,22 +117,22 @@ public class QuoteService {
         }
 
         quoteByTicker = quotes;
-        quoteByMetalEtf = fetchMetals();
+        quoteByCommodity = fetchCommodities();
         quoteBySectorEtf = fetchSectorEtfs();
         log.info("Refreshed {} quotes and {} sector ETFs.", quotes.size(), quoteBySectorEtf.size());
     }
 
-    private Map<String, FinnhubQuoteDto> fetchMetals() {
+    private Map<String, FinnhubQuoteDto> fetchCommodities() {
         Map<String, FinnhubQuoteDto> quotes = new HashMap<>();
-        for (String etf : METAL_ETFS) {
+        for (String symbol : COMMODITIES) {
             try {
-                FinnhubQuoteDto quote = fetchQuote(etf);
-                if (quote != null && quote.isKnown()) quotes.put(etf, quote);
+                FinnhubQuoteDto quote = fetchQuote(symbol);
+                if (quote != null && quote.isKnown()) quotes.put(symbol, quote);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                log.warn("Could not load the quote of {}: {}", etf, e.getMessage());
+                log.warn("Could not load the quote of {}: {}", symbol, e.getMessage());
             }
         }
         return quotes;

@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -33,11 +34,14 @@ class SectorServiceTest {
     @Mock
     private CompanyProfileService companyProfileService;
 
+    @Mock
+    private SectorOverrideService sectorOverrideService;
+
     private SectorService sectorService;
 
     @BeforeEach
     void setUp() {
-        sectorService = new SectorService(positionService, quoteService, companyProfileService);
+        sectorService = new SectorService(positionService, quoteService, companyProfileService, sectorOverrideService);
     }
 
     // A real Position: only the ticker, the name and what it is worth today matter here
@@ -194,5 +198,46 @@ class SectorServiceTest {
         thePortfolioIs(Map.of("NVDA_US_EQ", "Semiconductors"), position("NVDA_US_EQ", "600"));
 
         assertTrue(sectorService.getSectorMap().sectors().stream().noneMatch(sector -> sector.name().equals("Other")));
+    }
+
+    // ===== The subsector you chose =====
+
+    @Test
+    void theSubsectorYouChose_winsOverTheIndustry_andTheStockIsMarkedAsPlacedByYou() {
+        // RWE has no industry (not a US stock): you put it in Clean energy
+        thePortfolioIs(Map.of("NVDA_US_EQ", "Semiconductors"), position("NVDA_US_EQ", "600"), position("RWEd_EQ", "400"));
+        when(sectorOverrideService.getOverrides()).thenReturn(Map.of("RWEd_EQ", "Clean energy"));
+
+        SectorMap map = sectorService.getSectorMap();
+        SubsectorTile clean = subsector(map, "Utilities", "Clean energy");
+
+        assertEquals(List.of("RWEd_EQ"), clean.holdings().stream().map(SectorHolding::ticker).toList());
+        assertTrue(clean.holdings().get(0).chosen());
+        assertFalse(subsector(map, "Technology", "Semiconductors").holdings().get(0).chosen());
+        // Nothing left in Other, so there is no Other
+        assertTrue(map.sectors().stream().noneMatch(sector -> sector.name().equals("Other")));
+    }
+
+    @Test
+    void aChoiceCanMoveAStockAwayFromItsIndustry_too() {
+        thePortfolioIs(Map.of("NVDA_US_EQ", "Semiconductors"), position("NVDA_US_EQ", "600"));
+        when(sectorOverrideService.getOverrides()).thenReturn(Map.of("NVDA_US_EQ", "Software"));
+
+        SectorMap map = sectorService.getSectorMap();
+
+        assertEquals(1, subsector(map, "Technology", "Software").holdings().size());
+        assertTrue(subsector(map, "Technology", "Semiconductors").holdings().isEmpty());
+    }
+
+    @Test
+    void aChoiceThatNoLongerExistsInTheCatalog_isIgnored() {
+        // A subsector renamed or removed later: the stock goes back to where its industry puts it
+        thePortfolioIs(Map.of("NVDA_US_EQ", "Semiconductors"), position("NVDA_US_EQ", "600"));
+        when(sectorOverrideService.getOverrides()).thenReturn(Map.of("NVDA_US_EQ", "Old name"));
+
+        SubsectorTile semis = subsector(sectorService.getSectorMap(), "Technology", "Semiconductors");
+
+        assertEquals(1, semis.holdings().size());
+        assertTrue(semis.holdings().get(0).chosen());   // still yours: "Back to automatic" clears it
     }
 }

@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -153,5 +154,9 @@ public class SectorCatalog {
             log.info("No subsector for the Finnhub industry \"{}\" ({}): it goes to Other", industry, symbol);
         }
         return OTHER;
+    }
+
+    public static Optional<Subsector> byName(String name) {
+        return name == null ? Optional.empty() : Optional.ofNullable(BY_NAME.get(name));
     }
 }

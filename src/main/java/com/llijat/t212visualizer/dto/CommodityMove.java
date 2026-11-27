@@ -2,15 +2,17 @@ package com.llijat.t212visualizer.dto;
 
 import java.math.BigDecimal;
 
-public record MetalMove(
-        String etf,
+public record CommodityMove(
+        String symbol,
         BigDecimal changePercent
 ) {
     public String name() {
-        return switch (etf) {
+        return switch (symbol) {
             case "GLD" -> "Gold";
             case "SLV" -> "Silver";
-            default -> etf;
+            case "USO" -> "Crude oil";
+            case "BINANCE:BTCUSDT" -> "Bitcoin";
+            default -> symbol;
         };
     }
 }

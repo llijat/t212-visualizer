@@ -89,4 +89,14 @@ public class LiveFinnhubClient implements FinnhubClient {
                 .retrieve()
                 .body(FinnhubQuoteDto.class);
     }
+
+    @Override
+    public List<FinnhubNewsDto> fetchCryptoNews() {
+        FinnhubNewsDto[] response = finnhubRestClient.get()
+                .uri("/news?category=crypto")
+                .retrieve()
+                .body(FinnhubNewsDto[].class);
+
+        return response == null ? List.of() : List.of(response);
+    }
 }

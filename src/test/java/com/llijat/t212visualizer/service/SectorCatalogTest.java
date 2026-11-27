@@ -95,4 +95,13 @@ class SectorCatalogTest {
         field.setAccessible(true);
         return (Map<String, String>) field.get(null);
     }
+
+    @Test
+    void aSubsectorIsFoundByItsName_andAnUnknownOrMissingNameFindsNothing() {
+        assertEquals("ICLN", SectorCatalog.byName("Clean energy").orElseThrow().etf());
+        assertTrue(SectorCatalog.byName("Made-up subsector").isEmpty());
+        assertTrue(SectorCatalog.byName(null).isEmpty());
+        // Other is not one you can choose: moving a stock there is "back to automatic"
+        assertTrue(SectorCatalog.byName("Other").isEmpty());
+    }
 }

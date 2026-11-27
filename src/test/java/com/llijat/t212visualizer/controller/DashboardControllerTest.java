@@ -8,7 +8,7 @@ import com.llijat.t212visualizer.dto.DailyChange;
 import com.llijat.t212visualizer.dto.PriceSeries;
 import com.llijat.t212visualizer.dto.DividendHistory;
 import com.llijat.t212visualizer.dto.HoldingMove;
-import com.llijat.t212visualizer.dto.MetalMove;
+import com.llijat.t212visualizer.dto.CommodityMove;
 import com.llijat.t212visualizer.service.AccountService;
 import com.llijat.t212visualizer.service.AccountSnapshotService;
 import com.llijat.t212visualizer.service.CalendarService;
@@ -78,13 +78,13 @@ class DashboardControllerTest {
     @Test
     void theTodayCard_getsTheMoves_andTheMetalsNextToThem() throws Exception {
         List<HoldingMove> moves = List.of(new HoldingMove("AAPL", "AAPL_US_EQ", new BigDecimal("-4.19"), new BigDecimal("15.0")));
-        List<MetalMove> metals = List.of(new MetalMove("GLD", new BigDecimal("0.85")), new MetalMove("SLV", new BigDecimal("-3.77")));
+        List<CommodityMove> metals = List.of(new CommodityMove("GLD", new BigDecimal("0.85")), new CommodityMove("SLV", new BigDecimal("-3.77")));
         when(quoteService.getMoves()).thenReturn(moves);
-        when(quoteService.getMetals()).thenReturn(metals);
+        when(quoteService.getCommodities()).thenReturn(metals);
 
         mockMvc.perform(get("/"))
                 .andExpect(model().attribute("moves", moves))
-                .andExpect(model().attribute("metals", metals));
+                .andExpect(model().attribute("commodities", metals));
     }
 
     @Test

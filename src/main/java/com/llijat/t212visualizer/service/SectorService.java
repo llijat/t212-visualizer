@@ -25,11 +25,13 @@ public class SectorService {
     private final PositionService positionService;
     private final QuoteService quoteService;
     private final CompanyProfileService companyProfileService;
+    private final SectorOverrideService sectorOverrideService;
 
-    public SectorService(PositionService positionService, QuoteService quoteService, CompanyProfileService companyProfileService) {
+    public SectorService(PositionService positionService, QuoteService quoteService, CompanyProfileService companyProfileService, SectorOverrideService sectorOverrideService) {
         this.positionService = positionService;
         this.quoteService = quoteService;
         this.companyProfileService = companyProfileService;
+        this.sectorOverrideService = sectorOverrideService;
     }
 
     public SectorMap getSectorMap() {
@@ -37,11 +39,14 @@ public class SectorService {
         List<Position> positions = positionService.getAllPositions().stream()
                 .filter(position -> position.getCurrentValue() != null)
                 .toList();
+
         BigDecimal invested = positions.stream()
                 .map(Position::getCurrentValue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         Map<String, String> symbols = companyProfileService.currentSymbols();
         Map<String, String> industries = companyProfileService.currentIndustries();
+        Map<String, String> overrides = sectorOverrideService.getOverrides();
         Map<String, BigDecimal> moveByTicker = new HashMap<>();
         for (HoldingMove move : quoteService.getMoves()) {
             moveByTicker.put(move.ticker(), move.changePercent());
@@ -52,9 +57,10 @@ public class SectorService {
         for (Position position : positions) {
             String ticker = position.getTicker();
             String symbol = symbols.getOrDefault(ticker, position.getSymbol());
-            Subsector subsector = SectorCatalog.subsectorOf(symbol, industries.get(ticker));
+            Subsector subsector = SectorCatalog.byName(overrides.get(ticker))
+                    .orElseGet(() -> SectorCatalog.subsectorOf(symbol, industries.get(ticker)));
             SectorHolding holding = new SectorHolding(ticker, symbol, position.getName(),
-                    position.getCurrentValue(), percentOf(position.getCurrentValue(), invested), moveByTicker.get(ticker));
+                    position.getCurrentValue(), percentOf(position.getCurrentValue(), invested), moveByTicker.get(ticker), overrides.containsKey(ticker));
             holdingsBySubsector.computeIfAbsent(subsector.name(), name -> new ArrayList<>()).add(holding);
         }
 

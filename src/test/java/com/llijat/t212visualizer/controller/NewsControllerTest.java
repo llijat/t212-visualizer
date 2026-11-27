@@ -4,7 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 
 import com.llijat.t212visualizer.dto.HoldingMove;
-import com.llijat.t212visualizer.dto.MetalMove;
+import com.llijat.t212visualizer.dto.CommodityMove;
 import com.llijat.t212visualizer.dto.NewsDay;
 import com.llijat.t212visualizer.dto.PriceSeries;
 import com.llijat.t212visualizer.dto.UpcomingDividend;
@@ -129,14 +129,35 @@ class NewsControllerTest {
 
     @Test
     void thePage_getsTheMetals_andTheirNews() throws Exception {
-        List<MetalMove> metals = List.of(new MetalMove("GLD", new BigDecimal("1.2")));
+        List<CommodityMove> metals = List.of(new CommodityMove("GLD", new BigDecimal("1.2")));
         List<NewsDay> metalDays = List.of(new NewsDay(LocalDate.of(2026, 11, 20), List.of()));
-        when(quoteService.getMetals()).thenReturn(metals);
+        when(quoteService.getCommodities()).thenReturn(metals);
         when(newsService.getMetalNewsByDay()).thenReturn(metalDays);
 
         mockMvc.perform(get("/news"))
-                .andExpect(model().attribute("metals", metals))
+                .andExpect(model().attribute("commodities", metals))
                 .andExpect(model().attribute("metalDays", metalDays));
+    }
+
+    @Test
+    void thePage_getsTheOilAndCryptoNews() throws Exception {
+        List<NewsDay> oilDays = List.of(new NewsDay(LocalDate.of(2026, 11, 26), List.of()));
+        List<NewsDay> cryptoDays = List.of(new NewsDay(LocalDate.of(2026, 11, 25), List.of()));
+        when(newsService.getOilNewsByDay()).thenReturn(oilDays);
+        when(newsService.getCryptoNewsByDay()).thenReturn(cryptoDays);
+
+        mockMvc.perform(get("/news"))
+                .andExpect(model().attribute("oilDays", oilDays))
+                .andExpect(model().attribute("cryptoDays", cryptoDays));
+    }
+
+    @Test
+    void thePage_getsTheStoriesThatOnlyMentionAHoldingInPassing() throws Exception {
+        List<NewsDay> looseDays = List.of(new NewsDay(LocalDate.of(2026, 11, 26), List.of()));
+        when(newsService.getLooselyRelatedNewsByDay()).thenReturn(looseDays);
+
+        mockMvc.perform(get("/news"))
+                .andExpect(model().attribute("looseDays", looseDays));
     }
 
     @Test

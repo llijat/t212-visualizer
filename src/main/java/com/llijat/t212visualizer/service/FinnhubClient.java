@@ -13,4 +13,5 @@ public interface FinnhubClient {
     FinnhubCompanyProfileDto fetchCompanyProfile(String symbol);
     Optional<LogoImage> downloadLogo(String url);
     FinnhubQuoteDto fetchQuote(String symbol);
+    List<FinnhubNewsDto> fetchCryptoNews();
 }

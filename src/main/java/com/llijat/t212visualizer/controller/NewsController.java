@@ -44,9 +44,12 @@ public class NewsController {
         model.addAttribute("lastSession", quoteService.getLastSession());
         model.addAttribute("comingUp", calendarService.getComingUp());
         model.addAttribute("comingUpDividends", calendarService.getComingUpDividends());
-        model.addAttribute("metals", quoteService.getMetals());
+        model.addAttribute("commodities", quoteService.getCommodities());
         model.addAttribute("metalDays", newsService.getMetalNewsByDay());
         model.addAttribute("priceSeries", priceHistoryService.getRecentSeries());
+        model.addAttribute("looseDays", newsService.getLooselyRelatedNewsByDay());
+        model.addAttribute("oilDays", newsService.getOilNewsByDay());
+        model.addAttribute("cryptoDays", newsService.getCryptoNewsByDay());
         return "news";
     }
 

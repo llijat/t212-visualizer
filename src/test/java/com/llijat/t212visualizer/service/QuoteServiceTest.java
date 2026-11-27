@@ -5,7 +5,7 @@ import java.time.ZoneId;
 
 import com.llijat.t212visualizer.dto.FinnhubQuoteDto;
 import com.llijat.t212visualizer.dto.HoldingMove;
-import com.llijat.t212visualizer.dto.MetalMove;
+import com.llijat.t212visualizer.dto.CommodityMove;
 import com.llijat.t212visualizer.model.Position;
 import com.llijat.t212visualizer.model.PriceClose;
 import com.llijat.t212visualizer.model.PriceDay;
@@ -304,7 +304,7 @@ class QuoteServiceTest {
 
         quoteService.refreshQuotes();
 
-        List<MetalMove> metals = quoteService.getMetals();
+        List<CommodityMove> metals = quoteService.getCommodities();
         assertEquals(2, metals.size());
         assertEquals("Gold", metals.get(0).name());
         assertEquals(new BigDecimal("1.2"), metals.get(0).changePercent());
@@ -331,7 +331,7 @@ class QuoteServiceTest {
 
         quoteService.refreshQuotes();
 
-        assertEquals(List.of("Gold"), quoteService.getMetals().stream().map(MetalMove::name).toList());
+        assertEquals(List.of("Gold"), quoteService.getCommodities().stream().map(CommodityMove::name).toList());
     }
 
     @Test
@@ -343,12 +343,26 @@ class QuoteServiceTest {
 
         quoteService.refreshQuotes();
 
-        assertEquals(List.of("Silver"), quoteService.getMetals().stream().map(MetalMove::name).toList());
+        assertEquals(List.of("Silver"), quoteService.getCommodities().stream().map(CommodityMove::name).toList());
+    }
+
+    @Test
+    void oilAndBitcoin_comeAfterTheMetals_inThatOrder() {
+        thePortfolioIs();
+        when(finnhubClient.fetchQuote("GLD")).thenReturn(moved("1.2"));
+        when(finnhubClient.fetchQuote("SLV")).thenReturn(moved("-0.8"));
+        when(finnhubClient.fetchQuote("USO")).thenReturn(moved("-2.1"));
+        when(finnhubClient.fetchQuote("BINANCE:BTCUSDT")).thenReturn(moved("3.4"));
+
+        quoteService.refreshQuotes();
+
+        assertEquals(List.of("Gold", "Silver", "Crude oil", "Bitcoin"), quoteService.getCommodities().stream().map(CommodityMove::name).toList());
+        assertEquals(new BigDecimal("3.4"), quoteService.getCommodities().get(3).changePercent());
     }
 
     @Test
     void beforeTheFirstRefresh_thereAreNoMetals() {
-        assertTrue(quoteService.getMetals().isEmpty());
+        assertTrue(quoteService.getCommodities().isEmpty());
     }
 
     // ===== Sector ETFs (one per subsector of the Sectors page) =====

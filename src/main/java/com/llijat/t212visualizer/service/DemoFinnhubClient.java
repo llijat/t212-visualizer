@@ -26,7 +26,16 @@ public class DemoFinnhubClient implements FinnhubClient {
                 news("general", 2L, "", "Sample news: central banks hold interest rates", 5, "Demo Daily"),
                 news("general", 3L, "", "Sample news: the technology sector leads the gains", 9, "Sample Wire"),
                 news("general", 4L, "", "Sample news: gold reaches a new high as investors look for safety", 30, "Demo Markets"),
-                news("general", 5L, "", "Sample news: silver follows gold up on industrial demand", 54, "Demo Markets")
+                news("general", 5L, "", "Sample news: silver follows gold up on industrial demand", 54, "Demo Markets"),
+                news("general", 6L, "", "Sample news: crude oil slips as OPEC weighs a bigger output", 14, "Demo Daily")
+        );
+    }
+
+    @Override
+    public List<FinnhubNewsDto> fetchCryptoNews() {
+        return List.of(
+                news("crypto", 11L, "", "Sample news: bitcoin holds above a round number as funds keep buying", 4, "Demo Coins"),
+                news("crypto", 12L, "", "Sample news: a new crypto fund opens to European savers", 40, "Sample Wire")
         );
     }
 
@@ -38,7 +47,9 @@ public class DemoFinnhubClient implements FinnhubClient {
                 news("company", baseId + 1, symbol, "Sample news: " + symbol + " reports quarterly results", 3, "Sample Wire"),
                 news("company", baseId + 2, symbol, "Sample news: " + symbol + " announces a new product", 20, "Demo Daily"),
                 news("company", baseId + 3, symbol, "Sample news: analysts raise their target for " + symbol, 50, "Demo Markets"),
-                news("company", baseId + 4, symbol, "Sample news: " + symbol + " opens a new office in Europe", 100, "Sample Wire")
+                news("company", baseId + 4, symbol, "Sample news: " + symbol + " opens a new office in Europe", 100, "Sample Wire"),
+                // Names neither the company nor its symbol: the relevance filter moves it to "loosely related"
+                news("company", baseId + 5, symbol, "Sample news: a rival's results lift the whole sector", 30, "Demo Daily")
         );
     }
 

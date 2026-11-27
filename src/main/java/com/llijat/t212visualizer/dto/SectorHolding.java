@@ -8,5 +8,6 @@ public record SectorHolding(
         String name,
         BigDecimal value,
         BigDecimal weight,
-        BigDecimal changePercent
+        BigDecimal changePercent,
+        boolean chosen
 ) {}

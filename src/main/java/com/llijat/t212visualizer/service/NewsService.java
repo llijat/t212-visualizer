@@ -24,6 +24,7 @@ public class NewsService {
     private static final Logger log = LoggerFactory.getLogger(NewsService.class);
     private static final int PER_HOLDING_PER_DAY = 7;
     private static final Pattern METALS = Pattern.compile("\\b(gold|silver|bullion|precious metals?)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern OIL = Pattern.compile("\\b(oil|crude|brent|wti|opec)\\b", Pattern.CASE_INSENSITIVE);
 
     private final FinnhubClient finnhubClient;
     private Map<String, String> tickerBySymbol = Map.of();
@@ -41,7 +42,28 @@ public class NewsService {
     }
 
     public List<FinnhubNewsDto> getPortfolioNews() {
-        return lastWeek(NewsFeed.PORTFOLIO);
+        Map<String, String> names = nameBySymbol();
+        return lastWeek(NewsFeed.PORTFOLIO).stream()
+                .filter(news -> NewsRelevance.isAbout(news, names.get(news.related())))
+                .toList();
+    }
+
+    public List<NewsDay> getLooselyRelatedNewsByDay() {
+        Map<String, String> names = nameBySymbol();
+        List<FinnhubNewsDto> loose = lastWeek(NewsFeed.PORTFOLIO).stream()
+                .filter(news -> !NewsRelevance.isAbout(news, names.get(news.related())))
+                .toList();
+        return NewsGrouper.byDay(loose, clock.getZone());
+    }
+
+    // Symbol (the one the news comes under) → the company name T212 gives
+    private Map<String, String> nameBySymbol() {
+        Map<String, String> symbols = companyProfileService.currentSymbols();
+        Map<String, String> names = new HashMap<>();
+        for (Position position : positionService.getAllPositions()) {
+            names.put(symbols.getOrDefault(position.getTicker(), position.getSymbol()), position.getName());
+        }
+        return names;
     }
 
     public List<NewsDay> getPortfolioNewsByDay() {
@@ -57,6 +79,17 @@ public class NewsService {
                 .filter(news -> METALS.matcher(news.headline()).find())
                 .toList();
         return NewsGrouper.byDay(metalNews, clock.getZone());
+    }
+
+    public List<NewsDay> getCryptoNewsByDay() {
+        return NewsGrouper.byDay(lastWeek(NewsFeed.CRYPTO), clock.getZone());
+    }
+
+    public List<NewsDay> getOilNewsByDay() {
+        List<FinnhubNewsDto> oilNews = lastWeek(NewsFeed.MARKET).stream()
+                .filter(news -> OIL.matcher(news.headline()).find())
+                .toList();
+        return NewsGrouper.byDay(oilNews, clock.getZone());
     }
 
     public Map<String, Long> getNewsCountBySymbol() {
@@ -132,10 +165,18 @@ public class NewsService {
             store(fetched, NewsFeed.MARKET);
             log.info("Refreshed {} news.", fetched.size());
         }
-
         catch (Exception e) {
             log.warn("Could not refresh the news: {}", e.getMessage());
 
+        }
+
+        try {
+            List<FinnhubNewsDto> fetched = finnhubClient.fetchCryptoNews();
+            store(fetched, NewsFeed.CRYPTO);
+            log.info("Refreshed {} crypto news.", fetched.size());
+        }
+        catch (Exception e) {
+            log.warn("Could not refresh the crypto news: {}", e.getMessage());
         }
 
     }

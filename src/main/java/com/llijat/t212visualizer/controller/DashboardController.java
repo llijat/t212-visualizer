@@ -51,7 +51,7 @@ public class DashboardController {
         model.addAttribute("moves", quoteService.getMoves());
         model.addAttribute("comingUp", calendarService.getComingUp());
         model.addAttribute("today", LocalDate.now(clock));
-        model.addAttribute("metals", quoteService.getMetals());
+        model.addAttribute("commodities", quoteService.getCommodities());
         model.addAttribute("dividendHistory", dividendHistoryService.getLast12Months());
         model.addAttribute("tickers", newsService.getTickerBySymbol());
         model.addAttribute("todayChange", accountSnapshotService.getTodayChange());

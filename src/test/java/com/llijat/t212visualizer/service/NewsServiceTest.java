@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,7 +69,8 @@ class NewsServiceTest {
     }
 
     private static FinnhubNewsDto news(long id, String related, String utc) {
-        return new FinnhubNewsDto("company", Instant.parse(utc).getEpochSecond(), "Headline " + id,
+        // The headline names the symbol, so the relevance filter keeps it
+        return new FinnhubNewsDto("company", Instant.parse(utc).getEpochSecond(), "Headline " + id + (related == null ? "" : " about " + related),
                 "https://example.com/" + id, id, related, "", "Summary " + id, "Sample Wire");
     }
 
@@ -199,9 +201,10 @@ class NewsServiceTest {
 
         newsService.refreshFromFinnhub();
 
-        verify(newsItemRepository).saveAll(stored.capture());
-        assertEquals(List.of(2L, 3L), stored.getValue().stream().map(NewsItem::getId).toList());
-        assertTrue(stored.getValue().stream().allMatch(item -> item.getFeed() == NewsFeed.MARKET));
+        // Two saves: the market news first, then the crypto news (none here)
+        verify(newsItemRepository, times(2)).saveAll(stored.capture());
+        assertEquals(List.of(2L, 3L), stored.getAllValues().get(0).stream().map(NewsItem::getId).toList());
+        assertTrue(stored.getAllValues().get(0).stream().allMatch(item -> item.getFeed() == NewsFeed.MARKET));
     }
 
     @Test
@@ -212,8 +215,9 @@ class NewsServiceTest {
 
         newsService.refreshFromFinnhub();
 
-        verify(newsItemRepository).saveAll(stored.capture());
-        assertTrue(stored.getValue().isEmpty());
+        // Two saves: the market news first, then the crypto news (none here)
+        verify(newsItemRepository, times(2)).saveAll(stored.capture());
+        assertTrue(stored.getAllValues().get(0).isEmpty());
     }
 
     @Test
@@ -244,8 +248,9 @@ class NewsServiceTest {
 
         newsService.refreshFromFinnhub();
 
-        verify(newsItemRepository).saveAll(stored.capture());
-        assertTrue(stored.getValue().isEmpty());
+        // Two saves: the market news first, then the crypto news (none here)
+        verify(newsItemRepository, times(2)).saveAll(stored.capture());
+        assertTrue(stored.getAllValues().get(0).isEmpty());
     }
 
     // ===== The star =====
@@ -433,5 +438,96 @@ class NewsServiceTest {
 
         verify(newsItemRepository).findByFeedAndPublishedAtAfterOrderByPublishedAtDesc(eq(NewsFeed.MARKET), any());
         verify(newsItemRepository, never()).findByFeedAndPublishedAtAfterOrderByPublishedAtDesc(eq(NewsFeed.PORTFOLIO), any());
+    }
+
+    // ===== News that only mention the company in passing =====
+
+    private static FinnhubNewsDto article(long id, String related, String headline, String summary) {
+        return new FinnhubNewsDto("company", Instant.parse("2026-11-16T10:00:00Z").getEpochSecond(), headline,
+                "https://example.com/" + id, id, related, "", summary, "Yahoo");
+    }
+
+    private static Position named(String ticker, String symbol, String name) {
+        Position position = mock(Position.class);
+        when(position.getTicker()).thenReturn(ticker);
+        when(position.getSymbol()).thenReturn(symbol);
+        when(position.getName()).thenReturn(name);
+        return position;
+    }
+
+    @Test
+    void aNewsItemThatNeverNamesTheCompany_leavesThePortfolio_andGoesToLooselyRelated() {
+        // Built first: a mock cannot be stubbed in the middle of another when(...)
+        Position amazon = named("AMZN_US_EQ", "AMZN", "Amazon.com");
+        when(positionService.getAllPositions()).thenReturn(List.of(amazon));
+        theTableHolds(NewsFeed.PORTFOLIO,
+                article(1, "AMZN", "NFL's Thanksgiving Boom Raises Stakes for Disney, Netflix",
+                        "America's favorite sport is becoming an increasingly expensive business."),
+                article(2, "AMZN", "Amazon cuts prices ahead of Black Friday", "The retailer is going after Walmart."));
+
+        assertEquals(List.of(2L), newsService.getPortfolioNews().stream().map(FinnhubNewsDto::id).toList());
+        assertEquals(List.of(1L), newsService.getLooselyRelatedNewsByDay().get(0).news().stream().map(FinnhubNewsDto::id).toList());
+        assertEquals(Map.of("AMZN", 1L), newsService.getNewsCountBySymbol());
+    }
+
+    @Test
+    void theCompanyName_isLookedUpUnderTheCurrentSymbol() {
+        // T212 still says SQ; the news come under XYZ and talk about Block
+        Position block = named("SQ_US_EQ", "SQ", "Block");
+        when(positionService.getAllPositions()).thenReturn(List.of(block));
+        when(companyProfileService.currentSymbols()).thenReturn(Map.of("SQ_US_EQ", "XYZ"));
+        theTableHolds(NewsFeed.PORTFOLIO, article(1, "XYZ", "Block launches a bitcoin wallet", ""));
+
+        assertEquals(1, newsService.getPortfolioNews().size());
+        assertTrue(newsService.getLooselyRelatedNewsByDay().isEmpty());
+    }
+
+    // ===== Oil and crypto =====
+
+    private static FinnhubNewsDto headline(long id, String text) {
+        return new FinnhubNewsDto("general", Instant.parse("2026-11-16T10:00:00Z").getEpochSecond(), text,
+                "https://example.com/" + id, id, "", "", "", "Reuters");
+    }
+
+    @Test
+    void theOilFolder_keepsTheMarketNewsAboutCrudeBrentWtiOrOpec() {
+        theTableHolds(NewsFeed.MARKET,
+                headline(1, "Oil climbs as OPEC+ delays its output increase"),
+                headline(2, "Brent and WTI fall on weaker demand"),
+                headline(3, "Gold reaches a record"),
+                headline(4, "Boiling point: the Fed's next move"));   // "oil" inside another word does not count
+
+        List<Long> ids = newsService.getOilNewsByDay().stream().flatMap(day -> day.news().stream()).map(FinnhubNewsDto::id).toList();
+
+        assertEquals(List.of(1L, 2L), ids);
+    }
+
+    @Test
+    void theCryptoFolder_comesFromItsOwnFeed() {
+        theTableHolds(NewsFeed.CRYPTO, headline(1, "Bitcoin tops a round number"));
+
+        assertEquals(1, newsService.getCryptoNewsByDay().get(0).news().size());
+    }
+
+    @Test
+    void theCryptoNews_areStoredAsCrypto() {
+        when(finnhubClient.fetchCryptoNews()).thenReturn(List.of(headline(7, "Bitcoin tops a round number")));
+
+        newsService.refreshFromFinnhub();
+
+        verify(newsItemRepository, times(2)).saveAll(stored.capture());
+        assertEquals(List.of(7L), stored.getAllValues().get(1).stream().map(NewsItem::getId).toList());
+        assertEquals(NewsFeed.CRYPTO, stored.getAllValues().get(1).get(0).getFeed());
+    }
+
+    @Test
+    void ifTheMarketNewsFail_theCryptoNewsStillArrive() {
+        when(finnhubClient.fetchGeneralNews()).thenThrow(new RuntimeException("Too many requests"));
+        when(finnhubClient.fetchCryptoNews()).thenReturn(List.of(headline(7, "Bitcoin tops a round number")));
+
+        newsService.refreshFromFinnhub();
+
+        verify(newsItemRepository).saveAll(stored.capture());
+        assertEquals(NewsFeed.CRYPTO, stored.getValue().get(0).getFeed());
     }
 }
